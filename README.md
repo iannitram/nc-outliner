@@ -25,12 +25,12 @@ Status: **design.** No code yet. Project notes and status live in the vault at `
 | 2026-10-22 | Private repo; dev tree on Hyperion at `B:\dev\nc-outliner` | Ian |
 | 2026-10-22 | Per-user app; one fixed `Outlines/` folder in each user's Files | Ian |
 | 2026-10-22 | Publish copies: the outline stays the source, and re-publishing overwrites the doc (Nextcloud keeps the old versions) | Ian |
+| 2026-10-22 | Desktop browser only for v1; phone comes later | Ian |
 
 ## Open questions
 
-1. Phone: is desktop enough for v1?
-2. Published docs beside their outlines in `Outlines/`, or in an `Outlines/Published/` subfolder?
-4. Front end: plain JS with no build step (the Quote Database app's approach) or Vue (the usual Nextcloud app stack)? Kaylee leans toward plain JS for v1.
+1. Published docs beside their outlines in `Outlines/`, or in an `Outlines/Published/` subfolder?
+2. Front end: plain JS with no build step (the Quote Database app's approach) or Vue (the usual Nextcloud app stack)? Kaylee leans toward plain JS for v1.
 
 ## Layout (planned)
 
