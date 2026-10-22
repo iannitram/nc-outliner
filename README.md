@@ -24,12 +24,12 @@ Status: **design.** No code yet. Project notes and status live in the vault at `
 | 2026-10-22 | Nothing suitable in the Nextcloud app store to fork (551 apps checked; nearest are MeeTree, a tree of note pages, and files_mindmap) | Kaylee |
 | 2026-10-22 | Private repo; dev tree on Hyperion at `B:\dev\nc-outliner` | Ian |
 | 2026-10-22 | Per-user app; one fixed `Outlines/` folder in each user's Files | Ian |
+| 2026-10-22 | Publish copies: the outline stays the source, and re-publishing overwrites the doc (Nextcloud keeps the old versions) | Ian |
 
 ## Open questions
 
-1. Does Publish copy or move? Kaylee recommends **copy**: the outline stays the source, and re-publishing overwrites the doc (Nextcloud keeps the old versions).
-2. Phone: is desktop enough for v1?
-3. Published docs beside their outlines in `Outlines/`, or in an `Outlines/Published/` subfolder?
+1. Phone: is desktop enough for v1?
+2. Published docs beside their outlines in `Outlines/`, or in an `Outlines/Published/` subfolder?
 4. Front end: plain JS with no build step (the Quote Database app's approach) or Vue (the usual Nextcloud app stack)? Kaylee leans toward plain JS for v1.
 
 ## Layout (planned)
