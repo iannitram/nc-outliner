@@ -8,7 +8,8 @@ Status: **design.** No code yet. Project notes and status live in the vault at `
 
 - **Outline editor:** rows you can indent, outdent, collapse, drag to reorder, and drive from the keyboard (Enter, Tab, Shift+Tab). Any row can carry a note.
 - **Per-user:** the app works as the signed-in Nextcloud user, reading and writing only that user's own Files.
-- **Storage:** each outline is an `.opml` file in a fixed `Outlines/` folder in the user's Files, created on first use. A published `.odt` lands beside its outline with the same name. It syncs to every device, gets Nextcloud's version history, and imports outlines exported from OmniOutliner.
+- **Storage:** each outline is an `.opml` file in a fixed `Outlines/` folder in the user's Files, created on first use.
+- **Publish asks where to save:** a Nextcloud folder picker over the user's own Files. The outline remembers where it was last published, and re-publishing offers that spot again. It syncs to every device, gets Nextcloud's version history, and imports outlines exported from OmniOutliner.
 - **Publish to Doc:** writes an `.odt` (Nextcloud Office's native format) and opens it in Collabora.
   - Top-level rows become Heading 1.
   - A second-level row that has children becomes Heading 2 (to be confirmed with a sample doc).
@@ -26,11 +27,12 @@ Status: **design.** No code yet. Project notes and status live in the vault at `
 | 2026-10-22 | Per-user app; one fixed `Outlines/` folder in each user's Files | Ian |
 | 2026-10-22 | Publish copies: the outline stays the source, and re-publishing overwrites the doc (Nextcloud keeps the old versions) | Ian |
 | 2026-10-22 | Desktop browser only for v1; phone comes later | Ian |
+| 2026-10-22 | Publish asks where to save (folder picker); re-publish offers the last spot | Ian |
+| 2026-10-22 | Goal is feature parity with OmniOutliner; see `ROADMAP.md` | Ian |
 
 ## Open questions
 
-1. Published docs beside their outlines in `Outlines/`, or in an `Outlines/Published/` subfolder?
-2. Front end: plain JS with no build step (the Quote Database app's approach) or Vue (the usual Nextcloud app stack)? Kaylee leans toward plain JS for v1.
+1. Front end: plain JS with no build step (the Quote Database app's approach) or Vue (the usual Nextcloud app stack)? Kaylee leans toward plain JS for v1.
 
 ## Layout (planned)
 
