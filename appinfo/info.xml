@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+    <id>outliner</id>
+    <name>Outliner</name>
+    <summary>Create and organize outline files</summary>
+    <description>A simple outline editor for Nextcloud.</description>
+    <version>0.1.0</version>
+    <licence>agpl</licence>
+    <author>iannitram</author>
+    <namespace>Outliner</namespace>
+    <category>office</category>
+    <dependencies>
+        <nextcloud min-version="33" max-version="33"/>
+    </dependencies>
+    <navigations>
+        <navigation>
+            <name>Outliner</name>
+            <route>outliner.page.index</route>
+        </navigation>
+    </navigations>
+</info>
