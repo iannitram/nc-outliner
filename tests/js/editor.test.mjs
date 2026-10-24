@@ -216,8 +216,10 @@ test('delete-row button removes subtree through history while plain text Delete 
   assert.equal(f.event('Delete', f.inputs()[0]).prevented, undefined);
   const descendants = el => el.children.flatMap(child => [child, ...descendants(child)]);
   const button = descendants(f.root).find(el => el.className === 'outliner-delete-row');
+  button.focus(); // The button is also usable directly from keyboard navigation.
   button.listeners.click();
   assert.deepEqual(f.editor.getDocument().rows.map(r => r.id), ['b']);
   f.editor.undo();
   assert.equal(f.editor.getDocument().rows[0].children[0].id, 'c');
+  assert.equal(f.dom.activeElement.dataset.rowId, 'a');
 });

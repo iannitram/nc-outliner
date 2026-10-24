@@ -32,7 +32,7 @@ export function moveRow(document, id, direction) {
 function applyDelete(id, context) {
   const result = deleteRow(context.getDocument(), id);
   context.change(() => result.document, {
-    type: 'delete-row', selection: context.getSelection(), focus: result.focus,
+    type: 'delete-row', selection: context.getSelection() ?? { id, offset: 0 }, focus: result.focus,
   });
 }
 
