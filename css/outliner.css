@@ -84,3 +84,6 @@
 .outliner-files button { display: block; max-width: 100%; overflow-wrap: anywhere; }
 .outliner-workspace { flex: 1; min-width: 0; padding: 1rem; overflow: auto; }
 .outliner-workspace [role="status"] { min-height: 1.5rem; color: var(--ol-muted); }
+.outliner-import { margin-block: 1rem; }
+.outliner-import form { display: grid; gap: .5rem; }
+.outliner-import input, .outliner-import textarea { box-sizing: border-box; width: 100%; }

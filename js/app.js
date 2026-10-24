@@ -1,3 +1,5 @@
+import { importOutline, mountImport } from './import.js';
+
 /** File shell. F02 supplies editor.js; F01 can also display outlines read-only. */
 export function createApi(base, fetcher = globalThis.fetch) {
   return async function request(path = '', method = 'GET', data) {
@@ -45,10 +47,12 @@ export async function start(el) {
   sidebar.append(heading, form, list);
   workspace.append(title, save, status, content);
   el.replaceChildren(sidebar, workspace);
+  let importHost = sidebar;
   try {
     const { mountShell } = await import('./shell.js');
     const shell = mountShell(el);
     shell.navigation.append(heading, form, list);
+    importHost = shell.navigation;
     shell.toolbar.append(title, save);
     shell.content.append(content);
     status = shell.status;
@@ -152,6 +156,18 @@ export async function start(el) {
   });
   globalThis.addEventListener('beforeunload', event => {
     if (dirty) { event.preventDefault(); event.returnValue = ''; }
+  });
+  mountImport(importHost, async input => {
+    if (busy) throw new Error('Wait for the current file operation to finish.');
+    busy = true;
+    controls();
+    try {
+      const result = await importOutline(api, input, mayLeave);
+      if (!result) return null;
+      display(result);
+      await refresh();
+      return result;
+    } finally { busy = false; controls(); }
   });
   try { await refresh(); }
   catch (e) { error(e); }
