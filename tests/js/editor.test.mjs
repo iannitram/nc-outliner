@@ -238,3 +238,23 @@ test('timestamp toolbar remembers a text range after focus moves and supports un
   assert.equal(f.editor.getDocument().rows[0].text, 'Alpha');
   assert.deepEqual(f.editor.getSelection(), { id: 'a', offset: 1, end: 4, direction: 'backward' });
 });
+
+test('handle drop moves a subtree through autosave notification and undo/redo with caret', () => {
+  const f = fixture({ metadata: { owner: 'Me' }, rows: [{ id: 'a', text: 'Alpha', children: [{ id: 'b', text: 'Beta', children: [], custom: 'keep' }] }, { id: 'c', text: 'Gamma', children: [] }] });
+  const descendants = el => el.children.flatMap(child => [child, ...descendants(child)]);
+  const handles = descendants(f.root).filter(el => el.className === 'outliner-drag-handle');
+  const zones = descendants(f.root).filter(el => el.className === 'outliner-drop-zones');
+  const input = f.inputs()[0]; input.focus(); input.setSelectionRange(1, 3, 'backward');
+  const event = () => ({ preventDefault() { this.prevented = true; }, stopPropagation() {}, dataTransfer: { setData() {} } });
+  handles[0].listeners.mousedown(event()); handles[0].focus();
+  handles[0].listeners.dragstart(event());
+  const invalid = event(); zones[1].children[1].listeners.drop(invalid);
+  assert.equal(invalid.prevented, undefined); // Descendant cannot become a parent of itself.
+  zones[2].children[1].listeners.drop(event());
+  assert.equal(f.editor.getDocument().rows[0].children[0].id, 'a');
+  assert.equal(f.editor.getDocument().rows[0].children[0].children[0].custom, 'keep');
+  assert.deepEqual(f.editor.getSelection(), { id: 'a', offset: 1, end: 3, direction: 'backward' });
+  assert.equal(f.changes.length, 1);
+  f.editor.undo(); assert.deepEqual(f.editor.getDocument().rows.map(r => r.id), ['a', 'c']);
+  f.editor.redo(); assert.equal(f.editor.getDocument().rows[0].children[0].id, 'a');
+});

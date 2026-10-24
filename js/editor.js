@@ -7,6 +7,7 @@ import { updateNote, setNoteVisible, renderNote } from './notes.js';
 import { handleRowActionKey, renderRowActions } from './row-actions.js';
 import { handleExpansionKey, mountExpansionControls } from './expansion.js';
 import { matchingRowIds } from './search.js';
+import { createDragDrop } from './drag-drop.js';
 import { mountTimestampControls } from './timestamp.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
@@ -120,6 +121,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   let checkboxToggle;
   const context = { undo: () => replay('undo'), redo: () => replay('redo'), getHistoryState: history.getState, getDocument: () => document, getSelection, change, replaceDocument, focusRow, render };
+  const dragDrop = createDragDrop(root, context);
   mountExpansionControls(toolbar, context, () => getSelection() ?? lastRowSelection);
 
   mountTimestampControls(toolbar, context, () => getSelection() ?? lastRowSelection, options.timestamp);
@@ -159,6 +161,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         renderNote(row, item, context);
         renderCheckbox(row, item, context);
         renderRowActions(row, item, context);
+        dragDrop.renderRow(row, item);
         if (row.children?.length && (included || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
         list.appendChild(item);
       }
@@ -251,6 +254,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   return { ...context, destroy() {
     destroyed = true;
     unsubscribe();
+    dragDrop.destroy();
     root.removeEventListener('focusout', onFocusOut);
     root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);

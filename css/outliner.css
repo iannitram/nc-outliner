@@ -145,3 +145,22 @@
 #outliner-app[data-outliner-theme] :is(button, select):hover { background-color: var(--ol-hover); }
 #outliner-app .outliner-theme { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 #outliner-app .outliner-theme [role="status"] { color: var(--ol-muted); }
+#outliner-app .outliner-drag-handle {
+  cursor: grab;
+  padding: 0 8px;
+  margin-inline-end: 4px;
+  color: var(--ol-muted);
+  background: var(--ol-bg);
+  border: 1px solid var(--ol-border);
+}
+.outliner-drop-zones { display: none; }
+.outliner-editor[data-dragging] .outliner-drop-zones { display: flex; gap: 4px; }
+.outliner-drop-zone {
+  flex: 1;
+  padding: 8px;
+  border: 2px dashed var(--ol-border);
+  color: var(--ol-muted);
+  background: var(--ol-bg);
+}
+.outliner-drop-zone[data-over] { border-color: var(--ol-accent); background: var(--ol-hover); }
+#outliner-app .outliner-drag-handle:focus-visible { outline: 2px solid var(--ol-accent); }

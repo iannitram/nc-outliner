@@ -24,6 +24,7 @@
 
 | Module | Editing or display behavior |
 |---|---|
+| [drag-drop.js](../../js/drag-drop.js) | Native draggable handles and Before/Inside/After targets move complete subtrees through history. Rejects external drags, self/descendant cycles and no-op placements; handle Alt+arrows offer keyboard moves. |
 | [indent.js](../../js/indent.js) | Tab/Shift+Tab move complete subtrees. Boundary operations keep the document identity unchanged. |
 | [collapse.js](../../js/collapse.js) | Disclosure buttons, leaf bullets, visible preorder and boundary-aware left/right navigation. Supplies default editor hooks. |
 | [expansion.js](../../js/expansion.js) | Recursive whole-outline/subtree expansion, toolbar controls, Alt+Left/Right, and visible-focus correction. |
