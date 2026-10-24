@@ -15,3 +15,14 @@
   background: var(--ol-bg);
   color: var(--ol-fg);
 }
+
+.outliner-files {
+  width: 16rem;
+  padding: 1rem;
+  border-inline-end: 1px solid var(--ol-border);
+  overflow: auto;
+}
+.outliner-files form { display: grid; gap: .5rem; margin-block: 1rem; }
+.outliner-files button { display: block; max-width: 100%; overflow-wrap: anywhere; }
+.outliner-workspace { flex: 1; min-width: 0; padding: 1rem; overflow: auto; }
+.outliner-workspace [role="status"] { min-height: 1.5rem; color: var(--ol-muted); }
