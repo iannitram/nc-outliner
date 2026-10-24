@@ -6,6 +6,7 @@ import { createCollapseExtension } from './collapse.js';
 import { updateNote, setNoteVisible, renderNote } from './notes.js';
 import { handleRowActionKey, renderRowActions } from './row-actions.js';
 import { handleExpansionKey, mountExpansionControls } from './expansion.js';
+import { matchingRowIds } from './search.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
@@ -34,6 +35,37 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   toolbar.addEventListener('mousedown', (event) => event.preventDefault());
   toolbar.appendChild(undoButton);
   toolbar.appendChild(redoButton);
+  const searchPanel = dom.createElement('div');
+  searchPanel.className = 'outliner-search';
+  const searchInput = dom.createElement('input');
+  searchInput.type = 'search';
+  searchInput.setAttribute('aria-label', 'Search rows');
+  searchInput.placeholder = 'Search rows';
+  const clearSearch = dom.createElement('button');
+  clearSearch.type = 'button';
+  clearSearch.textContent = 'Clear search';
+  const searchStatus = dom.createElement('p');
+  searchStatus.setAttribute('role', 'status');
+  searchStatus.textContent = 'No matching rows';
+  searchPanel.appendChild(searchInput);
+  searchPanel.appendChild(clearSearch);
+  searchPanel.appendChild(searchStatus);
+  let searchQuery = '';
+  function setSearchQuery(query) {
+    if (destroyed) return;
+    searchQuery = query;
+    searchInput.value = query;
+    const start = searchInput.selectionStart;
+    const end = searchInput.selectionEnd;
+    render();
+    searchInput.focus();
+    if (start !== null && end !== null) searchInput.setSelectionRange(start, end);
+  }
+  searchInput.addEventListener('input', () => setSearchQuery(searchInput.value));
+  searchInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { event.preventDefault(); setSearchQuery(''); }
+  });
+  clearSearch.addEventListener('click', () => setSearchQuery(''));
   const unsubscribe = history.subscribe(({ canUndo, canRedo }) => {
     undoButton.disabled = !canUndo;
     redoButton.disabled = !canRedo;
@@ -97,10 +129,15 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     }
     updateCheckboxToggle(checkboxToggle, document);
     root.appendChild(toolbar);
+    root.appendChild(searchPanel);
+    const included = matchingRowIds(document.rows, searchQuery);
+    clearSearch.disabled = included === null;
+    searchStatus.hidden = included === null || included.size > 0;
     function renderRows(rows, container) {
       const list = dom.createElement('ul');
       list.className = 'outliner-rows';
       for (const row of rows) {
+        if (included && !included.has(row.id)) continue;
         const item = dom.createElement('li');
         item.className = 'outliner-row';
         item.dataset.rowId = row.id;
@@ -118,7 +155,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         renderNote(row, item, context);
         renderCheckbox(row, item, context);
         renderRowActions(row, item, context);
-        if (row.children?.length && options.shouldRenderChildren?.(row) !== false) renderRows(row.children, item);
+        if (row.children?.length && (included || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
         list.appendChild(item);
       }
       container.appendChild(list);
@@ -135,6 +172,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     });
     pendingSelection = null;
     input.rows = Math.max(1, input.value.split('\n').length);
+    if (searchQuery.trim()) {
+      const selection = getSelection();
+      const included = matchingRowIds(document.rows, searchQuery);
+      render();
+      if (selection && included.has(selection.id)) focusRow(selection.id, selection.offset, selection.end, selection.direction);
+      else searchInput.focus();
+    }
   }
 
   function onKeyDown(event) {
