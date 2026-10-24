@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test \"tests/js/*.test.mjs\""
+    "test": "node --test \"tests/js/*.test.mjs\"",
+    "test:php": "node tests/tools/php-check.mjs test",
+    "lint:php": "node tests/tools/php-check.mjs lint",
+    "check": "npm test && node tests/tools/php-check.mjs all"
   }
 }
