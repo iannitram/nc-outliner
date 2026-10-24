@@ -114,3 +114,6 @@
   background: var(--ol-bg);
   border: 1px solid var(--ol-border);
 }
+.outliner-import { margin-block: 1rem; }
+.outliner-import form { display: grid; gap: .5rem; }
+.outliner-import input, .outliner-import textarea { box-sizing: border-box; width: 100%; }
