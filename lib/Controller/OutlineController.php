@@ -40,10 +40,12 @@ class OutlineController extends Controller
     }
 
     #[NoAdminRequired]
-    public function create(string $name, string $content): DataResponse
+    public function create(?string $name = null, ?string $content = null): DataResponse
     {
+        if ($name === null) return new DataResponse(['error' => 'invalid name'], 400);
         $normalized = OutlineName::normalize($name);
         if ($normalized === null) return new DataResponse(['error' => 'invalid name'], 400);
+        if ($content === null) return new DataResponse(['error' => 'invalid content'], 400);
         $uid = $this->uid();
         if ($uid === null) return new DataResponse(['error' => 'unauthorized'], 401);
         try { return new DataResponse($this->storage->create($uid, $normalized, $content), 201); }
