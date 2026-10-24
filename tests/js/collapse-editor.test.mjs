@@ -22,11 +22,11 @@ class Element {
   remove() { this.parent.children = this.parent.children.filter((child) => child !== this); }
 }
 
-function fixture() {
+function fixture(document = { title: 'Plan', rows: [{ id: 'a', text: 'Parent', children: [{ id: 'b', text: 'Child', children: [] }] }] }) {
   const dom = { createElement(tag) { return new Element(tag, this); } };
   const element = new Element('div', dom);
   const changes = [];
-  const editor = mountEditor(element, { title: 'Plan', rows: [{ id: 'a', text: 'Parent', children: [{ id: 'b', text: 'Child', children: [] }] }] }, (doc) => changes.push(doc), createCollapseExtension());
+  const editor = mountEditor(element, document, (doc) => changes.push(doc), createCollapseExtension());
   const root = element.children[0];
   const inputs = () => root.querySelectorAll();
   function key(key, input) {
@@ -34,7 +34,8 @@ function fixture() {
     root.listeners.keydown(event);
     return event;
   }
-  const button = () => root.children[0].children[0].children[0];
+  const descendants = (element) => element.children.flatMap((child) => [child, ...descendants(child)]);
+  const button = () => descendants(root).find((child) => child.className === 'ol-disclosure');
   return { editor, dom, root, changes, inputs, key, button };
 }
 
@@ -72,4 +73,45 @@ test('actual editor arrow disclosure preserves interior caret and moves focus ac
   f.key('ArrowRight', f.dom.activeElement);
   assert.equal(f.inputs().length, 2);
   assert.equal(f.dom.activeElement.dataset.rowId, 'a');
+});
+
+test('undo and redo replay combined indent and collapse through the shared editor history', () => {
+  const initial = {
+    title: 'Plan', custom: { version: 'retained' },
+    rows: [
+      { id: 'a', text: 'Parent', children: [], style: { color: 'blue' } },
+      { id: 'b', text: 'Child', children: [{ id: 'c', text: 'Grandchild', children: [], extra: 'retained' }] },
+    ],
+  };
+  const f = fixture(initial);
+  const child = f.inputs().find((input) => input.dataset.rowId === 'b');
+  child.focus(); child.setSelectionRange(2, 2);
+  assert.equal(f.key('Tab', child).prevented, true);
+  const indented = structuredClone(f.editor.getDocument());
+  assert.equal(indented.rows.length, 1);
+  assert.equal(indented.rows[0].children[0].id, 'b');
+  assert.equal(f.dom.activeElement.dataset.rowId, 'b');
+  assert.equal(f.dom.activeElement.selectionStart, 2);
+  const parent = f.inputs()[0];
+  parent.focus(); parent.setSelectionRange(0, 0);
+  f.key('ArrowLeft', parent);
+  const collapsed = structuredClone(f.editor.getDocument());
+  assert.equal(collapsed.rows[0].collapsed, true);
+  assert.equal(f.inputs().length, 1);
+  f.editor.undo();
+  assert.deepEqual(f.editor.getDocument(), indented);
+  assert.equal(f.inputs().length, 3);
+  assert.equal(f.dom.activeElement.dataset.rowId, 'a');
+  f.editor.undo();
+  assert.deepEqual(f.editor.getDocument(), initial);
+  assert.equal(f.dom.activeElement.dataset.rowId, 'b');
+  assert.equal(f.dom.activeElement.selectionStart, 2);
+  assert.equal(f.editor.getHistoryState().canUndo, false);
+  f.editor.redo();
+  assert.deepEqual(f.editor.getDocument(), indented);
+  f.editor.redo();
+  assert.deepEqual(f.editor.getDocument(), collapsed);
+  assert.equal(f.inputs().length, 1);
+  assert.equal(f.editor.getHistoryState().canRedo, false);
+  assert.equal(f.changes.length, 6);
 });
