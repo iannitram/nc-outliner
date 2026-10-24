@@ -17,6 +17,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   const history = createHistory({ document, selection: null });
   let pendingSelection = null;
   let lastRowSelection = null;
+  let focusedRowId = null;
   const dom = element.ownerDocument;
   const root = dom.createElement('div');
   root.className = 'outliner-editor';
@@ -37,6 +38,31 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   redoButton.addEventListener('mousedown', (event) => event.preventDefault());
   toolbar.appendChild(undoButton);
   toolbar.appendChild(redoButton);
+  const focusButton = dom.createElement('button');
+  const unfocusButton = dom.createElement('button');
+  focusButton.type = unfocusButton.type = 'button';
+  focusButton.textContent = 'Focus row';
+  unfocusButton.textContent = 'Unfocus';
+  focusButton.setAttribute('aria-label', 'Focus selected row and its section');
+  unfocusButton.setAttribute('aria-label', 'Show the full outline');
+  focusButton.addEventListener('click', () => {
+    const selection = getSelection() ?? lastRowSelection;
+    if (!selection || !hasRow(document.rows, selection.id)) return;
+    focusedRowId = selection.id;
+    searchQuery = '';
+    searchInput.value = '';
+    render();
+    focusRow(selection.id, selection.offset, selection.end, selection.direction, selection.field);
+  });
+  unfocusButton.addEventListener('click', () => {
+    if (!focusedRowId) return;
+    focusedRowId = null;
+    render();
+    const selection = getSelection() ?? lastRowSelection;
+    if (selection && hasRow(document.rows, selection.id)) focusRow(selection.id, selection.offset, selection.end, selection.direction, selection.field);
+  });
+  toolbar.appendChild(focusButton);
+  toolbar.appendChild(unfocusButton);
   const searchPanel = dom.createElement('div');
   searchPanel.className = 'outliner-search';
   const searchInput = dom.createElement('input');
@@ -87,6 +113,12 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       ...(target.dataset.noteId ? { field: 'note' } : {}) };
   }
 
+  function updateFocusControls() {
+    const selection = getSelection() ?? lastRowSelection;
+    focusButton.disabled = !selection || !hasRow(document.rows, selection.id);
+    unfocusButton.disabled = !focusedRowId;
+  }
+
   function focusRow(id, offset = 0, end = offset, direction = 'none', field = 'text') {
     const attribute = field === 'note' ? 'noteId' : 'rowId';
     const target = [...root.querySelectorAll(field === 'note' ? 'textarea[data-note-id]' : 'textarea[data-row-id]')].find((input) => input.dataset[attribute] === id);
@@ -114,7 +146,10 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   function replaceDocument(next, { selection, notify = true, replay = false } = {}) {
     pendingSelection = null;
-    if (!replay) lastRowSelection = null;
+    if (!replay) {
+      lastRowSelection = null;
+      focusedRowId = null;
+    }
     return change(() => next, { type: 'replace', replay, focus: selection, notify });
   }
 
@@ -126,6 +161,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   function render() {
     if (destroyed) return;
+    if (focusedRowId && !hasRow(document.rows, focusedRowId)) focusedRowId = null;
     root.replaceChildren();
     if (!checkboxToggle) {
       checkboxToggle = createCheckboxToggle(dom, context);
@@ -134,9 +170,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     updateCheckboxToggle(checkboxToggle, document);
     root.appendChild(toolbar);
     root.appendChild(searchPanel);
-    const included = matchingRowIds(document.rows, searchQuery);
-    clearSearch.disabled = included === null;
-    searchStatus.hidden = included === null || included.size > 0;
+    const searched = matchingRowIds(document.rows, searchQuery);
+    const focused = focusedRowId ? sectionRowIds(document.rows, focusedRowId) : null;
+    const included = searched === null ? focused : focused === null ? searched : new Set([...searched].filter(id => focused.has(id)));
+    const visibleRoots = focusedRowId ? [findRow(document.rows, focusedRowId)].filter(Boolean) : document.rows;
+    updateFocusControls();
+    clearSearch.disabled = searched === null;
+    searchStatus.hidden = searched === null || searched.size > 0;
     function renderRows(rows, container) {
       const list = dom.createElement('ul');
       list.className = 'outliner-rows';
@@ -159,12 +199,12 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         renderNote(row, item, context);
         renderCheckbox(row, item, context);
         renderRowActions(row, item, context);
-        if (row.children?.length && (included || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
+        if (row.children?.length && (searched !== null || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
         list.appendChild(item);
       }
       container.appendChild(list);
     }
-    renderRows(document.rows, root);
+    renderRows(visibleRoots, root);
   }
 
   function onInput(event) {
@@ -236,8 +276,14 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     const id = target.dataset?.rowId ?? target.dataset?.noteId;
     if (id && (target.matches?.('textarea[data-row-id]') || target.dataset?.noteId)) {
       lastRowSelection = { id, offset: target.selectionStart, end: target.selectionEnd, direction: target.selectionDirection, ...(target.dataset.noteId ? { field: 'note' } : {}) };
+      updateFocusControls();
     }
   }
+  function onFocusIn(event) {
+    const target = event.target;
+    if (target.matches?.('textarea[data-row-id]') || target.dataset?.noteId) updateFocusControls();
+  }
+  root.addEventListener('focusin', onFocusIn);
   root.addEventListener('focusout', onFocusOut);
   root.addEventListener('beforeinput', onBeforeInput);
   root.addEventListener('input', onInput);
@@ -251,10 +297,36 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   return { ...context, destroy() {
     destroyed = true;
     unsubscribe();
+    root.removeEventListener('focusin', onFocusIn);
     root.removeEventListener('focusout', onFocusOut);
     root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);
     root.removeEventListener('keydown', onKeyDown);
     root.remove();
   } };
+}
+
+function hasRow(rows, id) {
+  for (const row of rows) {
+    if (row.id === id || hasRow(row.children ?? [], id)) return true;
+  }
+  return false;
+}
+
+function findRow(rows, id) {
+  for (const row of rows) {
+    if (row.id === id) return row;
+    const child = findRow(row.children ?? [], id);
+    if (child) return child;
+  }
+  return null;
+}
+
+function sectionRowIds(rows, id, found = false, ids = new Set()) {
+  for (const row of rows) {
+    const inSection = found || row.id === id;
+    if (inSection) ids.add(row.id);
+    if (row.children?.length) sectionRowIds(row.children, id, inSection, ids);
+  }
+  return ids;
 }

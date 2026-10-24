@@ -33,6 +33,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/60 |
 | F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/61 |
 | F14 | **Search field:** show only rows matching the text (with their parents) | Medium | Needs F04; https://github.com/iannitram/nc-outliner/pull/62 |
+| F18 | **Focus** on a row or section (hide everything else), and unfocus | Medium | Needs F04; https://github.com/iannitram/nc-outliner/pull/69 |
 | F26 | **Insert timestamp:** short or long date, time, or both | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/63 |
 | F34 | **Import plain text** (tab-indented or bulleted) and Markdown lists as a new outline | Low | Needs F01; https://github.com/iannitram/nc-outliner/pull/64 |
 | F35 | **Export plain text, OPML and Markdown** | Low | Needs F01. Markdown isn't in Omni, but it's a cheap win; https://github.com/iannitram/nc-outliner/pull/65 |
@@ -51,7 +52,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 18 | F15 | **Bold, italic, underline, strikethrough** in row text and notes | Medium | Needs F02. Needs the rich-text storage from F01 |
 | 19 | F16 | **Links in text:** paste or add a URL and it's clickable | Low | Needs F15 |
 | 20 | F17 | **Calculated checkboxes:** a parent shows checked, unchecked or mixed from its children; checking a parent checks them all | Medium | Needs F10 |
-| 21 | F18 | **Focus** on a row or section (hide everything else), and unfocus | Medium | Needs F04 |
 | 22 | F19 | **Full keyboard set:** add inside / add outside, move left / right, toggle checkbox, edit note, focus | Low | Needs F03, F06, F10, F18 |
 | 23 | F20 | **Outline file management:** rename, duplicate and move outlines; a list of recent outlines | Low | Needs F01. Uses Nextcloud's file APIs |
 | 24 | F21 | **Group / ungroup:** put selected rows under a new parent, or dissolve one | Low | Needs F11 |
