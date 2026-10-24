@@ -18,6 +18,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   let destroyed = false;
   const history = createHistory({ document, selection: null });
   let pendingSelection = null;
+  let composing = false;
   let lastRowSelection = null;
   const dom = element.ownerDocument;
   const root = dom.createElement('div');
@@ -173,6 +174,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     const input = event.target;
     const isNote = Boolean(input.dataset?.noteId);
     if (!isNote && !input.matches?.('textarea[data-row-id], [data-rich-input][data-row-id]')) return;
+    // The browser owns the composition DOM until commit, including while filtering.
+    if (composing || event.isComposing) return;
     change((old) => isNote ? updateNote(old, input.dataset.noteId, input.value, pendingSelection) : updateText(old, input.dataset.rowId, input.value, pendingSelection), {
       type: 'input', selection: pendingSelection ?? getSelection(), skipRender: true,
     });
@@ -196,7 +199,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   function onKeyDown(event) {
     const input = event.target;
     const isNote = Boolean(input.dataset?.noteId);
-    if ((!isNote && !input.matches?.('textarea[data-row-id], [data-rich-input][data-row-id]')) || event.isComposing || event.keyCode === 229) return;
+    if ((!isNote && !input.matches?.('textarea[data-row-id], [data-rich-input][data-row-id]')) || composing || event.isComposing || event.keyCode === 229) return;
     const format = formatCommand(event);
     if (format) { event.preventDefault(); applyFormat(context, getSelection(), format); return; }
     const command = historyCommand(event);
@@ -235,6 +238,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   }
 
   function onBeforeInput(event) {
+    if (composing || event.isComposing) return;
     const mark = { formatBold: 'bold', formatItalic: 'italic', formatUnderline: 'underline', formatStrikeThrough: 'strikethrough' }[event.inputType];
     if (mark) { event.preventDefault(); applyFormat(context, getSelection(), mark); return; }
     if (event.target.matches?.('textarea[data-row-id], [data-rich-input][data-row-id]') || event.target.dataset?.noteId) pendingSelection = getSelection();
@@ -250,7 +254,10 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       lastRowSelection = { id, offset: target.selectionStart, end: target.selectionEnd, direction: target.selectionDirection, ...(target.dataset.noteId ? { field: 'note' } : {}) };
     }
   }
-  root.addEventListener('compositionend', onInput);
+  function onCompositionStart() { composing = true; pendingSelection = getSelection(); }
+  function onCompositionEnd(event) { composing = false; onInput(event); }
+  root.addEventListener('compositionstart', onCompositionStart);
+  root.addEventListener('compositionend', onCompositionEnd);
   root.addEventListener('focusout', onFocusOut);
   root.addEventListener('beforeinput', onBeforeInput);
   root.addEventListener('input', onInput);
@@ -264,7 +271,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   return { ...context, destroy() {
     destroyed = true;
     unsubscribe();
-    root.removeEventListener('compositionend', onInput);
+    root.removeEventListener('compositionstart', onCompositionStart);
+    root.removeEventListener('compositionend', onCompositionEnd);
     root.removeEventListener('focusout', onFocusOut);
     root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);

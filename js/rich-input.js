@@ -89,6 +89,7 @@ export function createRichInput(dom, text, ranges) {
   });
   input.addEventListener('drop', (event) => event.preventDefault());
   input.addEventListener('beforeinput', (event) => {
+    if (event.isComposing) return;
     if (['insertParagraph', 'insertLineBreak'].includes(event.inputType)) {
       event.preventDefault();
       insertPlain('\n');

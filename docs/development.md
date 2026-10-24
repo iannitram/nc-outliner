@@ -39,6 +39,6 @@ JavaScript tests belong in `tests/js/*.test.mjs`. PHP tests use the `_test.php` 
 
 ## Rich text browser check
 
-`node tests/browser/richtext.mjs` runs the committed rich text smoke test against a temporary local HTTP server and real Chromium. It needs Playwright available through `NODE_PATH` (it is optional and is not an app dependency). `CHROMIUM_BIN` defaults to `/usr/bin/chromium`. The check covers topic/note marks, range selection, keyboard and toolbar, typing, history, hostile clipboard HTML, multiline notes and reloading a saved document snapshot. It uses a standalone editor, not a signed-in Nextcloud instance.
+`node tests/browser/richtext.mjs` runs the committed rich text smoke test against a temporary local HTTP server and real Chromium. It needs Playwright available through `NODE_PATH` (it is optional and is not an app dependency). `CHROMIUM_BIN` defaults to `/usr/bin/chromium`. The check covers topic/note marks, range selection, keyboard and toolbar, typing, history, hostile clipboard HTML, multiline notes, reloading a saved document snapshot, and real Chromium IME composition with an active search filter. It uses a standalone editor, not a signed-in Nextcloud instance.
 
 Select text in a topic or note and use Bold, Italic, Underline or Strikethrough, or Ctrl/Cmd+B/I/U and Ctrl/Cmd+Shift+X. Empty selections leave the document unchanged. Plain text and Markdown exports retain their existing text-only behavior; OPML preserves formatting annotations.

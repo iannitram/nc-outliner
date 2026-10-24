@@ -32,7 +32,7 @@
 | [checkboxes.js](../../js/checkboxes.js) | Document visibility toggle, checked-state edits and accessible per-row checkboxes. Hiding retains checked states. |
 | [search.js](../../js/search.js) | `matchingRowIds()` returns literal case-insensitive matches plus ancestors. Editor filtering reveals matching paths without changing saved collapse state. |
 | [richtext.js](../../js/richtext.js) | Safe UTF-16 mark ranges, immutable selection toggles, edit rebasing, toolbar controls and Ctrl/Cmd+B/I/U or Shift+X. |
-| [rich-input.js](../../js/rich-input.js) | Contenteditable rendering using text nodes and allowlisted CSS classes; textarea-compatible value/selection adapter, plain-text paste and line breaks. |
+| [rich-input.js](../../js/rich-input.js) | Contenteditable rendering using text nodes and allowlisted CSS classes; textarea-compatible value/selection adapter, plain-text paste and line breaks. Composition owns its DOM until commit; the editor defers history/autosave/filter rendering until composition ends. |
 | [timestamp.js](../../js/timestamp.js) | Localized date/time formats and insertion into the last selected topic or note range. Uses the shared edit/history boundary. |
 
 ## Editor contract

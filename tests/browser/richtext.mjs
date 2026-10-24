@@ -90,9 +90,43 @@ try {
     'Note',
   );
   assert.equal(await page.locator('img').count(), 0);
+  // Real Chromium composition must retain its DOM and original document until commit,
+  // even when the interim string no longer matches the active search filter.
+  await page.evaluate(() =>
+    editor.replaceDocument({
+      title: 'IME',
+      rows: [
+        {
+          id: 'a',
+          text: 'Alpha beta',
+          children: [],
+          textFormats: [{ start: 0, end: 5, marks: ['bold'] }],
+        },
+      ],
+    }),
+  );
+  await page.getByRole('searchbox', { name: 'Search rows' }).fill('Alpha');
+  await page.evaluate(() => {
+    editor.focusRow('a', 0, 5);
+    window.compositionInput = document.activeElement;
+  });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.imeSetComposition', { text: 'に', selectionStart: 1, selectionEnd: 1 });
+  assert.equal(await page.evaluate(() => editor.getDocument().rows[0].text), 'Alpha beta');
+  assert.equal(await page.evaluate(() => document.activeElement === window.compositionInput), true);
+  await cdp.send('Input.imeSetComposition', { text: '日本', selectionStart: 2, selectionEnd: 2 });
+  assert.equal(await page.evaluate(() => document.activeElement === window.compositionInput), true);
+  await cdp.send('Input.insertText', { text: '日本' });
+  assert.equal(await page.evaluate(() => editor.getDocument().rows[0].text), '日本 beta');
+  assert.deepEqual(await page.evaluate(() => editor.getDocument().rows[0].textFormats), [
+    { start: 0, end: 2, marks: ['bold'] },
+  ]);
+  await page.evaluate(() => editor.undo());
+  assert.equal(await page.evaluate(() => editor.getDocument().rows[0].text), 'Alpha beta');
+  assert.equal(await page.locator(topic + ' .outliner-format-bold').textContent(), 'Alpha');
   assert.deepEqual(errors, []);
   console.log(
-    'PASS browser: topic/note marks, backward selection, keyboard/toolbar, typing, undo/redo, hostile paste, multiline, saved snapshot reload',
+    'PASS browser: topic/note marks, backward selection, keyboard/toolbar, typing, undo/redo, hostile paste, multiline, saved snapshot reload, IME commit with active search',
   );
 } finally {
   await browser.close();
