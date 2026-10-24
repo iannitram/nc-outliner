@@ -45,3 +45,17 @@ check('invalid and duplicate IDs are rejected', function () use ($codec): void {
         catch (InvalidArgumentException) {}
     }
 });
+check('notes and visibility round trip with multiline text and XML characters', function () use ($codec): void {
+    $doc = ['title' => 'Notes', 'rows' => [['id' => 'a', 'text' => 'Topic', 'collapsed' => false, 'children' => [], 'note' => "First & <safe>\nSecond line", 'noteVisible' => false]]];
+    same($doc, $codec->read($codec->write($doc, $codec->create(''))));
+    $doc['rows'][0]['note'] = '';
+    $doc['rows'][0]['noteVisible'] = true;
+    same($doc, $codec->read($codec->write($doc, $codec->create(''))));
+});
+check('invalid notes and note visibility are rejected', function () use ($codec): void {
+    foreach ([['note' => ['invalid']], ['noteVisible' => 'false']] as $invalid) {
+        $row = array_merge(['id' => 'a', 'text' => '', 'children' => []], $invalid);
+        try { $codec->write(['title' => '', 'rows' => [$row]], $codec->create('')); throw new RuntimeException('Invalid note accepted'); }
+        catch (InvalidArgumentException) {}
+    }
+});

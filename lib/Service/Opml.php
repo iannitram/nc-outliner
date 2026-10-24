@@ -65,9 +65,16 @@ class Opml
                 throw new InvalidArgumentException('Duplicate row ID.');
             }
             $nodes[$id] = $node;
-            $rows[] = ['id' => $id, 'text' => $node->getAttribute('text'),
+            $row = ['id' => $id, 'text' => $node->getAttribute('text'),
                 'collapsed' => $node->getAttributeNS(self::NS, 'collapsed') === 'true',
                 'children' => $this->rows($node, $nodes, $position)];
+            if ($node->hasAttributeNS(self::NS, 'note')) {
+                $row['note'] = $node->getAttributeNS(self::NS, 'note');
+            }
+            if ($node->hasAttributeNS(self::NS, 'note-visible')) {
+                $row['noteVisible'] = $node->getAttributeNS(self::NS, 'note-visible') === 'true';
+            }
+            $rows[] = $row;
         }
         return $rows;
     }
@@ -121,6 +128,18 @@ class Opml
                 $node->setAttribute('text', $row['text']);
                 $node->setAttributeNS(self::NS, 'nc:id', $row['id']);
                 $node->setAttributeNS(self::NS, 'nc:collapsed', !empty($row['collapsed']) ? 'true' : 'false');
+                if (array_key_exists('note', $row)) {
+                    if (!is_string($row['note'])) {
+                        throw new InvalidArgumentException('Invalid row note.');
+                    }
+                    $node->setAttributeNS(self::NS, 'nc:note', $row['note']);
+                }
+                if (array_key_exists('noteVisible', $row)) {
+                    if (!is_bool($row['noteVisible'])) {
+                        throw new InvalidArgumentException('Invalid note visibility.');
+                    }
+                    $node->setAttributeNS(self::NS, 'nc:note-visible', $row['noteVisible'] ? 'true' : 'false');
+                }
                 foreach ($build($row['children'], $depth + 1) as $child) {
                     $node->appendChild($child);
                 }

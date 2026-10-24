@@ -61,7 +61,6 @@ test('IME Enter and modified Enter do not create unwanted rows', () => {
   const f = fixture(); const input = f.inputs()[0];
   f.event('Enter', input, { isComposing: true });
   f.event('Enter', input, { keyCode: 229 });
-  f.event('Enter', input, { shiftKey: true });
   f.event('Enter', input, { ctrlKey: true });
   assert.equal(f.editor.getDocument().rows.length, 1);
   assert.equal(f.changes.length, 0);

@@ -41,7 +41,7 @@ export function insertAfter(document, id) {
 export function deleteEmpty(document, id) {
   const original = findRow(document.rows, id);
   // Deleting a parent must never discard its children.
-  if (!original || original.row.text !== '' || original.row.children?.length) return { document, focus: null };
+  if (!original || original.row.text !== '' || original.row.note || original.row.children?.length) return { document, focus: null };
   const ordered = flattenVisibleRows(document.rows);
   if (ordered.length === 1) return { document, focus: { id, offset: 0 } };
   const index = ordered.findIndex((row) => row.id === id);

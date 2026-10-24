@@ -84,3 +84,18 @@
 .outliner-files button { display: block; max-width: 100%; overflow-wrap: anywhere; }
 .outliner-workspace { flex: 1; min-width: 0; padding: 1rem; overflow: auto; }
 .outliner-workspace [role="status"] { min-height: 1.5rem; color: var(--ol-muted); }
+
+.outliner-note-toggle { margin: .25rem .5rem; }
+.outliner-note {
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% - 1rem);
+  margin: .25rem .5rem .75rem;
+  padding: .5rem;
+  color: var(--ol-fg);
+  background: var(--ol-bg);
+  border: 1px solid var(--ol-border);
+  border-radius: 4px;
+  font: inherit;
+  resize: vertical;
+}
