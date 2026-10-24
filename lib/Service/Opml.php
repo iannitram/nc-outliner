@@ -1,0 +1,144 @@
+<?php
+declare(strict_types=1);
+
+namespace OCA\Outliner\Service;
+
+use DOMDocument;
+use DOMElement;
+use InvalidArgumentException;
+
+/** OPML 2.0 with a namespaced extension; unknown XML is kept when editing. */
+class Opml
+{
+    public const NS = 'https://nextcloud.com/ns/outliner/1';
+
+    private function xml(string $xml): DOMDocument
+    {
+        if (strlen($xml) > 5 * 1024 * 1024 || stripos($xml, '<!DOCTYPE') !== false || stripos($xml, '<!ENTITY') !== false) {
+            throw new InvalidArgumentException('Unsafe or oversized OPML file.');
+        }
+        $dom = new DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        try {
+            if (!$dom->loadXML($xml, LIBXML_NONET) || $dom->documentElement?->tagName !== 'opml') {
+                throw new InvalidArgumentException('Invalid OPML file.');
+            }
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+        return $dom;
+    }
+
+    public function create(string $title): string
+    {
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        $root = $dom->appendChild($dom->createElement('opml'));
+        $root->setAttribute('version', '2.0');
+        $root->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:nc', self::NS);
+        $head = $root->appendChild($dom->createElement('head'));
+        $head->appendChild($dom->createElement('title'))->appendChild($dom->createTextNode($title));
+        $root->appendChild($dom->createElement('body'));
+        return $dom->saveXML();
+    }
+
+    private function child(DOMElement $parent, string $name): ?DOMElement
+    {
+        foreach ($parent->childNodes as $node) {
+            if ($node instanceof DOMElement && $node->tagName === $name) {
+                return $node;
+            }
+        }
+        return null;
+    }
+
+    private function rows(DOMElement $parent, array &$nodes, string $path = ''): array
+    {
+        $rows = [];
+        foreach ($parent->childNodes as $node) {
+            if (!$node instanceof DOMElement || $node->tagName !== 'outline') {
+                continue;
+            }
+            $position = $path . '/' . count($rows);
+            $id = $node->getAttributeNS(self::NS, 'id') ?: 'row-' . substr(hash('sha256', $position), 0, 24);
+            if (isset($nodes[$id])) {
+                throw new InvalidArgumentException('Duplicate row ID.');
+            }
+            $nodes[$id] = $node;
+            $rows[] = ['id' => $id, 'text' => $node->getAttribute('text'),
+                'collapsed' => $node->getAttributeNS(self::NS, 'collapsed') === 'true',
+                'children' => $this->rows($node, $nodes, $position)];
+        }
+        return $rows;
+    }
+
+    public function read(string $xml): array
+    {
+        $dom = $this->xml($xml);
+        $head = $this->child($dom->documentElement, 'head');
+        $body = $this->child($dom->documentElement, 'body');
+        if (!$body) {
+            throw new InvalidArgumentException('OPML body is missing.');
+        }
+        $nodes = [];
+        return ['title' => $head ? ($this->child($head, 'title')?->textContent ?? '') : '', 'rows' => $this->rows($body, $nodes)];
+    }
+
+    public function write(array $document, string $original): string
+    {
+        if (!is_string($document['title'] ?? null) || !is_array($document['rows'] ?? null)) {
+            throw new InvalidArgumentException('Invalid outline document.');
+        }
+        $dom = $this->xml($original);
+        $root = $dom->documentElement;
+        $head = $this->child($root, 'head') ?? $root->insertBefore($dom->createElement('head'), $root->firstChild);
+        $title = $this->child($head, 'title') ?? $head->appendChild($dom->createElement('title'));
+        $title->textContent = $document['title'];
+        $body = $this->child($root, 'body');
+        if (!$body) {
+            throw new InvalidArgumentException('OPML body is missing.');
+        }
+        $nodes = [];
+        $this->rows($body, $nodes);
+        $seen = [];
+        $count = 0;
+        $build = function (array $rows, int $depth = 0) use (&$build, &$seen, &$count, $dom, $nodes): array {
+            if ($depth > 100) {
+                throw new InvalidArgumentException('Outline is too deeply nested.');
+            }
+            $result = [];
+            foreach ($rows as $row) {
+                if (!is_array($row) || !is_string($row['id'] ?? null) || !preg_match('/^[A-Za-z0-9_-]{1,128}$/D', $row['id']) || isset($seen[$row['id']]) || !is_string($row['text'] ?? null) || !is_array($row['children'] ?? null) || ++$count > 10000) {
+                    throw new InvalidArgumentException('Invalid outline row.');
+                }
+                $seen[$row['id']] = true;
+                $node = isset($nodes[$row['id']]) ? $nodes[$row['id']]->cloneNode(true) : $dom->createElement('outline');
+                foreach (iterator_to_array($node->childNodes) as $child) {
+                    if ($child instanceof DOMElement && $child->tagName === 'outline') {
+                        $node->removeChild($child);
+                    }
+                }
+                $node->setAttribute('text', $row['text']);
+                $node->setAttributeNS(self::NS, 'nc:id', $row['id']);
+                $node->setAttributeNS(self::NS, 'nc:collapsed', !empty($row['collapsed']) ? 'true' : 'false');
+                foreach ($build($row['children'], $depth + 1) as $child) {
+                    $node->appendChild($child);
+                }
+                $result[] = $node;
+            }
+            return $result;
+        };
+        $replacement = $build($document['rows']);
+        foreach (iterator_to_array($body->childNodes) as $node) {
+            if ($node instanceof DOMElement && $node->tagName === 'outline') {
+                $body->removeChild($node);
+            }
+        }
+        foreach ($replacement as $node) {
+            $body->appendChild($node);
+        }
+        $xml = $dom->saveXML();
+        $this->xml($xml);
+        return $xml;
+    }
+}
