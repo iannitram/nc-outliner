@@ -1,5 +1,7 @@
 # Development checks
 
+For entry points, module relationships, API/storage contracts and test coverage, start with [CODEMAP.md](../CODEMAP.md).
+
 The app uses native JavaScript modules and PHP. It has no build step and no npm dependencies. Node.js 22 or newer runs the JavaScript tests:
 
 ```sh
