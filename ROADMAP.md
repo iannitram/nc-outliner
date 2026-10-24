@@ -29,6 +29,8 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F04 | **Expand / collapse** a row (disclosure triangle, arrow keys); a bullet for rows without children | Low | Needs F02. Collapsed state saved in the file; https://github.com/iannitram/nc-outliner/pull/6 |
 | F05 | **Undo / redo** for every change | Medium | Needs F02. Build it early: every later editing feature has to go through it; https://github.com/iannitram/nc-outliner/pull/7 |
 
+| F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/16 |
+
 ## Unwritten
 
 | Rank | ID | Feature | Complexity | Notes (dependencies) |
@@ -43,7 +45,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 13 | F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02 |
 | 14 | F11 | **Select several rows** (Shift/Ctrl+click, Shift+arrow) and act on them together | Medium | Needs F02. Needed by F12, F21, F22 |
 | 15 | F12 | **Cut, copy, paste rows** with their structure, between outlines too; pasting tab-indented or bulleted text becomes rows | Medium | Needs F11 |
-| 16 | F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04 |
 | 17 | F14 | **Search field:** show only rows matching the text (with their parents) | Medium | Needs F04 |
 | 18 | F15 | **Bold, italic, underline, strikethrough** in row text and notes | Medium | Needs F02. Needs the rich-text storage from F01 |
 | 19 | F16 | **Links in text:** paste or add a URL and it's clickable | Low | Needs F15 |
