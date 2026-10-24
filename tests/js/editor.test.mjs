@@ -238,3 +238,64 @@ test('timestamp toolbar remembers a text range after focus moves and supports un
   assert.equal(f.editor.getDocument().rows[0].text, 'Alpha');
   assert.deepEqual(f.editor.getSelection(), { id: 'a', offset: 1, end: 4, direction: 'backward' });
 });
+
+const selectionRows = () => ({ title: 'Plan', rows: [
+  { id: 'a', text: 'Alpha', children: [] },
+  { id: 'b', text: 'Beta', children: [{ id: 'b1', text: 'Child', children: [], custom: 'keep' }] },
+  { id: 'c', text: 'Gamma', children: [] },
+  { id: 'd', text: 'Delta', children: [] },
+] });
+function clickRow(f, id, modifiers = {}) {
+  const input = f.inputs().find(input => input.dataset.rowId === id);
+  const event = { target: input, preventDefault() { this.prevented = true; }, ...modifiers };
+  f.root.listeners.click(event); return event;
+}
+function selectedButton(f, label) { return f.root.children[0].children.find(button => button.textContent === label); }
+test('modified clicks select disjoint rows and ranges, while plain text clicks and Escape clear', () => {
+  const f=fixture(selectionRows());
+  clickRow(f,'a'); clickRow(f,'c',{ctrlKey:true});assert.deepEqual(f.editor.getSelectedRowIds(),['a','c']);
+  clickRow(f,'a',{metaKey:true});assert.deepEqual(f.editor.getSelectedRowIds(),['c']);
+  clickRow(f,'d',{shiftKey:true});assert.deepEqual(f.editor.getSelectedRowIds(),['a','b','b1','c','d']);
+  assert.equal(f.changes.length,0);assert.deepEqual(f.editor.getHistoryState(),{canUndo:false,canRedo:false});
+  f.event('Escape',f.dom.activeElement);assert.deepEqual(f.editor.getSelectedRowIds(),[]);
+  clickRow(f,'b',{ctrlKey:true});clickRow(f,'a');assert.deepEqual(f.editor.getSelectedRowIds(),[]);
+});
+test('Shift arrows extend and contract through visible rows and ignore IME composition', () => {
+  const initial=selectionRows();initial.rows[1].collapsed=true;
+  const f=fixture(initial); const a=f.inputs()[0];a.focus();
+  f.event('ArrowDown',a,{shiftKey:true,isComposing:true});assert.deepEqual(f.editor.getSelectedRowIds(),[]);
+  assert.equal(f.event('ArrowDown',a,{shiftKey:true}).prevented,true);
+  assert.deepEqual(f.editor.getSelectedRowIds(),['a','b']);
+  f.event('ArrowDown',f.dom.activeElement,{shiftKey:true});assert.deepEqual(f.editor.getSelectedRowIds(),['a','b','c']);
+  f.event('ArrowUp',f.dom.activeElement,{shiftKey:true});assert.deepEqual(f.editor.getSelectedRowIds(),['a','b']);
+  assert.equal(f.changes.length,0);
+});
+test('bulk deletion records one history/autosave change, removes subtrees once and restores selection on undo', () => {
+  const f=fixture(selectionRows());
+  clickRow(f,'b');clickRow(f,'c',{shiftKey:true});
+  assert.deepEqual(f.editor.getSelectedRowIds(),['b','b1','c']);
+  selectedButton(f,'Delete selected').listeners.click();
+  assert.deepEqual(f.editor.getDocument().rows.map(r=>r.id),['a','d']);
+  assert.equal(f.changes.length,1);assert.deepEqual(f.editor.getSelectedRowIds(),[]);
+  f.editor.undo();assert.equal(f.editor.getDocument().rows[1].children[0].custom,'keep');
+  assert.deepEqual(f.editor.getSelectedRowIds(),['b','b1','c']);
+  f.editor.redo();assert.deepEqual(f.editor.getDocument().rows.map(r=>r.id),['a','d']);
+});
+test('multi-row Tab, Alt movement and toolbar status changes share history and preserve metadata', () => {
+  const f=fixture(selectionRows());clickRow(f,'b');clickRow(f,'c',{shiftKey:true});
+  f.event('Tab',f.dom.activeElement);assert.deepEqual(f.editor.getDocument().rows[0].children.map(r=>r.id),['b','c']);
+  f.event('Tab',f.dom.activeElement,{shiftKey:true});assert.deepEqual(f.editor.getDocument().rows.map(r=>r.id),['a','b','c','d']);
+  f.event('ArrowDown',f.dom.activeElement,{altKey:true});assert.deepEqual(f.editor.getDocument().rows.map(r=>r.id),['a','d','b','c']);
+  selectedButton(f,'Check selected').listeners.click();
+  const b=f.editor.getDocument().rows[2];assert.equal(b.checked,true);assert.equal(b.children[0].checked,true);
+  assert.equal(b.children[0].custom,'keep');assert.equal(f.editor.getDocument().rows[3].checked,true);
+  assert.equal(f.changes.length,4);f.editor.undo();assert.equal(f.editor.getDocument().showCheckboxes,undefined);
+  f.editor.replaceDocument({rows:[{id:'z',text:'Other file',children:[]}]});assert.deepEqual(f.editor.getSelectedRowIds(),[]);
+});
+test('search restricts selected rows to displayed matches and keyboard range skips hidden rows', () => {
+  const f=fixture(selectionRows());clickRow(f,'a');clickRow(f,'d',{shiftKey:true});
+  const search=f.root.children[1].children[0];search.value='Alpha';search.listeners.input();
+  assert.deepEqual(f.editor.getSelectedRowIds(),['a']);
+  assert.equal(f.changes.length,0);selectedButton(f,'Delete selected').listeners.click();
+  assert.deepEqual(f.editor.getDocument().rows.map(r=>r.id),['b','c','d']);
+});

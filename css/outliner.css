@@ -145,3 +145,10 @@
 #outliner-app[data-outliner-theme] :is(button, select):hover { background-color: var(--ol-hover); }
 #outliner-app .outliner-theme { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 #outliner-app .outliner-theme [role="status"] { color: var(--ol-muted); }
+#outliner-app .outliner-row[data-selected="true"] > .outliner-row-text {
+  background: var(--ol-hover);
+  border-color: var(--ol-accent);
+  box-shadow: inset 4px 0 var(--ol-accent);
+}
+#outliner-app .outliner-select-row { margin-inline-end: 4px; color: var(--ol-muted); }
+#outliner-app .outliner-select-row[aria-pressed="true"] { border: 2px solid var(--ol-accent); }

@@ -24,6 +24,7 @@
 
 | Module | Editing or display behavior |
 |---|---|
+| [selection.js](../../js/selection.js) | Transient ranges/toggled row IDs in displayed order. Atomic selected-row delete, indent/outdent, movement and checkbox actions retain subtrees and metadata. |
 | [indent.js](../../js/indent.js) | Tab/Shift+Tab move complete subtrees. Boundary operations keep the document identity unchanged. |
 | [collapse.js](../../js/collapse.js) | Disclosure buttons, leaf bullets, visible preorder and boundary-aware left/right navigation. Supplies default editor hooks. |
 | [expansion.js](../../js/expansion.js) | Recursive whole-outline/subtree expansion, toolbar controls, Alt+Left/Right, and visible-focus correction. |
@@ -35,9 +36,9 @@
 
 ## Editor contract
 
-`mountEditor()` returns `getDocument`, `getSelection`, `change`, `replaceDocument`, `focusRow`, `render`, `undo`, `redo`, `getHistoryState` and `destroy`.
+`mountEditor()` returns `getDocument`, `getSelection`, `getSelectedRowIds`, `change`, `replaceDocument`, `focusRow`, `render`, `undo`, `redo`, `getHistoryState` and `destroy`.
 
-Selections are `{ id, offset, end, direction }`, with `field: 'note'` for a note. `focusRow(id, offset, end, direction, field)` restores the appropriate textarea. Topic inputs use `data-row-id`; note inputs use `data-note-id`. Toolbar focus tracking retains the last text selection for bulk actions and timestamps.
+Selections are `{ id, offset, end, direction }`, with `field: 'note'` for a note. `focusRow(id, offset, end, direction, field)` restores the appropriate textarea. Topic inputs use `data-row-id`; note inputs use `data-note-id`. Toolbar focus tracking retains the last text selection for bulk actions and timestamps. Explicit row selections add `rowIds` and `rowAnchor` to the selection snapshot so Undo/Redo restores them; these fields are transient and never added to the outline document. `getSelectedRowIds()` exposes a copy for later row commands. Shift/Ctrl/Cmd+click on topic text or Select row buttons and Shift+Up/Down choose displayed rows; search and collapse prune hidden selections. Escape or an ordinary text click clears explicit selection. The selected-row toolbar and multi-row Tab/Shift+Tab and Alt+Up/Down/Delete shortcuts apply one history/autosave edit; structural commands skip selected descendants of selected parents.
 
 `change(mutator, meta)` applies an immutable document updater. A same-reference return is a no-op. Metadata carries the edit type, prior selection, target focus, optional render/notification suppression and history replay flag. Successful edits render as needed, record history, call hooks, and notify `onChange(document)`.
 
