@@ -113,13 +113,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     function visit(rows) {
       for (const row of rows) {
         if (row.id === revealedRowId) return true;
-        path.push(row.id);
+        path.push(row);
         if (visit(row.children ?? [])) return true;
         path.pop();
       }
       return false;
     }
-    revealedAncestors = visit(document.rows) ? new Set(path) : new Set();
+    revealedAncestors = visit(document.rows) ? new Set(path.filter(row => row.collapsed).map(row => row.id)) : new Set();
   }
 
   function clearReveal(rowId = null) {
@@ -133,6 +133,10 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   function change(mutator, meta = {}) {
     if (destroyed) return false;
+    if (revealedRowId && ['collapse', 'expand-all', 'expand-subtree'].includes(meta.type)) {
+      revealedRowId = null;
+      revealedAncestors = new Set();
+    }
     const previous = document;
     const previousSelection = meta.selection ?? getSelection();
     options.beforeChange?.(previous, meta);

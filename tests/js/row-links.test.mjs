@@ -68,7 +68,7 @@ function allElements(root) {
   return root.children.flatMap(child => [child, ...allElements(child)]);
 }
 
-async function mountedApp({ href, clipboard, openError, outlineName = 'Plan & Notes.opml' } = {}) {
+async function mountedApp({ href, clipboard, openError, outlineName = 'Plan & Notes.opml', parentCollapsed = true } = {}) {
   const document = appDocument();
   const element = new Element('main', document);
   element.dataset.apiBase = '/apps/outliner/api';
@@ -79,7 +79,7 @@ async function mountedApp({ href, clipboard, openError, outlineName = 'Plan & No
     if (openError) throw new Error(openError);
     return {
       name: outlineName, etag: 'etag-1',
-      document: { title: 'Plan', rows: [{ id: 'parent', text: 'Parent', collapsed: true, children: [{ id: 'row /?é', text: 'Target', children: [] }] }] },
+      document: { title: 'Plan', rows: [{ id: 'parent', text: 'Parent', collapsed: parentCollapsed, children: [{ id: 'row /?é', text: 'Target', children: [] }] }] },
     };
   };
   const priorAddEventListener = globalThis.addEventListener;
@@ -124,6 +124,29 @@ test('browser app reopens a nested outline name through the normal encoded API p
     ['GET', ''], ['GET', '/Work%2FPlan.opml'],
   ]);
   assert.equal(f.document.activeElement.dataset.rowId, 'row /?é');
+});
+
+test('a naturally expanded ancestor collapses on its first click after following a row link', async () => {
+  const f = await mountedApp({
+    href: 'https://cloud.example/apps/outliner/?outline=Plan.opml&row=row+%2F%3F%C3%A9',
+    parentCollapsed: false,
+  });
+  const disclosure = allElements(f.element).find(node => node.tag === 'button' && node.attributes['aria-label'] === 'Collapse row');
+  assert.equal(disclosure.attributes['aria-expanded'], 'true');
+  disclosure.listeners.click();
+  assert.deepEqual(f.element.querySelectorAll('textarea[data-row-id]').map(input => input.dataset.rowId), ['parent']);
+  assert.equal(allElements(f.element).find(node => node.tag === 'button' && node.attributes['aria-label'] === 'Expand row').attributes['aria-expanded'], 'false');
+});
+
+test('collapse all clears a temporary reveal without saving a document change', async () => {
+  const f = await mountedApp({
+    href: 'https://cloud.example/apps/outliner/?outline=Plan.opml&row=row+%2F%3F%C3%A9',
+  });
+  assert.ok(f.element.querySelectorAll('textarea[data-row-id]').some(input => input.dataset.rowId === 'row /?é'));
+  const collapseAll = allElements(f.element).find(node => node.tag === 'button' && node.textContent === 'Collapse all');
+  collapseAll.listeners.click();
+  assert.deepEqual(f.element.querySelectorAll('textarea[data-row-id]').map(input => input.dataset.rowId), ['parent']);
+  assert.equal(f.calls.some(call => call.method === 'PUT'), false);
 });
 
 test('browser app surfaces missing row, rejected clipboard, invalid URL, and unauthorized file errors', async () => {

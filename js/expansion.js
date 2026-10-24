@@ -38,7 +38,10 @@ export function visibleSelection(document, selection) {
 export function applyExpansion(context, expanded, id = null, selection = context.getSelection()) {
   const previous = context.getDocument();
   const next = setExpanded(previous, expanded, id);
-  if (next === previous) return false;
+  if (next === previous) {
+    context.clearReveal?.();
+    return false;
+  }
   return context.change(() => next, {
     type: id === null ? 'expand-all' : 'expand-subtree',
     selection,
