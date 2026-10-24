@@ -1,5 +1,6 @@
 # nc-outliner: notes for coding sessions
 
+- **Code navigation:** [CODEMAP.md](CODEMAP.md) indexes the frontend, backend/storage and test maps. Check its branch scope before treating a feature as merged.
 - **Read first:** `README.md` here, then the vault's `J:\Nextcloud\Workspaces\Outliner\PROJECT.md` for status, roadmap and open questions. Record decisions and status in PROJECT.md, not in this repo's README.
 - **Hyperion machine rules apply.** This clone lives at `B:\dev\nc-outliner`. Heavy commands (anything that compiles, runs a multi-minute test suite, or loads the GPU) go through the dev gate: `python3 "B:/dev/potn-dev/tools/dev-gate.py" run --who nc-outliner --cwd B:/dev/nc-outliner -- <one command>` (one command after the `--`, never `cd x && ...`; exit 75 = not now, nothing ran). Full rules: part 1 of `J:\Nextcloud\Workspaces\CLAUDE.md`.
 - **Keep code out of the vault.** The vault workspace holds docs only.
