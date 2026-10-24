@@ -29,4 +29,3 @@ Browser HTTP checks used a mocked API. PHP storage tests used Nextcloud Files AP
 ## Overlapping work
 
 Partial PR #57 has a different theme-helper implementation, overlapping PR #66. Partial PR #56 has a different autosave engine, overlapping PR #67. Reconcile the implementations before merging both alternatives.
-
