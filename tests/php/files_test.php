@@ -1,32 +1,73 @@
 <?php
 declare(strict_types=1);
-namespace OCP { interface IUserSession { public function getUser(); } }
+namespace OCP {
+    class Server { public static mixed $provider; public static function get(string $type): mixed { return self::$provider; } }
+    class Util {
+        public static array $hooks = [];
+        public static mixed $before = null;
+        public static mixed $after = null;
+        public static function connectHook($scope, $event, $listener, $method): void { self::$hooks[$event][] = [$listener, $method]; }
+        public static function emit(string $event, string $path, callable $action, ?string $destination = null): void {
+            // Model View's SHARED lock, cancellable hooks, then exclusive upgrade.
+            if (self::$before) { $before = self::$before; self::$before = null; $before(); }
+            $run = true;
+            $params = ['path' => $path, 'oldpath' => $path, 'newpath' => $destination, 'run' => &$run];
+            foreach (self::$hooks[$event] ?? [] as $hook) {
+                try { $hook($params); } catch (\Throwable) {} // OC_Hook swallows exceptions.
+            }
+            if ($run) {
+                $action();
+                foreach (self::$hooks['post_' . $event] ?? [] as $hook) { try { $hook($params); } catch (\Throwable) {} }
+            }
+        }
+    }
+    interface IConfig { public function getUserValue($uid, $app, $key, $default); public function setUserValue($uid, $app, $key, $value); } interface IUserSession { public function getUser(); } }
 namespace OCP\Lock { interface ILockingProvider { public const LOCK_SHARED = 1; public const LOCK_EXCLUSIVE = 2; } }
+namespace OC\Files { class Filesystem { public static bool $loaded = true; public static function getRoot(): string { return ''; } } }
+namespace OC\Lock { class NoopLockingProvider implements \OCP\Lock\ILockingProvider {} }
 namespace OCP\Files {
     interface IRootFolder { public function getUserFolder(string $uid); }
     class NotFoundException extends \RuntimeException {}
     class AlreadyExistsException extends \RuntimeException {}
     class File {
         public int $locks = 0;
-        public function __construct(public string $name, public string $content = '', public string $etag = 'initial') {}
+        public function __construct(public string $name, public string $content = '', public string $etag = 'initial', public ?Folder $parent = null) {}
         public function getName(): string { return $this->name; }
+        public function move(string $path): void {
+            $parts = explode('/', $path);
+            $name = array_pop($parts);
+            $target = Folder::$root->get(implode('/', $parts));
+            \OCP\Util::emit('rename', '/' . $this->parent->getPath() . '/' . $this->name, function () use ($name, $target): void {
+                unset($this->parent->nodes[$this->name]);
+                $this->name = $name;
+                $this->parent = $target;
+                $target->nodes[$name] = $this;
+            }, '/' . $path);
+        }
         public function getContent(): string { return $this->content; }
-        public function putContent(string $content): void { $this->content = $content; $this->etag = hash('sha256', $content); }
+        public function putContent(string $content): void { \OCP\Util::emit('write', '/' . $this->parent->getPath() . '/' . $this->name, function () use ($content): void { $this->content = $content; $this->etag = hash('sha256', $content); }); if (\OCP\Util::$after) { $after = \OCP\Util::$after; \OCP\Util::$after = null; $after(); } }
         public function getEtag(): string { return $this->etag; }
         public function lock(int $type): void { $this->locks++; }
         public function unlock(int $type): void { $this->locks--; }
     }
     class Folder {
+        public static Folder $root;
         public array $nodes = [];
         public int $locks = 0;
-        public function __construct(public string $name = '') {}
+        public function __construct(public string $name = '', public ?Folder $parent = null) { if ($parent === null) self::$root = $this; }
         public function getName(): string { return $this->name; }
-        public function nodeExists(string $name): bool { return isset($this->nodes[$name]); }
-        public function get(string $name) { return $this->nodes[$name] ?? throw new NotFoundException(); }
-        public function newFolder(string $name): Folder { return $this->nodes[$name] = new Folder($name); }
+        public function getPath(): string { return $this->parent ? trim($this->parent->getPath() . '/' . $this->name, '/') : ''; }
+        public function nodeExists(string $name): bool { try { $this->get($name); return true; } catch (NotFoundException) { return false; } }
+        public function get(string $name) {
+            if ($name === '') return $this;
+            $parts = explode('/', $name, 2);
+            $node = $this->nodes[$parts[0]] ?? throw new NotFoundException();
+            return count($parts) === 1 ? $node : ($node instanceof Folder ? $node->get($parts[1]) : throw new NotFoundException());
+        }
+        public function newFolder(string $name): Folder { return $this->nodes[$name] = new Folder($name, $this); }
         public function newFile(string $name, string $content): File {
-            if ($this->locks < 1) throw new \RuntimeException('Creation must hold folder lock');
-            return $this->nodes[$name] = new File($name, $content);
+            \OCP\Util::emit('write', '/' . $this->getPath() . '/' . $name, function () use ($name, $content): void { $this->nodes[$name] = new File($name, $content, 'initial', $this); });
+            return $this->nodes[$name] ?? throw new \RuntimeException('Creation cancelled');
         }
         public function getDirectoryListing(): array { return array_values($this->nodes); }
         public function lock(int $type): void { $this->locks++; }
@@ -43,7 +84,7 @@ use OCP\Files\File;
 use OCP\Files\Folder;
 $root = new class implements \OCP\Files\IRootFolder {
     public array $homes = [];
-    public function getUserFolder(string $uid): Folder { return $this->homes[$uid] ??= new Folder(); }
+    public function getUserFolder(string $uid): Folder { return Folder::$root = ($this->homes[$uid] ??= new Folder()); }
 };
 $session = new class implements \OCP\IUserSession {
     public ?string $uid = 'alice';
@@ -52,7 +93,13 @@ $session = new class implements \OCP\IUserSession {
         public function getUID(): string { return $this->uid; }
     }; }
 };
-$files = new OutlineFiles($root, $session, new Opml());
+$config = new class implements \OCP\IConfig {
+    public array $values = [];
+    public function getUserValue($uid, $app, $key, $default) { return $this->values[$uid][$key] ?? $default; }
+    public function setUserValue($uid, $app, $key, $value) { $this->values[$uid][$key] = $value; }
+};
+\OCP\Server::$provider = new class implements \OCP\Lock\ILockingProvider {};
+$files = new OutlineFiles($root, $session, new Opml(), $config);
 check('first use creates own Outlines folder', function () use ($files, $root): void {
     same([], $files->listing());
     same(true, $root->homes['alice']->nodeExists('Outlines'));
@@ -137,6 +184,102 @@ check('keeping a local copy preserves the conflicting original and creates disti
     same('Local rewrite', $first['document']['title']);
     same(false, $first['name'] === $second['name']);
     same($original, $files->open('Plan.opml'));
+});
+
+check('rename and nested move preserve exact XML and return usable etags', function () use ($files, $root): void {
+    $opened = $files->create('To move.opml');
+    $source = $root->homes['alice']->get('Outlines/To move.opml');
+    $source->content = '<opml xmlns:x="urn:custom"><head><title>Metadata</title><x:columns>kept</x:columns></head><body><outline text="Topic" custom="preserved"/></body></opml>';
+    $original = $source->content;
+    $renamed = $files->relocate('To move.opml', 'Renamed.opml', $opened['etag']);
+    same('Renamed.opml', $renamed['name']);
+    $moved = $files->relocate('Renamed.opml', 'School/Term/Plan.opml', $renamed['etag']);
+    same($original, $root->homes['alice']->get('Outlines/School/Term/Plan.opml')->content);
+    same(true, in_array('School/Term/Plan.opml', $files->listing(), true));
+    same(false, in_array('Renamed.opml', $files->listing(), true));
+    same('School/Term/Plan.opml', $files->recent()[0]);
+    same(false, in_array('Renamed.opml', $files->recent(), true));
+    same('Metadata', $moved['document']['title']);
+    $files->save($moved['name'], $moved['document'], $moved['etag']);
+    same(0, $source->locks);
+});
+check('relocation rejects overwrite stale etags traversal and nonfolders', function () use ($files, $root): void {
+    $opened = $files->create('Guarded.opml');
+    foreach ([['Plan.opml', $opened['etag'], 409], ['Moved.opml', 'stale', 412]] as [$destination, $etag, $status]) {
+        try { $files->relocate('Guarded.opml', $destination, $etag); throw new \LogicException('Unsafe relocation accepted'); }
+        catch (\RuntimeException $e) { same($status, $e->getCode()); }
+    }
+    foreach (['../Outside.opml', '/Outside.opml', 'A/../Outside.opml', 'A\\B.opml', 'notes.txt/X.opml', 'Archive.part/Plan.opml'] as $destination) {
+        try { $files->relocate('Guarded.opml', $destination, $opened['etag']); throw new \LogicException('Unsafe path accepted'); }
+        catch (\InvalidArgumentException) {}
+    }
+    same($opened, $files->open('Guarded.opml'));
+    same(0, $root->homes['alice']->get('Outlines')->locks);
+    same(0, $root->homes['alice']->get('Outlines/Guarded.opml')->locks);
+});
+check('recents persist per user and ignore stale paths', function () use ($files, $session, $config): void {
+    $session->uid = 'bob';
+    same(['Plan.opml'], $files->recent());
+    $session->uid = 'alice';
+    $config->values['alice']['recent'] = json_encode(['missing.opml', 'Guarded.opml']);
+    same(['Guarded.opml'], $files->recent());
+    $files->open('School/Term/Plan.opml');
+    same('School/Term/Plan.opml', $files->recent()[0]);
+});
+
+check('a writer arriving after the initial ETag check cannot be overwritten or relocated', function () use ($files, $root): void {
+    foreach (['save', 'move'] as $operation) {
+        $opened = $files->create('Race ' . $operation . '.opml');
+        $node = $root->homes['alice']->get('Outlines/' . $opened['name']);
+        \OCP\Util::$before = function () use ($node): void { $node->content = 'concurrent writer'; $node->etag = 'concurrent'; };
+        try {
+            if ($operation === 'save') $files->save($opened['name'], $opened['document'], $opened['etag']);
+            else $files->relocate($opened['name'], 'Unsafe.opml', $opened['etag']);
+            throw new \LogicException('Racing writer overwritten');
+        } catch (\RuntimeException $e) { same(412, $e->getCode()); }
+        same('concurrent writer', $node->content);
+        same(true, $root->homes['alice']->nodeExists('Outlines/' . $opened['name']));
+        same(false, $root->homes['alice']->nodeExists('Outlines/Unsafe.opml'));
+    }
+});
+check('a destination appearing after the initial check cannot be replaced', function () use ($files, $root): void {
+    $opened = $files->create('Collision source.opml');
+    $folder = $root->homes['alice']->get('Outlines');
+    \OCP\Util::$before = function () use ($folder): void { $folder->nodes['Collision.opml'] = new File('Collision.opml', 'other data', 'other', $folder); };
+    try { $files->relocate($opened['name'], 'Collision.opml', $opened['etag']); throw new \LogicException('Racing destination overwritten'); }
+    catch (\RuntimeException $e) { same(409, $e->getCode()); }
+    same('other data', $folder->get('Collision.opml')->content);
+    same($opened, $files->open($opened['name']));
+});
+check('creation rechecks availability at the native lock boundary', function () use ($files, $root): void {
+    $folder = $root->homes['alice']->get('Outlines');
+    \OCP\Util::$before = function () use ($folder): void { $folder->nodes['Create race.opml'] = new File('Create race.opml', 'keep', 'other', $folder); };
+    try { $files->create('Create race.opml'); throw new \LogicException('Racing creation overwritten'); }
+    catch (\RuntimeException $e) { same(409, $e->getCode()); }
+    same('keep', $folder->get('Create race.opml')->content);
+});
+check('missing hook context or disabled locking refuses mutation before writing', function () use ($files): void {
+    $provider = \OCP\Server::$provider;
+    foreach (['context', 'locking'] as $missing) {
+        \OC\Files\Filesystem::$loaded = $missing !== 'context';
+        \OCP\Server::$provider = $missing === 'locking' ? new \OC\Lock\NoopLockingProvider() : $provider;
+        try { $files->create('Unavailable.opml'); throw new \LogicException('Unsafe creation accepted'); }
+        catch (\RuntimeException $e) { same(true, str_contains($e->getMessage(), 'Safe file updates')); }
+        same(false, in_array('Unavailable.opml', $files->listing(), true));
+    }
+    \OC\Files\Filesystem::$loaded = true;
+    \OCP\Server::$provider = $provider;
+});
+
+check('save response retains its own ETag if another writer commits after native unlock', function () use ($files, $root): void {
+    $opened = $files->create('Response race.opml');
+    $node = $root->homes['alice']->get('Outlines/Response race.opml');
+    \OCP\Util::$after = function () use ($node): void { $node->content = 'unseen external data'; $node->etag = 'external-after-save'; };
+    $saved = $files->save($opened['name'], $opened['document'], $opened['etag']);
+    same(false, $saved['etag'] === 'external-after-save');
+    try { $files->save($opened['name'], $opened['document'], $saved['etag']); throw new \LogicException('Unseen change overwritten'); }
+    catch (\RuntimeException $e) { same(412, $e->getCode()); }
+    same('unseen external data', $node->content);
 });
 
 }

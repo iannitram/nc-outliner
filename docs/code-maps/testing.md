@@ -31,7 +31,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | `notes.test.mjs`, `checkboxes.test.mjs` | Notes/checklist edits, visibility, retained state, history and persistence notifications |
 | `search.test.mjs` | Ancestor paths, collapsed matches, hidden-tree preservation and filtered note caret regression |
 | `timestamp.test.mjs` | Locale/timezone formatting, range replacement, notes and metadata preservation |
-| `files.test.mjs`, `autosave.test.mjs` | Request options, strong If-Match, debounce, in-flight edits, retry, conflict and lifecycle disposal |
+| `files.test.mjs`, `autosave.test.mjs`, `file-management.test.mjs` | Request options, nested URL encoding, rename/move save barriers, strong If-Match, debounce, in-flight edits, retry, conflict and lifecycle disposal |
 | `import.test.mjs`, `export.test.mjs` | Parsing/validation, create-only workflow, unsaved snapshots, escaping, download lifecycle and failed requests |
 | `theme.test.mjs` | Auto inheritance, preference transport, selector state, failure rollback and disposal |
 
@@ -40,7 +40,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | [routes_test.php](../../tests/php/routes_test.php) | Page route scaffold; inspect `appinfo/routes.php` when changing other endpoints |
 | [opml_test.php](../../tests/php/opml_test.php) | Codec round trips, extension retention, moves, XML rejection, IDs and notes |
 | [checkboxes_test.php](../../tests/php/checkboxes_test.php) | Checklist persistence, hiding and boolean validation |
-| [files_test.php](../../tests/php/files_test.php) | User isolation, duplicate protection, paths, locks, ETags, copies and read-only export |
+| [files_test.php](../../tests/php/files_test.php) | User isolation, nested paths, relocations, recents, native-hook cancellation, racing ETags/destinations, saved response ETags, copies and read-only export |
 | [autosave_controller_test.php](../../tests/php/autosave_controller_test.php) | Strong/missing/weak/multiple If-Match handling and copy dispatch |
 | [theme_test.php](../../tests/php/theme_test.php) | Per-user preferences, defaults, validation and anonymous access |
 
@@ -51,3 +51,16 @@ JS editor tests use small DOM doubles; they do not establish browser layout or f
 The latest reviewed feature batch passed 122 JS tests, 31 PHP checks and PHP lint. Separate Chromium workflows exercised the combined app with a mocked HTTP API. Those checks covered import/export, autosave retries and conflicts, page-leave flush, note timestamps, checkboxes, appearance and keyboard actions; they were session-level checks, not a committed live-Nextcloud test harness. See [batch-two-review.md](../batch-two-review.md).
 
 When adding a saved field, check both JS edit/history behavior and PHP XML round trips, including unknown metadata. When changing a save endpoint, check the controller precondition and service lock/write behavior separately. Browser/API checks and any live deployment verification must be reported with their actual environment; standalone tests are not deployment evidence.
+
+## Native Files integration fixture
+
+[tests/integration/native-files.php](../../tests/integration/native-files.php) runs against an installed app in a disposable Nextcloud 33 container. It creates uniquely named outlines for the supplied disposable user; use a test instance and discard its data after the run. For example:
+
+```sh
+docker cp tests/integration/native-files.php outliner-file23-smoke:/tmp/native-files.php
+docker exec --user www-data outliner-file23-smoke php /tmp/native-files.php DISPOSABLE_USER_ID
+```
+
+The fixture injects writes through native Node events between the service's initial checks and View's shared-lock boundary. It explicitly updates the changed file's cache ETag to model metadata published by a separate request, while retaining an old FileInfo instance; it verifies fresh-node checks cancel save/move with 412 and preserve bytes. It also injects create/move destination collisions and verifies 409 without replacement. These are deterministic native-hook checks, not a multiprocess stress test. The standalone PHP suite separately verifies that a writer committing after native unlock cannot cause the save response to return that unseen writer's ETag.
+
+For F20, `npm run check` passed 126 JavaScript tests, 51 PHP checks and PHP lint. A disposable Nextcloud 33.0.10 Apache/SQLite instance also passed signed-in API and Chromium workflows for create, autosave before rename, nested move, duplicate, reopen, persisted recents, stale ETags, destination collisions and traversal rejection. Nested paths retain literal separators and encode individual segments because default Apache rejects encoded `%2F` separators.

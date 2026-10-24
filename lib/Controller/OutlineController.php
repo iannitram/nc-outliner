@@ -49,7 +49,12 @@ class OutlineController extends Controller
     #[NoAdminRequired]
     public function update(string $name, array $document = []): JSONResponse
     {
-        // Only a strong, exact If-Match value can authorize replacing this file.
+
+        return $this->respond(fn () => $this->files->save($name, $document, $this->etag()));
+    }
+
+    private function etag(): string
+    {
         $header = $this->request->getHeader('If-Match');
         $etag = '';
         if (strlen($header) >= 2 && $header[0] === '"' && str_ends_with($header, '"')) {
@@ -58,7 +63,16 @@ class OutlineController extends Controller
                 $etag = $candidate;
             }
         }
-        return $this->respond(fn () => $this->files->save($name, $document, $etag));
+        return $etag;
+    }
+
+    #[NoAdminRequired]
+    public function recent(): JSONResponse { return $this->respond(fn () => $this->files->recent()); }
+
+    #[NoAdminRequired]
+    public function relocate(string $name, string $destination = ''): JSONResponse
+    {
+        return $this->respond(fn () => $this->files->relocate($name, $destination, $this->etag()));
     }
 
     #[NoAdminRequired]

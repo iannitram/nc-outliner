@@ -1,3 +1,4 @@
+import { encodeOutlinePath } from './file-path.js';
 import { createRow } from './model.js';
 
 /** Parse indented text and Markdown list markers without interpreting HTML. */
@@ -44,7 +45,7 @@ export async function importOutline(api, { name, text }, mayLeave = () => true) 
   if (!await mayLeave()) return null;
   const created = await api('', 'POST', { name: filename });
   try {
-    const saved = await api(`/${encodeURIComponent(created.name)}`, 'PUT', { document, etag: created.etag });
+    const saved = await api(`/${encodeOutlinePath(created.name)}`, 'PUT', { document, etag: created.etag });
     return { ...created, ...saved, document };
   } catch (error) {
     throw new Error(`Created ${created.name}, but could not save imported text: ${error.message}. Your source text is still in the import form.`, { cause: error });

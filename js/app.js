@@ -1,6 +1,8 @@
+import { encodeOutlinePath } from './file-path.js';
 import { importOutline, mountImport } from './import.js';
 import { mountExport } from './export.js';
 import { mountTheme } from './theme.js';
+import { renameDestination, moveDestination, relocateOutline } from './file-management.js';
 import { createAutosave } from './autosave.js';
 
 /** File shell. F02 supplies editor.js; F01 can also display outlines read-only. */
@@ -42,6 +44,8 @@ export async function start(el) {
   const create = make('button', 'Create outline');
   create.type = 'submit';
   const list = make('div');
+  const recentHeading = make('h3', 'Recent outlines');
+  const recentList = make('div');
   const workspace = make('section');
   let toolbar = workspace;
   workspace.className = 'outliner-workspace';
@@ -56,14 +60,14 @@ export async function start(el) {
   status.setAttribute('role', 'status');
   const content = make('div');
   form.append(name, create);
-  sidebar.append(heading, form, list);
+  sidebar.append(heading, form, recentHeading, recentList, list);
   workspace.append(title, conflicts, status, content);
   el.replaceChildren(sidebar, workspace);
   let importHost = sidebar;
   try {
     const { mountShell } = await import('./shell.js');
     const shell = mountShell(el);
-    shell.navigation.append(heading, form, list);
+    shell.navigation.append(heading, form, recentHeading, recentList, list);
     importHost = shell.navigation;
     toolbar = shell.toolbar;
     mountTheme(el, shell.toolbar);
@@ -87,8 +91,42 @@ export async function start(el) {
   const exportControls = mountExport(toolbar, () => current ? {
     name: current.name, document: editor?.getDocument() ?? current.document,
   } : null, api, error => { status.textContent = error.message; });
+  const rename = make('button', 'Rename');
+  const duplicate = make('button', 'Duplicate');
+  const move = make('button', 'Move');
+  for (const button of [rename, duplicate, move]) { button.type = 'button'; toolbar.append(button); }
+  async function manage(action) {
+    if (busy || !current) return;
+    busy = true; controls();
+    try { await action(); }
+    catch (e) { error(e); }
+    finally { busy = false; controls(); }
+  }
+  rename.addEventListener('click', () => manage(async () => {
+    const value = globalThis.prompt('New outline filename', current.name.split('/').at(-1));
+    if (value === null) return;
+    display(await relocateOutline(api, current, autosave, renameDestination(current.name, value)));
+    await refresh();
+  }));
+  move.addEventListener('click', () => manage(async () => {
+    const value = globalThis.prompt('Destination folder inside Outlines (blank for Outlines; new folders are created)', current.name.split('/').slice(0, -1).join('/'));
+    if (value === null) return;
+    display(await relocateOutline(api, current, autosave, moveDestination(current.name, value)));
+    await refresh();
+  }));
+  duplicate.addEventListener('click', () => manage(async () => {
+    const document = structuredClone(editor?.getDocument() ?? current.document);
+    // Save the original before switching; copy still includes the current snapshot.
+    await autosave.flush();
+    if (autosave.hasPending()) throw new Error('Save or resolve the conflict before duplicating this outline.');
+    display(await api(`/${encodeOutlinePath(current.name)}/copy`, 'POST', { document }));
+    await refresh();
+  }));
   function controls() {
     exportControls.refresh();
+    content.inert = busy;
+    for (const button of [rename, duplicate, move]) button.disabled = busy || !current;
+    recentList.querySelectorAll('button').forEach(button => { button.disabled = busy; });
     reload.disabled = copy.disabled = busy;
     create.disabled = busy;
     name.disabled = busy;
@@ -96,7 +134,15 @@ export async function start(el) {
   }
   const error = e => { status.textContent = e.message; };
   async function refresh() {
-    const names = await api();
+    const [names, recent] = await Promise.all([api(), api('-recent')]);
+    recentList.replaceChildren();
+    recentHeading.hidden = recent.length === 0;
+    for (const filename of recent) {
+      const button = make('button', filename.slice(0, -5));
+      button.type = 'button';
+      button.addEventListener('click', () => open(filename).catch(error));
+      recentList.append(button);
+    }
     list.replaceChildren();
     for (const filename of names) {
       const button = make('button', filename.slice(0, -5));
@@ -113,7 +159,7 @@ export async function start(el) {
     conflicts.hidden = true;
     autosave = createAutosave({
       document: result.document, etag: result.etag,
-      save: (document, etag, options) => api(`/${encodeURIComponent(result.name)}`, 'PUT', { document, etag }, options),
+      save: (document, etag, options) => api(`/${encodeOutlinePath(result.name)}`, 'PUT', { document, etag }, options),
       onStatus: text => { status.textContent = text; },
       onConflict: () => { conflicts.hidden = false; },
     });
@@ -148,7 +194,7 @@ export async function start(el) {
     busy = true;
     controls();
     if (!await mayLeave()) { busy = false; controls(); return; }
-    try { display(await api(`/${encodeURIComponent(filename)}`)); }
+    try { display(await api(`/${encodeOutlinePath(filename)}`)); await refresh(); }
     finally { busy = false; controls(); }
   }
   form.addEventListener('submit', async event => {
@@ -169,7 +215,7 @@ export async function start(el) {
   reload.addEventListener('click', async () => {
     if (busy || !current) return;
     busy = true; controls();
-    try { display(await api(`/${encodeURIComponent(current.name)}`)); }
+    try { display(await api(`/${encodeOutlinePath(current.name)}`)); }
     catch (e) { error(e); }
     finally { busy = false; controls(); }
   });
@@ -178,7 +224,7 @@ export async function start(el) {
     busy = true; controls();
     const snapshot = structuredClone(editor.getDocument());
     try {
-      const result = await api(`/${encodeURIComponent(current.name)}/copy`, 'POST', { document: snapshot });
+      const result = await api(`/${encodeOutlinePath(current.name)}/copy`, 'POST', { document: snapshot });
       const latest = structuredClone(editor.getDocument());
       display(result);
       if (JSON.stringify(latest) !== JSON.stringify(snapshot)) editor.replaceDocument(latest);

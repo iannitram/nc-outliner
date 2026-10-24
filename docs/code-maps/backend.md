@@ -21,10 +21,12 @@ The API base is generated from the app page URL plus `/api`; browser code must n
 
 | Method and suffix | Input | Success payload |
 |---|---|---|
-| `GET /outlines` | None | Array of OPML filenames |
+| `GET /outlines` | None | Array of OPML paths relative to `Outlines/` |
 | `POST /outlines` | `{ name }` | `{ name, etag, document }` for the newly created file |
-| `GET /outlines/{name}` | URL-encoded basename | `{ name, etag, document }` |
+| `GET /outlines/{name}` | Path with each filename/folder segment URL-encoded, keeping `/` separators | `{ name, etag, document }` |
 | `PUT /outlines/{name}` | `{ document }`, strong `If-Match: "etag"` | `{ name, etag }` |
+| `GET /outlines-recent` | None | Up to ten existing recent paths for this user |
+| `POST /outlines/{name}/relocate` | `{ destination }`, strong `If-Match: "etag"` | `{ name, etag, document }` after rename/move |
 | `POST /outlines/{name}/copy` | `{ document }` | `{ name, etag, document }` for a distinct copy |
 | `POST /outlines/{name}/export` | `{ document }` | `{ content }`, with OPML XML as a JSON string |
 | `GET /theme` | None | `{ theme }` |
@@ -34,11 +36,13 @@ The client currently also includes `etag` in save JSON; the controller authorize
 
 ## Files and concurrency
 
-`OutlineFiles` resolves `IRootFolder::getUserFolder()` using `IUserSession`. Its fixed `Outlines/` folder is created on first use. Listings include files only, not folders with an `.opml` suffix. Filenames must be nonempty OPML basenames, at most 240 bytes, without paths, leading dots or control characters.
+`OutlineFiles` resolves `IRootFolder::getUserFolder()` using `IUserSession`. Its fixed `Outlines/` folder is created on first use. Listings recurse through visible folders and include OPML files. Relative paths reject empty, dot, hidden and `.part` segments, backslashes and control characters; each segment is at most 240 bytes and the final name ends in `.opml`. The `.part` restriction matters because Nextcloud suppresses native hooks for partial-file paths.
 
-Create holds an exclusive folder lock, checks `nodeExists()`, then calls `newFile()`. This check matters because Nextcloud's `newFile()` can overwrite an existing file. Open holds a shared file lock while reading the ETag and content. Save holds an exclusive file lock across ETag comparison, codec serialization and `putContent()`. Locks are released in `finally` blocks.
+Mutations use the native Nextcloud 33 Files API. Its legacy `OC_Filesystem` `write` and `rename` hooks run under shared source/destination locks immediately before the native exclusive upgrade. A scoped listener rechecks destination availability and a freshly fetched source ETag there. Cancellation sets the hook's referenced `run` flag to false and rethrows the captured error after the API returns, since Nextcloud swallows ordinary hook exceptions. The service refuses mutation when the signed-in filesystem context or locking provider is unavailable. Explicit exclusive Node locks cannot wrap these calls because the native API first requests a shared lock.
 
-Conflict copies read source XML under a shared lock, apply the supplied local document, then create a randomly suffixed filename under an exclusive folder lock. They never write the conflicting original. OPML export also serializes against the original XML under a shared lock, but writes no file. Text and Markdown downloads do not call the server exporter.
+Save captures its resulting ETag in native `post_write`, while the shared lock is still held, so another writer cannot lend an unseen ETag to the local document. Open and export hold shared locks while reading. A relocation preserves XML bytes through `File::move()`, creates requested parent folders inside `Outlines/`, and refuses replacement of another node. Standard Nextcloud version/cache hooks remain active.
+
+Conflict copies read source XML under a shared lock, apply the supplied local document and create a randomly suffixed filename with the same destination guard. They never write the conflicting original. Recent paths are stored in `outliner/recent` user preferences, capped at ten and filtered against existing outlines. Renaming/moving replaces the old recent path. OPML export writes no file; text and Markdown downloads do not call the server exporter.
 
 ## Document and OPML mapping
 

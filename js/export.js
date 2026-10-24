@@ -1,3 +1,4 @@
+import { encodeOutlinePath } from './file-path.js';
 const formats = {
   text: { extension: 'txt', type: 'text/plain;charset=utf-8' },
   markdown: { extension: 'md', type: 'text/markdown;charset=utf-8' },
@@ -36,7 +37,7 @@ export async function prepareExport(current, format, api) {
   // Snapshot before awaiting the server so concurrent edits cannot change this export.
   const document = structuredClone(current.document);
   const content = format === 'opml'
-    ? (await api(`/${encodeURIComponent(current.name)}/export`, 'POST', { document })).content
+    ? (await api(`/${encodeOutlinePath(current.name)}/export`, 'POST', { document })).content
     : exportText(document, format === 'markdown');
   if (typeof content !== 'string') throw new Error('The export response was invalid.');
   return { content, filename: exportFilename(current.name, format), type: formats[format].type };
