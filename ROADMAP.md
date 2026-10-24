@@ -28,14 +28,14 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/5 |
 | F04 | **Expand / collapse** a row (disclosure triangle, arrow keys); a bullet for rows without children | Low | Needs F02. Collapsed state saved in the file; https://github.com/iannitram/nc-outliner/pull/6 |
 | F05 | **Undo / redo** for every change | Medium | Needs F02. Build it early: every later editing feature has to go through it; https://github.com/iannitram/nc-outliner/pull/7 |
-| F06 | **Row notes:** a note under any row, shown or hidden per row | Medium | Needs F02; https://github.com/iannitram/nc-outliner/pull/8 |
-| F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/13 |
-| F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/11 |
-| F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/16 |
-| F14 | **Search field:** show only rows matching the text (with their parents) | Medium | Needs F04; https://github.com/iannitram/nc-outliner/pull/17 |
-| F26 | **Insert timestamp:** short or long date, time, or both | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/28 |
-| F34 | **Import plain text** (tab-indented or bulleted) and Markdown lists as a new outline | Low | Needs F01; https://github.com/iannitram/nc-outliner/pull/36 |
-| F35 | **Export plain text, OPML and Markdown** | Low | Needs F01. Markdown isn't in Omni, but it's a cheap win; https://github.com/iannitram/nc-outliner/pull/37 |
+| F06 | **Row notes:** a note under any row, shown or hidden per row | Medium | Needs F02; https://github.com/iannitram/nc-outliner/pull/58 |
+| F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/59 |
+| F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/60 |
+| F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/61 |
+| F14 | **Search field:** show only rows matching the text (with their parents) | Medium | Needs F04; https://github.com/iannitram/nc-outliner/pull/62 |
+| F26 | **Insert timestamp:** short or long date, time, or both | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/63 |
+| F34 | **Import plain text** (tab-indented or bulleted) and Markdown lists as a new outline | Low | Needs F01; https://github.com/iannitram/nc-outliner/pull/64 |
+| F35 | **Export plain text, OPML and Markdown** | Low | Needs F01. Markdown isn't in Omni, but it's a cheap win; https://github.com/iannitram/nc-outliner/pull/65 |
 
 ## Unwritten
 
