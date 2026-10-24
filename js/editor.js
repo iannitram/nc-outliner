@@ -5,6 +5,7 @@ import { handleIndentKey } from './indent.js';
 import { createCollapseExtension } from './collapse.js';
 import { updateNote, setNoteVisible, renderNote } from './notes.js';
 import { handleRowActionKey, renderRowActions } from './row-actions.js';
+import { handleExpansionKey, mountExpansionControls } from './expansion.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
@@ -13,6 +14,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   let destroyed = false;
   const history = createHistory({ document, selection: null });
   let pendingSelection = null;
+  let lastRowSelection = null;
   const dom = element.ownerDocument;
   const root = dom.createElement('div');
   root.className = 'outliner-editor';
@@ -20,7 +22,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   element.appendChild(root);
   const toolbar = dom.createElement('div');
   toolbar.setAttribute('role', 'toolbar');
-  toolbar.setAttribute('aria-label', 'Edit history');
+  toolbar.setAttribute('aria-label', 'Outline actions');
   const undoButton = dom.createElement('button');
   const redoButton = dom.createElement('button');
   undoButton.type = redoButton.type = 'button';
@@ -78,11 +80,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   function replaceDocument(next, { selection, notify = true, replay = false } = {}) {
     pendingSelection = null;
+    if (!replay) lastRowSelection = null;
     return change(() => next, { type: 'replace', replay, focus: selection, notify });
   }
 
   let checkboxToggle;
   const context = { undo: () => replay('undo'), redo: () => replay('redo'), getHistoryState: history.getState, getDocument: () => document, getSelection, change, replaceDocument, focusRow, render };
+  mountExpansionControls(toolbar, context, () => getSelection() ?? lastRowSelection);
 
   function render() {
     if (destroyed) return;
@@ -151,6 +155,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       if (!change((old) => setNoteVisible(old, input.dataset.rowId, true), { type: 'note-visibility', focus })) focusRow(input.dataset.rowId, 0, 0, 'none', 'note');
       return;
     }
+    if (handleExpansionKey(event, context)) { event.preventDefault(); return; }
     if (options.onKeyDown?.(event, context)) { event.preventDefault(); return; }
     if (handleIndentKey(event, context)) { event.preventDefault(); return; }
     if (handleRowActionKey(event, context)) { event.preventDefault(); return; }
@@ -178,6 +183,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       replay(event.inputType === 'historyUndo' ? 'undo' : 'redo');
     }
   }
+  function onFocusOut(event) {
+    const input = event.target;
+    if (input.matches?.('textarea[data-row-id]')) {
+      lastRowSelection = { id: input.dataset.rowId, offset: input.selectionStart, end: input.selectionEnd, direction: input.selectionDirection };
+    }
+  }
+  root.addEventListener('focusout', onFocusOut);
   root.addEventListener('beforeinput', onBeforeInput);
   root.addEventListener('input', onInput);
   root.addEventListener('keydown', onKeyDown);
@@ -190,6 +202,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   return { ...context, destroy() {
     destroyed = true;
     unsubscribe();
+    root.removeEventListener('focusout', onFocusOut);
     root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);
     root.removeEventListener('keydown', onKeyDown);
