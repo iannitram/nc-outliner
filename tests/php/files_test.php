@@ -95,6 +95,25 @@ check('saving checks etag and releases locks after conflicts', function () use (
     same('Updated', $files->open('Plan.opml')['document']['title']);
     same(0, $root->homes['alice']->get('Outlines')->get('Plan.opml')->locks);
 });
+check('export includes unsaved edits and unknown XML without changing the original file', function () use ($files, $root): void {
+    $file = $root->homes['alice']->get('Outlines')->get('Plan.opml');
+    $original = $file->content;
+    $etag = $file->etag;
+    $file->content = '<opml xmlns:x="urn:custom"><head><title>Original</title><x:columns>schema</x:columns></head><body><outline text="Old" custom="kept"/></body></opml>';
+    $document = $files->open('Plan.opml')['document'];
+    $document['rows'][0]['text'] = 'Unsaved & <safe>';
+    $export = $files->export('Plan.opml', $document)['content'];
+    same(true, str_contains($export, '<x:columns>schema</x:columns>'));
+    same(true, str_contains($export, 'custom="kept"'));
+    same('Unsaved & <safe>', (new Opml())->read($export)['rows'][0]['text']);
+    same('Old', $files->open('Plan.opml')['document']['rows'][0]['text']);
+    same($etag, $file->etag);
+    same(0, $file->locks);
+    try { $files->export('Plan.opml', []); throw new \LogicException('Invalid export accepted'); }
+    catch (\InvalidArgumentException) {}
+    same(0, $file->locks);
+    $file->content = $original;
+});
 check('same filename in another user home is isolated', function () use ($files, $session): void {
     $session->uid = 'bob';
     same([], $files->listing());

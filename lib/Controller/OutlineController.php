@@ -48,4 +48,7 @@ class OutlineController extends Controller
 
     #[NoAdminRequired]
     public function update(string $name, array $document = [], string $etag = ''): JSONResponse { return $this->respond(fn () => $this->files->save($name, $document, $etag)); }
+
+    #[NoAdminRequired]
+    public function export(string $name, array $document = []): JSONResponse { return $this->respond(fn () => $this->files->export($name, $document)); }
 }

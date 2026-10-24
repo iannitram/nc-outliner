@@ -106,4 +106,16 @@ class OutlineFiles
             $file->unlock(ILockingProvider::LOCK_EXCLUSIVE);
         }
     }
+
+    /** Render current edits against the original XML without modifying the file. */
+    public function export(string $name, array $document): array
+    {
+        $file = $this->file($name);
+        $file->lock(ILockingProvider::LOCK_SHARED);
+        try {
+            return ['content' => $this->opml->write($document, $file->getContent())];
+        } finally {
+            $file->unlock(ILockingProvider::LOCK_SHARED);
+        }
+    }
 }
