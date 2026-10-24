@@ -1,0 +1,17 @@
+#outliner-app {
+  --ol-bg: var(--color-main-background);
+  --ol-fg: var(--color-main-text);
+  --ol-muted: var(--color-text-maxcontrast);
+  --ol-border: var(--color-border);
+  --ol-accent: var(--color-primary-element);
+  --ol-accent-fg: var(--color-primary-element-text);
+  --ol-hover: var(--color-background-hover);
+}
+
+#outliner-app {
+  display: flex;
+  height: 100%;
+  min-height: 60vh;
+  background: var(--ol-bg);
+  color: var(--ol-fg);
+}
