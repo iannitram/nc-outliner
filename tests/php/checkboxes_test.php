@@ -5,11 +5,11 @@ require __DIR__ . '/../../lib/Service/Opml.php';
 use OCA\Outliner\Service\Opml;
 $codec = new Opml();
 check('checklist visibility and nested statuses survive save reopen and hiding', function () use ($codec): void {
-    $doc = ['title' => 'Tasks', 'showCheckboxes' => true, 'rows' => [
-        ['id' => 'a', 'text' => 'Parent', 'collapsed' => false, 'checked' => true, 'children' => [
-            ['id' => 'b', 'text' => 'Child', 'collapsed' => false, 'checked' => false, 'children' => []],
-        ]],
-    ]];
+    $doc = ['title' => 'Tasks', 'rows' => [
+        ['id' => 'a', 'text' => 'Parent', 'collapsed' => false, 'children' => [
+            ['id' => 'b', 'text' => 'Child', 'collapsed' => false, 'children' => [], 'checked' => false],
+        ], 'checked' => true],
+    ], 'showCheckboxes' => true];
     $xml = $codec->write($doc, $codec->create('Old'));
     same($doc, $codec->read($xml));
     $doc['showCheckboxes'] = false;
