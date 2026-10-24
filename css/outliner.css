@@ -117,3 +117,31 @@
 .outliner-import { margin-block: 1rem; }
 .outliner-import form { display: grid; gap: .5rem; }
 .outliner-import input, .outliner-import textarea { box-sizing: border-box; width: 100%; }
+#outliner-app[data-outliner-theme="light"] {
+  --ol-bg: #ffffff;
+  --ol-fg: #222222;
+  --ol-muted: #555555;
+  --ol-border: #b8b8b8;
+  --ol-accent: #0059a6;
+  --ol-accent-fg: #ffffff;
+  --ol-hover: #ededed;
+  color-scheme: light;
+}
+#outliner-app[data-outliner-theme="dark"] {
+  --ol-bg: #181818;
+  --ol-fg: #eeeeee;
+  --ol-muted: #bdbdbd;
+  --ol-border: #737373;
+  --ol-accent: #8dc8ff;
+  --ol-accent-fg: #101010;
+  --ol-hover: #303030;
+  color-scheme: dark;
+}
+#outliner-app[data-outliner-theme] :is(button, input, textarea, select) {
+  color: var(--ol-fg);
+  background-color: var(--ol-bg);
+  border-color: var(--ol-border);
+}
+#outliner-app[data-outliner-theme] :is(button, select):hover { background-color: var(--ol-hover); }
+#outliner-app .outliner-theme { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+#outliner-app .outliner-theme [role="status"] { color: var(--ol-muted); }

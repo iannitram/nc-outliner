@@ -1,5 +1,6 @@
 import { importOutline, mountImport } from './import.js';
 import { mountExport } from './export.js';
+import { mountTheme } from './theme.js';
 
 /** File shell. F02 supplies editor.js; F01 can also display outlines read-only. */
 export function createApi(base, fetcher = globalThis.fetch) {
@@ -57,6 +58,7 @@ export async function start(el) {
     importHost = shell.navigation;
     shell.toolbar.append(title, save);
     toolbar = shell.toolbar;
+    mountTheme(el, shell.toolbar);
     shell.content.append(content);
     status = shell.status;
     status.setAttribute('role', 'status');
