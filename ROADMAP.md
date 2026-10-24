@@ -28,6 +28,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/5 |
 | F04 | **Expand / collapse** a row (disclosure triangle, arrow keys); a bullet for rows without children | Low | Needs F02. Collapsed state saved in the file; https://github.com/iannitram/nc-outliner/pull/6 |
 | F05 | **Undo / redo** for every change | Medium | Needs F02. Build it early: every later editing feature has to go through it; https://github.com/iannitram/nc-outliner/pull/7 |
+| F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/13 |
 
 ## Unwritten
 
@@ -40,7 +41,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 10 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it |
 | 11 | F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02 |
 | 12 | F09 | **Drag and drop** rows by their handle to reorder or nest | Medium | Needs F03, F04 |
-| 13 | F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02 |
 | 14 | F11 | **Select several rows** (Shift/Ctrl+click, Shift+arrow) and act on them together | Medium | Needs F02. Needed by F12, F21, F22 |
 | 15 | F12 | **Cut, copy, paste rows** with their structure, between outlines too; pasting tab-indented or bulleted text becomes rows | Medium | Needs F11 |
 | 16 | F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04 |

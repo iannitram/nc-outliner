@@ -65,9 +65,13 @@ class Opml
                 throw new InvalidArgumentException('Duplicate row ID.');
             }
             $nodes[$id] = $node;
-            $rows[] = ['id' => $id, 'text' => $node->getAttribute('text'),
+            $row = ['id' => $id, 'text' => $node->getAttribute('text'),
                 'collapsed' => $node->getAttributeNS(self::NS, 'collapsed') === 'true',
                 'children' => $this->rows($node, $nodes, $position)];
+            if ($node->hasAttributeNS(self::NS, 'checked')) {
+                $row['checked'] = $node->getAttributeNS(self::NS, 'checked') === 'true';
+            }
+            $rows[] = $row;
         }
         return $rows;
     }
@@ -81,7 +85,11 @@ class Opml
             throw new InvalidArgumentException('OPML body is missing.');
         }
         $nodes = [];
-        return ['title' => $head ? ($this->child($head, 'title')?->textContent ?? '') : '', 'rows' => $this->rows($body, $nodes)];
+        $document = ['title' => $head ? ($this->child($head, 'title')?->textContent ?? '') : '', 'rows' => $this->rows($body, $nodes)];
+        if ($dom->documentElement->hasAttributeNS(self::NS, 'showCheckboxes')) {
+            $document['showCheckboxes'] = $dom->documentElement->getAttributeNS(self::NS, 'showCheckboxes') === 'true';
+        }
+        return $document;
     }
 
     public function write(array $document, string $original): string
@@ -91,6 +99,12 @@ class Opml
         }
         $dom = $this->xml($original);
         $root = $dom->documentElement;
+        if (array_key_exists('showCheckboxes', $document)) {
+            if (!is_bool($document['showCheckboxes'])) {
+                throw new InvalidArgumentException('Invalid checklist visibility.');
+            }
+            $root->setAttributeNS(self::NS, 'nc:showCheckboxes', $document['showCheckboxes'] ? 'true' : 'false');
+        }
         $head = $this->child($root, 'head') ?? $root->insertBefore($dom->createElement('head'), $root->firstChild);
         $title = $this->child($head, 'title') ?? $head->appendChild($dom->createElement('title'));
         $title->textContent = $document['title'];
@@ -117,6 +131,12 @@ class Opml
                     if ($child instanceof DOMElement && $child->tagName === 'outline') {
                         $node->removeChild($child);
                     }
+                }
+                if (array_key_exists('checked', $row)) {
+                    if (!is_bool($row['checked'])) {
+                        throw new InvalidArgumentException('Invalid checkbox status.');
+                    }
+                    $node->setAttributeNS(self::NS, 'nc:checked', $row['checked'] ? 'true' : 'false');
                 }
                 $node->setAttribute('text', $row['text']);
                 $node->setAttributeNS(self::NS, 'nc:id', $row['id']);

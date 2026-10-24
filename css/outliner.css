@@ -84,3 +84,11 @@
 .outliner-files button { display: block; max-width: 100%; overflow-wrap: anywhere; }
 .outliner-workspace { flex: 1; min-width: 0; padding: 1rem; overflow: auto; }
 .outliner-workspace [role="status"] { min-height: 1.5rem; color: var(--ol-muted); }
+
+#outliner-app .outliner-check-row { padding-inline-start: 3.5rem; }
+#outliner-app .outliner-check {
+  position: absolute;
+  inset-inline-start: 1.75rem;
+  inset-block-start: .4rem;
+}
+#outliner-app .outliner-check input { margin: 0; }
