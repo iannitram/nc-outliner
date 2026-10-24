@@ -6,7 +6,7 @@ import { createCollapseExtension } from './collapse.js';
 import { updateNote, setNoteVisible, renderNote } from './notes.js';
 import { handleRowActionKey, renderRowActions } from './row-actions.js';
 import { handleExpansionKey, mountExpansionControls } from './expansion.js';
-import { matchingRowIds } from './search.js';
+import { matchingRowIds, findMatches, renderMatchPreview } from './search.js';
 import { mountTimestampControls } from './timestamp.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
@@ -42,7 +42,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   const searchInput = dom.createElement('input');
   searchInput.type = 'search';
   searchInput.setAttribute('aria-label', 'Search rows');
-  searchInput.placeholder = 'Search rows';
+  searchInput.placeholder = 'Find in topics and notes';
+  searchInput.setAttribute('aria-label', 'Find in topics and notes');
   const clearSearch = dom.createElement('button');
   clearSearch.type = 'button';
   clearSearch.textContent = 'Clear search';
@@ -52,10 +53,31 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   searchPanel.appendChild(searchInput);
   searchPanel.appendChild(clearSearch);
   searchPanel.appendChild(searchStatus);
+  const previousMatch = dom.createElement('button');
+  const nextMatch = dom.createElement('button');
+  previousMatch.type = nextMatch.type = 'button';
+  previousMatch.textContent = 'Previous match';
+  nextMatch.textContent = 'Next match';
+  previousMatch.addEventListener('click', () => navigateMatch(-1));
+  nextMatch.addEventListener('click', () => navigateMatch(1));
+  searchPanel.appendChild(previousMatch);
+  searchPanel.appendChild(nextMatch);
   let searchQuery = '';
+  let matches = [];
+  let activeMatch = null;
+  function navigateMatch(direction) {
+    if (destroyed || !matches.length) return;
+    const index = matches.indexOf(activeMatch);
+    activeMatch = matches[(index < 0 ? (direction > 0 ? 0 : matches.length - 1) : index + direction + matches.length) % matches.length];
+    render();
+    focusRow(activeMatch.id, activeMatch.start, activeMatch.end, 'forward', activeMatch.field);
+    const attribute = activeMatch.field === 'note' ? 'noteId' : 'rowId';
+    [...root.querySelectorAll(activeMatch.field === 'note' ? 'textarea[data-note-id]' : 'textarea[data-row-id]')].find(input => input.dataset[attribute] === activeMatch.id)?.scrollIntoView?.({ block: 'nearest' });
+  }
   function setSearchQuery(query) {
     if (destroyed) return;
     searchQuery = query;
+    activeMatch = null;
     searchInput.value = query;
     const start = searchInput.selectionStart;
     const end = searchInput.selectionEnd;
@@ -65,6 +87,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   }
   searchInput.addEventListener('input', () => setSearchQuery(searchInput.value));
   searchInput.addEventListener('keydown', (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === 'Enter') { event.preventDefault(); navigateMatch(event.shiftKey ? -1 : 1); }
     if (event.key === 'Escape') { event.preventDefault(); setSearchQuery(''); }
   });
   clearSearch.addEventListener('click', () => setSearchQuery(''));
@@ -135,8 +159,18 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     root.appendChild(toolbar);
     root.appendChild(searchPanel);
     const included = matchingRowIds(document.rows, searchQuery);
+    const previous = activeMatch;
+    matches = findMatches(document.rows, searchQuery);
+    activeMatch = previous ? matches.find(match => match.id === previous.id && match.field === previous.field && match.start === previous.start && match.end === previous.end) ?? null : null;
+    const matchesByRow = new Map();
+    for (const match of matches) {
+      if (!matchesByRow.has(match.id)) matchesByRow.set(match.id, []);
+      matchesByRow.get(match.id).push(match);
+    }
+    previousMatch.disabled = nextMatch.disabled = matches.length === 0;
+    searchStatus.textContent = matches.length ? `${activeMatch ? matches.indexOf(activeMatch) + 1 : 0} of ${matches.length} matches` : 'No matching rows';
     clearSearch.disabled = included === null;
-    searchStatus.hidden = included === null || included.size > 0;
+    searchStatus.hidden = included === null;
     function renderRows(rows, container) {
       const list = dom.createElement('ul');
       list.className = 'outliner-rows';
@@ -156,7 +190,16 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         input.title = 'Move row: Alt+Up/Down. Delete row and children: Alt+Delete.';
         item.appendChild(input);
         options.renderRow?.(row, item, context);
-        renderNote(row, item, context);
+        const rowMatches = matchesByRow.get(row.id) ?? [];
+        renderNote(row, item, context, { reveal: rowMatches.some(match => match.field === 'note') });
+        for (const field of ['text', 'note']) {
+          const fieldMatches = rowMatches.filter(match => match.field === field);
+          if (fieldMatches.length) {
+            const preview = renderMatchPreview(dom, String(row[field] ?? ''), fieldMatches, activeMatch);
+            preview.dataset.field = field;
+            item.appendChild(preview);
+          }
+        }
         renderCheckbox(row, item, context);
         renderRowActions(row, item, context);
         if (row.children?.length && (included || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
@@ -186,6 +229,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   }
 
   function onKeyDown(event) {
+    if (event.isComposing || event.keyCode === 229) return;
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+      event.preventDefault(); searchInput.focus(); return;
+    }
+    if (event.key === 'F3' || ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g')) {
+      event.preventDefault(); navigateMatch(event.shiftKey ? -1 : 1); return;
+    }
     const input = event.target;
     const isNote = Boolean(input.dataset?.noteId);
     if ((!isNote && !input.matches?.('textarea[data-row-id]')) || event.isComposing || event.keyCode === 229) return;

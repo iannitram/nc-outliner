@@ -21,14 +21,15 @@ export function setNoteVisible(document, id, visible) {
   return next;
 }
 
-export function renderNote(row, item, context) {
+export function renderNote(row, item, context, { reveal = false } = {}) {
   const dom = item.ownerDocument;
-  const visible = noteIsVisible(row);
+  const visible = reveal || noteIsVisible(row);
   const button = dom.createElement('button');
   button.type = 'button';
   button.className = 'outliner-note-toggle';
   button.textContent = visible ? 'Hide note' : (row.note ? 'Show note' : 'Add note');
   button.setAttribute('aria-expanded', String(visible));
+  if (reveal && !noteIsVisible(row)) { button.disabled = true; button.title = 'This note is revealed by the current search.'; }
   button.addEventListener('click', () => context.change(
     (document) => setNoteVisible(document, row.id, !visible),
     { type: 'note-visibility', focus: { id: row.id, offset: 0, field: visible ? 'text' : 'note' } },

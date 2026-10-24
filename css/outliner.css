@@ -145,3 +145,16 @@
 #outliner-app[data-outliner-theme] :is(button, select):hover { background-color: var(--ol-hover); }
 #outliner-app .outliner-theme { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 #outliner-app .outliner-theme [role="status"] { color: var(--ol-muted); }
+
+/* Match previews retain editable textareas while marking every literal occurrence. */
+.outliner-find-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 2px 0 6px;
+  padding: 4px 8px;
+  border-inline-start: 2px solid var(--ol-border);
+  color: var(--ol-fg);
+  font: inherit;
+}
+.outliner-find-preview mark { background: var(--ol-hover); color: var(--ol-fg); text-decoration: underline; }
+.outliner-find-preview .outliner-find-current { background: var(--ol-accent); color: var(--ol-accent-fg); outline: 2px solid currentColor; }

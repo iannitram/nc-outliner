@@ -30,7 +30,7 @@
 | [row-actions.js](../../js/row-actions.js) | Explicit subtree deletion and sibling movement; buttons, Alt+Delete and Alt+Up/Down. |
 | [notes.js](../../js/notes.js) | Immutable note/visibility edits and per-row note controls. Shift+Enter opens a note; Escape returns to the topic. |
 | [checkboxes.js](../../js/checkboxes.js) | Document visibility toggle, checked-state edits and accessible per-row checkboxes. Hiding retains checked states. |
-| [search.js](../../js/search.js) | `matchingRowIds()` returns literal case-insensitive matches plus ancestors. Editor filtering reveals matching paths without changing saved collapse state. |
+| [search.js](../../js/search.js) | `matchingRowIds()` includes topic/note matches plus ancestors; `findMatches()` enumerates literal case-insensitive occurrences with textarea offsets. Next/Previous (Enter/Shift+Enter, F3/Shift+F3, Ctrl/Cmd+G) selects each occurrence and wraps. Match previews mark all occurrences; hidden notes and collapsed paths are revealed during search without changing saved visibility or history. |
 | [timestamp.js](../../js/timestamp.js) | Localized date/time formats and insertion into the last selected topic or note range. Uses the shared edit/history boundary. |
 
 ## Editor contract

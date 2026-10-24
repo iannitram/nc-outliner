@@ -29,7 +29,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | `indent.test.mjs`, `row-actions.test.mjs` | Subtree preservation, structural boundaries, movement/deletion and keyboard guards |
 | `collapse.test.mjs`, `collapse-editor.test.mjs`, `expansion.test.mjs` | Visibility, disclosure controls, recursive actions, focus and combined structural undo |
 | `notes.test.mjs`, `checkboxes.test.mjs` | Notes/checklist edits, visibility, retained state, history and persistence notifications |
-| `search.test.mjs` | Ancestor paths, collapsed matches, hidden-tree preservation and filtered note caret regression |
+| `search.test.mjs` | Ancestor paths, collapsed and hidden-note occurrences, literal/Unicode offsets, wrapping Next/Previous and keyboard controls, safe highlights, hidden-tree/metadata preservation and filtered note caret regression |
 | `timestamp.test.mjs` | Locale/timezone formatting, range replacement, notes and metadata preservation |
 | `files.test.mjs`, `autosave.test.mjs` | Request options, strong If-Match, debounce, in-flight edits, retry, conflict and lifecycle disposal |
 | `import.test.mjs`, `export.test.mjs` | Parsing/validation, create-only workflow, unsaved snapshots, escaping, download lifecycle and failed requests |

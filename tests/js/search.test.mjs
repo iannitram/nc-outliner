@@ -134,3 +134,91 @@ test('typing a visible note while filtering keeps the note caret and hidden outl
   assert.equal(saved.rows[1].text, 'Unrelated');
   assert.equal(saved.rows[0].collapsed, true);
 });
+
+test('find enumerates literal repeated topic/note occurrences inside collapsed rows', async () => {
+  const { findMatches } = await import('../../js/search.js');
+  const document = fixture();
+  Object.assign(document.rows[0].children[0], { text: 'A.* a.*', note: 'Hidden A.*', noteVisible: false });
+  const original = structuredClone(document);
+  assert.deepEqual(findMatches(document.rows, 'a.*'), [
+    { id: 'b', field: 'text', start: 0, end: 3 },
+    { id: 'b', field: 'text', start: 4, end: 7 },
+    { id: 'b', field: 'note', start: 7, end: 10 },
+  ]);
+  assert.deepEqual(document, original);
+  assert.deepEqual(findMatches(document.rows, '   '), []);
+});
+
+test('find offsets handle Unicode and markup as literal source text', async () => {
+  const { findMatches } = await import('../../js/search.js');
+  assert.deepEqual(findMatches([{ id: 'u', text: '😀 É <img> é', children: [] }], 'é'), [
+    { id: 'u', field: 'text', start: 3, end: 4 },
+    { id: 'u', field: 'text', start: 11, end: 12 },
+  ]);
+});
+
+test('next and previous select each match, wrap, and reveal hidden notes without history changes', () => {
+  const document = fixture();
+  Object.assign(document.rows[0].children[0], { text: 'Hit hit', note: 'Hidden HIT', noteVisible: false, custom: { kept: true } });
+  const original = structuredClone(document);
+  const f = mounted(document);
+  f.query('hit');
+  const previous = f.root.children.find(el => el.className === 'outliner-search').children[3];
+  const next = f.root.children.find(el => el.className === 'outliner-search').children[4];
+  assert.equal(f.status.textContent, '0 of 3 matches');
+  next.listeners.click();
+  assert.deepEqual(f.editor.getSelection(), { id: 'b', offset: 0, end: 3, direction: 'forward' });
+  next.listeners.click();
+  assert.deepEqual(f.editor.getSelection(), { id: 'b', offset: 4, end: 7, direction: 'forward' });
+  next.listeners.click();
+  assert.deepEqual(f.editor.getSelection(), { id: 'b', offset: 7, end: 10, direction: 'forward', field: 'note' });
+  assert.equal(f.status.textContent, '3 of 3 matches');
+  next.listeners.click();
+  assert.equal(f.editor.getSelection().offset, 0);
+  previous.listeners.click();
+  assert.equal(f.editor.getSelection().field, 'note');
+  assert.deepEqual(f.editor.getDocument(), original);
+  assert.deepEqual(f.editor.getHistoryState(), { canUndo: false, canRedo: false });
+  assert.equal(f.changes.length, 0);
+  f.clear.listeners.click();
+  assert.equal(f.root.querySelectorAll('textarea[data-note-id]').length, 0);
+  assert.deepEqual(f.rows(), ['a', 'd']);
+});
+
+test('Enter, Shift+Enter and F3 navigate and every occurrence has a safe highlight', () => {
+  const document = fixture();
+  document.rows[0].children[0].text = '<hit> hit';
+  const f = mounted(document);
+  f.query('hit');
+  let prevented = 0;
+  f.input.listeners.keydown({ key: 'Enter', preventDefault() { prevented++; } });
+  assert.equal(f.editor.getSelection().offset, 1);
+  f.root.listeners.keydown({ key: 'F3', target: f.dom.activeElement, preventDefault() { prevented++; } });
+  assert.equal(f.editor.getSelection().offset, 6);
+  f.input.listeners.keydown({ key: 'Enter', shiftKey: true, preventDefault() { prevented++; } });
+  assert.equal(f.editor.getSelection().offset, 1);
+  function all(node) { return [node, ...node.children.flatMap(all)]; }
+  const marks = all(f.root).filter(node => node.tag === 'mark');
+  assert.equal(marks.length, 2);
+  assert.deepEqual(marks.map(mark => mark.textContent), ['hit', 'hit']);
+  assert.equal(marks.filter(mark => mark.className === 'outliner-find-current').length, 1);
+  assert.equal(prevented, 3);
+  f.query('missing');
+  assert.equal(f.root.children.find(el => el.className === 'outliner-search').children[4].disabled, true);
+});
+
+test('editing a revealed note saves its content while preserving collapsed and visibility metadata', () => {
+  const document = fixture();
+  Object.assign(document.rows[0].children[0], { note: 'Needle note', noteVisible: false, custom: { style: 'kept' } });
+  const f = mounted(document);
+  f.query('needle');
+  const note = f.root.querySelectorAll('textarea[data-note-id]')[0];
+  note.focus(); note.value = 'Needle edited'; note.setSelectionRange(6, 6);
+  f.root.listeners.input({ target: note });
+  const saved = f.changes.at(-1);
+  assert.equal(saved.rows[0].children[0].noteVisible, false);
+  assert.equal(saved.rows[0].collapsed, true);
+  assert.deepEqual(saved.rows[0].children[0].custom, { style: 'kept' });
+  assert.equal(saved.rows[0].children[0].note, 'Needle edited');
+  assert.equal(f.editor.getSelection().field, 'note');
+});
