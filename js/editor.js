@@ -1,4 +1,5 @@
 import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
+import { handleIndentKey } from './indent.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
@@ -83,6 +84,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     const input = event.target;
     if (!input.matches?.('textarea[data-row-id]') || event.isComposing || event.keyCode === 229) return;
     if (options.onKeyDown?.(event, context)) { event.preventDefault(); return; }
+    if (handleIndentKey(event, context)) { event.preventDefault(); return; }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     let result;
     if (event.key === 'Enter' && !event.shiftKey) result = insertAfter(document, input.dataset.rowId);

@@ -98,3 +98,30 @@ test('empty outlines receive a persistent editable row; destroy removes listener
   assert.equal(f.element.children.length, 0);
   assert.equal(Object.keys(f.root.listeners).length, 0);
 });
+
+test('Tab and Shift+Tab move subtrees through editor and preserve text selection', () => {
+  const descendant = { id: 'c', text: 'Child', children: [] };
+  const f = fixture({ rows: [
+    { id: 'a', text: 'Alpha', children: [], collapsed: true },
+    { id: 'b', text: 'Beta', children: [descendant] },
+  ] });
+  const input = f.inputs()[1]; input.focus(); input.setSelectionRange(1, 3, 'backward');
+  assert.equal(f.event('Tab', input).prevented, true);
+  assert.equal(f.editor.getDocument().rows[0].children[0].id, 'b');
+  assert.equal(f.editor.getDocument().rows[0].collapsed, false);
+  assert.equal(f.editor.getDocument().rows[0].children[0].children[0], descendant);
+  assert.deepEqual(f.editor.getSelection(), { id: 'b', offset: 1, end: 3, direction: 'backward' });
+  assert.equal(f.event('Tab', f.dom.activeElement, { shiftKey: true }).prevented, true);
+  assert.deepEqual(f.editor.getDocument().rows.map(r => r.id), ['a', 'b']);
+  assert.deepEqual(f.editor.getSelection(), { id: 'b', offset: 1, end: 3, direction: 'backward' });
+  assert.equal(f.changes.length, 2);
+});
+
+test('indent boundaries retain row focus and do not create a change', () => {
+  const f = fixture(); const input = f.inputs()[0]; input.focus(); input.setSelectionRange(2, 2);
+  assert.equal(f.event('Tab', input).prevented, true);
+  assert.equal(f.event('Tab', input, { shiftKey: true }).prevented, true);
+  assert.equal(f.dom.activeElement, input);
+  assert.equal(input.selectionStart, 2);
+  assert.equal(f.changes.length, 0);
+});
