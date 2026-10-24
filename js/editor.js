@@ -1,3 +1,4 @@
+import { createHistory, historyCommand } from './history.js';
 import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
 import { handleIndentKey } from './indent.js';
 
@@ -5,11 +6,38 @@ import { handleIndentKey } from './indent.js';
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
   let document = initialDocument;
   let destroyed = false;
+  const history = createHistory({ document, selection: null });
+  let pendingSelection = null;
   const dom = element.ownerDocument;
   const root = dom.createElement('div');
   root.className = 'outliner-editor';
   root.setAttribute('aria-label', 'Outline rows');
   element.appendChild(root);
+  const toolbar = dom.createElement('div');
+  toolbar.setAttribute('role', 'toolbar');
+  toolbar.setAttribute('aria-label', 'Edit history');
+  const undoButton = dom.createElement('button');
+  const redoButton = dom.createElement('button');
+  undoButton.type = redoButton.type = 'button';
+  undoButton.textContent = 'Undo';
+  redoButton.textContent = 'Redo';
+  undoButton.addEventListener('click', () => replay('undo'));
+  redoButton.addEventListener('click', () => replay('redo'));
+  // Keep the editing selection when clicking a history control.
+  toolbar.addEventListener('mousedown', (event) => event.preventDefault());
+  toolbar.appendChild(undoButton);
+  toolbar.appendChild(redoButton);
+  const unsubscribe = history.subscribe(({ canUndo, canRedo }) => {
+    undoButton.disabled = !canUndo;
+    redoButton.disabled = !canRedo;
+  });
+
+  function replay(command) {
+    if (destroyed) return false;
+    const snapshot = history[command]();
+    if (!snapshot) return false;
+    return replaceDocument(snapshot.document, { selection: snapshot.selection, replay: true });
+  }
 
   function getSelection() {
     const target = dom.activeElement;
@@ -27,26 +55,31 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   function change(mutator, meta = {}) {
     if (destroyed) return false;
     const previous = document;
+    const previousSelection = meta.selection ?? getSelection();
     options.beforeChange?.(previous, meta);
     const next = mutator(previous) ?? previous;
     if (next === previous) return false;
     document = next;
     if (!meta.skipRender) render();
     if (meta.focus) focusRow(meta.focus.id, meta.focus.offset, meta.focus.end, meta.focus.direction);
+    if (meta.type === 'replace' && !meta.replay) history.reset({ document, selection: getSelection() });
+    else if (!meta.replay) history.record({ document, selection: getSelection() }, previousSelection);
     options.afterChange?.(document, meta);
     if (meta.notify !== false) onChange(document);
     return true;
   }
 
   function replaceDocument(next, { selection, notify = true, replay = false } = {}) {
+    pendingSelection = null;
     return change(() => next, { type: 'replace', replay, focus: selection, notify });
   }
 
-  const context = { getDocument: () => document, getSelection, change, replaceDocument, focusRow, render };
+  const context = { undo: () => replay('undo'), redo: () => replay('redo'), getHistoryState: history.getState, getDocument: () => document, getSelection, change, replaceDocument, focusRow, render };
 
   function render() {
     if (destroyed) return;
     root.replaceChildren();
+    root.appendChild(toolbar);
     function renderRows(rows, container) {
       const list = dom.createElement('ul');
       list.className = 'outliner-rows';
@@ -75,14 +108,17 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     const input = event.target;
     if (!input.matches?.('textarea[data-row-id]')) return;
     change((old) => updateText(old, input.dataset.rowId, input.value), {
-      type: 'input', selection: getSelection(), skipRender: true,
+      type: 'input', selection: pendingSelection ?? getSelection(), skipRender: true,
     });
+    pendingSelection = null;
     input.rows = Math.max(1, input.value.split('\n').length);
   }
 
   function onKeyDown(event) {
     const input = event.target;
     if (!input.matches?.('textarea[data-row-id]') || event.isComposing || event.keyCode === 229) return;
+    const command = historyCommand(event);
+    if (command) { event.preventDefault(); replay(command); return; }
     if (options.onKeyDown?.(event, context)) { event.preventDefault(); return; }
     if (handleIndentKey(event, context)) { event.preventDefault(); return; }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
@@ -102,15 +138,26 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     if (result.focus) focusRow(result.focus.id, result.focus.offset);
   }
 
+  function onBeforeInput(event) {
+    if (event.target.matches?.('textarea[data-row-id]')) pendingSelection = getSelection();
+    if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
+      event.preventDefault();
+      replay(event.inputType === 'historyUndo' ? 'undo' : 'redo');
+    }
+  }
+  root.addEventListener('beforeinput', onBeforeInput);
   root.addEventListener('input', onInput);
   root.addEventListener('keydown', onKeyDown);
   if (!document.rows.length) {
     document = { ...document, rows: [createRow()] };
     onChange(document);
   }
+  history.reset({ document, selection: null });
   render();
   return { ...context, destroy() {
     destroyed = true;
+    unsubscribe();
+    root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);
     root.removeEventListener('keydown', onKeyDown);
     root.remove();

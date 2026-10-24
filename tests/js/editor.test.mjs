@@ -125,3 +125,66 @@ test('indent boundaries retain row focus and do not create a change', () => {
   assert.equal(input.selectionStart, 2);
   assert.equal(f.changes.length, 0);
 });
+test('undo and redo typing use document history and restore the pre-input caret', () => {
+  const f = fixture();
+  const input = f.inputs()[0]; input.focus(); input.setSelectionRange(2, 4, 'backward');
+  f.root.listeners.beforeinput({ target: input, inputType: 'insertText' });
+  input.value = 'Al!a'; input.setSelectionRange(3, 3);
+  f.root.listeners.input({ target: input });
+  assert.equal(f.event('z', input, { ctrlKey: true }).prevented, true);
+  assert.equal(f.editor.getDocument().rows[0].text, 'Alpha');
+  assert.equal(f.dom.activeElement.selectionStart, 2);
+  assert.equal(f.dom.activeElement.selectionEnd, 4);
+  assert.equal(f.dom.activeElement.selectionDirection, 'backward');
+  f.event('Z', f.inputs()[0], { metaKey: true, shiftKey: true });
+  assert.equal(f.editor.getDocument().rows[0].text, 'Al!a');
+  assert.equal(f.dom.activeElement.selectionStart, 3);
+  assert.equal(f.changes.length, 3);
+});
+
+test('history toolbar state follows Enter, deletion, undo and redo', () => {
+  const f = fixture();
+  const [undo, redo] = f.root.children[0].children;
+  assert.equal(undo.disabled, true); assert.equal(redo.disabled, true);
+  f.inputs()[0].focus();
+  f.event('Enter', f.inputs()[0]);
+  assert.equal(undo.disabled, false); assert.equal(redo.disabled, true);
+  const blankId = f.inputs()[1].dataset.rowId;
+  f.event('Backspace', f.inputs()[1]);
+  undo.listeners.click();
+  assert.equal(f.inputs().length, 2);
+  assert.equal(f.dom.activeElement.dataset.rowId, blankId);
+  undo.listeners.click();
+  assert.equal(f.inputs().length, 1);
+  assert.equal(undo.disabled, true); assert.equal(redo.disabled, false);
+  redo.listeners.click();
+  assert.equal(f.inputs().length, 2);
+  assert.equal(f.inputs()[1].dataset.rowId, blankId);
+});
+
+test('all extension commands use history and outline replacement clears it', () => {
+  const f = fixture({ rows: [{ id: 'a', text: 'Alpha', children: [], custom: { color: 'blue' } }] });
+  f.inputs()[0].focus();
+  f.editor.change((doc) => ({ ...doc, rows: [{ ...doc.rows[0], collapsed: true }] }), { focus: { id: 'a', offset: 1 } });
+  assert.equal(f.editor.getHistoryState().canUndo, true);
+  f.editor.undo();
+  assert.equal(f.editor.getDocument().rows[0].collapsed, undefined);
+  assert.deepEqual(f.editor.getDocument().rows[0].custom, { color: 'blue' });
+  f.editor.redo();
+  assert.equal(f.editor.getDocument().rows[0].collapsed, true);
+  f.editor.replaceDocument({ rows: [{ id: 'b', text: 'Other file', children: [] }] }, { notify: false });
+  assert.deepEqual(f.editor.getHistoryState(), { canUndo: false, canRedo: false });
+  assert.equal(f.editor.undo(), false);
+  assert.equal(f.editor.getDocument().rows[0].id, 'b');
+});
+
+test('browser beforeinput history command bypasses native textarea undo', () => {
+  const f = fixture(); f.inputs()[0].focus();
+  f.event('Enter', f.inputs()[0]);
+  const event = { target: f.inputs()[1], inputType: 'historyUndo', preventDefault() { this.prevented = true; } };
+  f.root.listeners.beforeinput(event);
+  assert.equal(event.prevented, true);
+  assert.equal(f.inputs().length, 1);
+  f.root.listeners.beforeinput({ ...event, inputType: 'historyRedo' });
+  assert.equal(f.inputs().length, 2);
+});
