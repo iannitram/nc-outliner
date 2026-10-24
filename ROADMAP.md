@@ -23,7 +23,8 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 
 | ID | Feature | Complexity | Notes |
 |---|---|---|---|
-| F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Draft PR pending F01; PR link added when opened. |
+| F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Needs F01. The editing core: keyboard handling and caret movement between rows; PR pending |
+| F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02; PR pending |
 
 ## Unwritten
 
@@ -32,7 +33,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 1 | F01 | **Outline files:** create and open `.opml` outlines in the user's `Outlines/` folder (created on first use), as the signed-in user | Medium | Foundation: everything depends on it. The file format needs room for row IDs, rich text, styles and columns later (OPML attributes plus an app namespace) |
 | 3 | F72 | **Autosave:** saves on its own a second or two after you stop typing, and again when you leave the page; a status shows Saved, Saving or Can't save (retrying). If the file changed somewhere else (another tab or device), it never overwrites it silently: it offers to reload, or to keep yours as a copy | Medium | Needs F01, F02. Ian's request (2026-10-22). Overwrite guard: Nextcloud's ETag with If-Match on every save. There's no Save button at all once this works |
 | 4 | F24 | **Versioning:** a version list with times, preview any version read-only, restore one (the current state is kept as a version first), and name a version you care about ("Before rewrite") so it never gets cleaned up | Medium | Needs F01, F72. Ian's request (2026-10-22). Built on Nextcloud's own file versions and version labels, the web stand-in for Time Machine. Autosave creates many versions: Nextcloud thins old ones automatically, and named versions are kept. Check Hyperion's version-retention setting first |
-| 5 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02 |
 | 6 | F04 | **Expand / collapse** a row (disclosure triangle, arrow keys); a bullet for rows without children | Low | Needs F02. Collapsed state saved in the file |
 | 7 | F05 | **Undo / redo** for every change | Medium | Needs F02. Build it early: every later editing feature has to go through it |
 | 8 | F06 | **Row notes:** a note under any row, shown or hidden per row | Medium | Needs F02 |
