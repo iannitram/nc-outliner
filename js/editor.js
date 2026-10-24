@@ -1,3 +1,4 @@
+import { createCheckboxToggle, updateCheckboxToggle, renderCheckbox } from './checkboxes.js';
 import { createHistory, historyCommand } from './history.js';
 import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
 import { handleIndentKey } from './indent.js';
@@ -79,11 +80,17 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     return change(() => next, { type: 'replace', replay, focus: selection, notify });
   }
 
+  let checkboxToggle;
   const context = { undo: () => replay('undo'), redo: () => replay('redo'), getHistoryState: history.getState, getDocument: () => document, getSelection, change, replaceDocument, focusRow, render };
 
   function render() {
     if (destroyed) return;
     root.replaceChildren();
+    if (!checkboxToggle) {
+      checkboxToggle = createCheckboxToggle(dom, context);
+      toolbar.appendChild(checkboxToggle);
+    }
+    updateCheckboxToggle(checkboxToggle, document);
     root.appendChild(toolbar);
     function renderRows(rows, container) {
       const list = dom.createElement('ul');
@@ -102,6 +109,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         item.appendChild(input);
         options.renderRow?.(row, item, context);
         renderNote(row, item, context);
+        renderCheckbox(row, item, context);
         if (row.children?.length && options.shouldRenderChildren?.(row) !== false) renderRows(row.children, item);
         list.appendChild(item);
       }
