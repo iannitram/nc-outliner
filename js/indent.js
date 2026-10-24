@@ -63,14 +63,16 @@ export function handleIndentKey(event, context) {
   const document = context.getDocument();
   const next = (event.shiftKey ? outdentRow : indentRow)(document, id);
   if (next !== document) {
+    const selection = {
+      id,
+      offset: input.selectionStart ?? 0,
+      end: input.selectionEnd ?? input.selectionStart ?? 0,
+      direction: input.selectionDirection ?? 'none',
+    };
     context.change(() => next, {
-      focus: {
-        id,
-        offset: input.selectionStart ?? 0,
-        end: input.selectionEnd ?? input.selectionStart ?? 0,
-        direction: input.selectionDirection ?? 'none',
-      },
-      kind: event.shiftKey ? 'outdent' : 'indent',
+      selection,
+      focus: selection,
+      type: event.shiftKey ? 'outdent' : 'indent',
     });
   }
   return true;

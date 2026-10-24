@@ -66,7 +66,8 @@ test('Tab handler preserves selected row, caret range and selection direction', 
   assert.equal(handleIndentKey(event, context), true);
   assert.equal(change.next.rows[0].children[0].id, 'b');
   assert.deepEqual(change.meta.focus, { id: 'b', offset: 1, end: 3, direction: 'backward' });
-  assert.equal(change.meta.kind, 'indent');
+  assert.deepEqual(change.meta.selection, change.meta.focus);
+  assert.equal(change.meta.type, 'indent');
 });
 
 test('Shift+Tab handler lifts row; boundaries consume Tab without changing history', () => {
@@ -75,7 +76,7 @@ test('Shift+Tab handler lifts row; boundaries consume Tab without changing histo
   const context = { getDocument: () => doc, change: (mutator, meta) => changes.push({ next: mutator(doc), meta }) };
   assert.equal(handleIndentKey({ key: 'Tab', shiftKey: true, target: { dataset: { rowId: 'b' } } }, context), true);
   assert.deepEqual(changes[0].next.rows.map(r => r.id), ['a', 'b']);
-  assert.equal(changes[0].meta.kind, 'outdent');
+  assert.equal(changes[0].meta.type, 'outdent');
   assert.equal(handleIndentKey({ key: 'Tab', target: { dataset: { rowId: 'a' } } }, context), true);
   assert.equal(changes.length, 1);
 });
