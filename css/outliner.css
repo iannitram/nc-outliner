@@ -106,3 +106,11 @@
   inset-block-start: .4rem;
 }
 #outliner-app .outliner-check input { margin: 0; }
+#outliner-app .outliner-delete-row {
+  margin-block: 2px 6px;
+  padding: 2px 8px;
+  font-size: .85em;
+  color: var(--ol-muted);
+  background: var(--ol-bg);
+  border: 1px solid var(--ol-border);
+}

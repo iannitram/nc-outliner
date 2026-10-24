@@ -4,6 +4,7 @@ import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
 import { handleIndentKey } from './indent.js';
 import { createCollapseExtension } from './collapse.js';
 import { updateNote, setNoteVisible, renderNote } from './notes.js';
+import { handleRowActionKey, renderRowActions } from './row-actions.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
@@ -106,10 +107,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         input.rows = Math.max(1, input.value.split('\n').length);
         input.spellcheck = true;
         input.setAttribute('aria-label', 'Row text');
+        input.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown Alt+Delete');
+        input.title = 'Move row: Alt+Up/Down. Delete row and children: Alt+Delete.';
         item.appendChild(input);
         options.renderRow?.(row, item, context);
         renderNote(row, item, context);
         renderCheckbox(row, item, context);
+        renderRowActions(row, item, context);
         if (row.children?.length && options.shouldRenderChildren?.(row) !== false) renderRows(row.children, item);
         list.appendChild(item);
       }
@@ -149,6 +153,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     }
     if (options.onKeyDown?.(event, context)) { event.preventDefault(); return; }
     if (handleIndentKey(event, context)) { event.preventDefault(); return; }
+    if (handleRowActionKey(event, context)) { event.preventDefault(); return; }
     if (event.ctrlKey || event.metaKey || event.altKey) return;
     let result;
     if (event.key === 'Enter' && !event.shiftKey) result = insertAfter(document, input.dataset.rowId);
