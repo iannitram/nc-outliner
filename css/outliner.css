@@ -84,3 +84,12 @@
 .outliner-files button { display: block; max-width: 100%; overflow-wrap: anywhere; }
 .outliner-workspace { flex: 1; min-width: 0; padding: 1rem; overflow: auto; }
 .outliner-workspace [role="status"] { min-height: 1.5rem; color: var(--ol-muted); }
+
+#outliner-app .outliner-delete-row {
+  margin-block: 2px 6px;
+  padding: 2px 8px;
+  font-size: .85em;
+  color: var(--ol-muted);
+  background: var(--ol-bg);
+  border: 1px solid var(--ol-border);
+}

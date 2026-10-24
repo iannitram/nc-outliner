@@ -28,6 +28,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/5 |
 | F04 | **Expand / collapse** a row (disclosure triangle, arrow keys); a bullet for rows without children | Low | Needs F02. Collapsed state saved in the file; https://github.com/iannitram/nc-outliner/pull/6 |
 | F05 | **Undo / redo** for every change | Medium | Needs F02. Build it early: every later editing feature has to go through it; https://github.com/iannitram/nc-outliner/pull/7 |
+| F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/11 |
 
 ## Unwritten
 
@@ -38,7 +39,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 8 | F06 | **Row notes:** a note under any row, shown or hidden per row | Medium | Needs F02 |
 | 9 | F07 | **Publish to Doc:** ask where to save (Nextcloud folder picker), write an `.odt` (top level → Heading 1, a second-level row with children → Heading 2, deeper → nested bullets, notes → paragraphs), open it in Nextcloud Office, remember the spot and offer it on re-publish (overwrites) | High | Needs F01, F03, F06. Not an Omni feature: it's this app's reason to exist. Show Ian a sample doc before locking the heading rules |
 | 10 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it |
-| 11 | F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02 |
 | 12 | F09 | **Drag and drop** rows by their handle to reorder or nest | Medium | Needs F03, F04 |
 | 13 | F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02 |
 | 14 | F11 | **Select several rows** (Shift/Ctrl+click, Shift+arrow) and act on them together | Medium | Needs F02. Needed by F12, F21, F22 |

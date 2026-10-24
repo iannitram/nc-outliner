@@ -191,3 +191,33 @@ test('browser beforeinput history command bypasses native textarea undo', () => 
   f.root.listeners.beforeinput({ ...event, inputType: 'historyRedo' });
   assert.equal(f.inputs().length, 2);
 });
+
+test('Alt move and delete commands preserve subtrees and caret and undo restores deletion', () => {
+  const child = { id: 'c', text: 'Child', children: [] };
+  const f = fixture({ rows: [{ id: 'a', text: 'Alpha', children: [child] }, { id: 'b', text: 'Beta', children: [] }] });
+  const input = f.inputs()[0]; input.focus(); input.setSelectionRange(1, 3, 'backward');
+  assert.equal(f.event('ArrowDown', input, { altKey: true }).prevented, true);
+  assert.deepEqual(f.editor.getDocument().rows.map(r => r.id), ['b', 'a']);
+  assert.deepEqual(f.editor.getSelection(), { id: 'a', offset: 1, end: 3, direction: 'backward' });
+  assert.equal(f.event('Delete', f.dom.activeElement, { altKey: true }).prevented, true);
+  assert.deepEqual(f.editor.getDocument().rows.map(r => r.id), ['b']);
+  assert.equal(f.dom.activeElement.dataset.rowId, 'b');
+  f.editor.undo();
+  assert.equal(f.editor.getDocument().rows[1].children[0].id, 'c');
+  assert.deepEqual(f.editor.getSelection(), { id: 'a', offset: 1, end: 3, direction: 'backward' });
+  f.editor.undo();
+  assert.deepEqual(f.editor.getDocument().rows.map(r => r.id), ['a', 'b']);
+  assert.equal(f.changes.length, 4);
+});
+
+test('delete-row button removes subtree through history while plain text Delete stays native', () => {
+  const f = fixture({ rows: [{ id: 'a', text: 'Alpha', children: [{ id: 'c', text: 'Child', children: [] }] }, { id: 'b', text: 'Beta', children: [] }] });
+  f.inputs()[0].focus();
+  assert.equal(f.event('Delete', f.inputs()[0]).prevented, undefined);
+  const descendants = el => el.children.flatMap(child => [child, ...descendants(child)]);
+  const button = descendants(f.root).find(el => el.className === 'outliner-delete-row');
+  button.listeners.click();
+  assert.deepEqual(f.editor.getDocument().rows.map(r => r.id), ['b']);
+  f.editor.undo();
+  assert.equal(f.editor.getDocument().rows[0].children[0].id, 'c');
+});
