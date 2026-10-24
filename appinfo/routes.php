@@ -8,5 +8,6 @@ return [
         ['name' => 'outline#create', 'url' => '/api/outlines', 'verb' => 'POST'],
         ['name' => 'outline#show', 'url' => '/api/outlines/{name}', 'verb' => 'GET'],
         ['name' => 'outline#update', 'url' => '/api/outlines/{name}', 'verb' => 'PUT'],
+        ['name' => 'outline#export', 'url' => '/api/outlines/{name}/export', 'verb' => 'POST'],
     ],
 ];

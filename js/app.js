@@ -1,3 +1,5 @@
+import { mountExport } from './export.js';
+
 /** File shell. F02 supplies editor.js; F01 can also display outlines read-only. */
 export function createApi(base, fetcher = globalThis.fetch) {
   return async function request(path = '', method = 'GET', data) {
@@ -33,6 +35,7 @@ export async function start(el) {
   create.type = 'submit';
   const list = make('div');
   const workspace = make('section');
+  let toolbar = workspace;
   workspace.className = 'outliner-workspace';
   const title = make('h2', 'Choose or create an outline');
   const save = make('button', 'Save');
@@ -50,6 +53,7 @@ export async function start(el) {
     const shell = mountShell(el);
     shell.navigation.append(heading, form, list);
     shell.toolbar.append(title, save);
+    toolbar = shell.toolbar;
     shell.content.append(content);
     status = shell.status;
     status.setAttribute('role', 'status');
@@ -66,7 +70,11 @@ export async function start(el) {
   } catch {
     // The outline-file foundation can display files before the editing module lands.
   }
+  const exportControls = mountExport(toolbar, () => current ? {
+    name: current.name, document: editor?.getDocument() ?? current.document,
+  } : null, api, error => { status.textContent = error.message; });
   function controls() {
+    exportControls.refresh();
     save.disabled = !current || !dirty || busy;
     create.disabled = busy;
     name.disabled = busy;
