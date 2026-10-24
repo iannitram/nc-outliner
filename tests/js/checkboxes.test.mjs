@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setCheckboxVisibility, setRowChecked } from '../../js/checkboxes.js';
+import { checkboxState, setCheckboxVisibility, setRowChecked } from '../../js/checkboxes.js';
 import { mountEditor } from '../../js/editor.js';
 
 const documentFixture = () => ({ title: 'Tasks', custom: { author: 'A' }, rows: [{ id: 'a', text: 'Parent', checked: true, children: [{ id: 'b', text: 'Child', custom: { color: 'red' }, children: [] }] }] });
@@ -57,7 +57,7 @@ test('default editor checklist controls notify persistence and undo/redo visibil
   toggle().listeners.click();
   assert.equal(toggle().attributes['aria-pressed'], 'true');
   assert.equal(checks().length, 2);
-  assert.equal(checks()[0].checked, true);
+  assert.equal(checks()[0].checked, false);
   assert.equal(checks()[1].attributes['aria-label'], 'Mark Child complete');
   checks()[1].checked = true;
   checks()[1].listeners.change();
@@ -72,4 +72,48 @@ test('default editor checklist controls notify persistence and undo/redo visibil
   editor.undo();
   assert.equal(checks()[1].checked, true);
   assert.equal(changes.length, 6);
+});
+
+
+test('calculated states aggregate recursively and subtree toggles preserve unrelated rows', () => {
+  const leaf = (id, checked) => ({ id, checked, children: [], custom: { id } });
+  const branch = { id: 'branch', collapsed: true, checked: true, children: [leaf('one', true), leaf('two', false)] };
+  const parent = { id: 'root', children: [branch, leaf('three', false)] };
+  const doc = { showCheckboxes: true, rows: [parent, leaf('outside', false)] };
+  assert.equal(checkboxState(parent), 'mixed');
+  const checked = setRowChecked(doc, 'root', true);
+  assert.equal(checkboxState(checked.rows[0]), 'checked');
+  assert.equal(checked.rows[0].children[0].children[1].checked, true);
+  assert.equal(checked.rows[1], doc.rows[1]);
+  assert.equal(parent.children[0].children[1].checked, false);
+  assert.equal(checked.rows[0].children[0].children[1].custom, branch.children[1].custom);
+  assert.equal(setRowChecked(checked, 'root', true), checked);
+  assert.equal(checkboxState(setRowChecked(checked, 'root', false).rows[0]), 'unchecked');
+  assert.equal(checkboxState(setRowChecked(checked, 'two', false).rows[0]), 'mixed');
+});
+
+test('mixed parent UI checks all descendants with one history/persistence edit and restores mixed on undo', () => {
+  const dom = { createElement(tag) { return new Element(tag, this); } };
+  const host = new Element('div', dom);
+  const changes = [];
+  const editor = mountEditor(host, { showCheckboxes: true, rows: [{ id: 'a', text: 'Parent', collapsed: true, children: [
+    { id: 'b', text: 'One', checked: true, children: [] }, { id: 'c', text: 'Two', children: [] },
+  ] }] }, (next) => changes.push(next));
+  const parent = () => descendants(host).find((el) => el.type === 'checkbox');
+  assert.equal(parent().indeterminate, true);
+  assert.equal(parent().attributes['aria-checked'], 'mixed');
+  parent().checked = true;
+  parent().listeners.change();
+  assert.equal(parent().indeterminate, false);
+  assert.equal(parent().checked, true);
+  assert.equal(editor.getDocument().rows[0].children.every((row) => row.checked), true);
+  assert.equal(changes.length, 1);
+  editor.undo();
+  assert.equal(parent().indeterminate, true);
+  editor.redo();
+  assert.equal(parent().checked, true);
+  parent().checked = false;
+  parent().listeners.change();
+  assert.equal(editor.getDocument().rows[0].children.every((row) => !row.checked), true);
+  assert.equal(parent().attributes['aria-checked'], 'false');
 });

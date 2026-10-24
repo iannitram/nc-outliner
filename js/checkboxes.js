@@ -4,21 +4,29 @@ export function setCheckboxVisibility(document, visible) {
   return { ...document, showCheckboxes: visible };
 }
 
+/** Parent state is derived from every child, including collapsed/filtered descendants. */
+export function checkboxState(row) {
+  const children = row.children ?? [];
+  if (!children.length) return row.checked ? 'checked' : 'unchecked';
+  const states = children.map(checkboxState);
+  if (states.every((state) => state === 'checked')) return 'checked';
+  if (states.every((state) => state === 'unchecked')) return 'unchecked';
+  return 'mixed';
+}
+
 export function setRowChecked(document, id, checked) {
-  let changed = false;
-  function update(rows) {
-    return rows.map((row) => {
-      if (row.id === id) {
-        if (Boolean(row.checked) === checked) return row;
-        changed = true;
-        return { ...row, checked };
-      }
-      const children = update(row.children ?? []);
-      return children.some((child, index) => child !== row.children[index]) ? { ...row, children } : row;
-    });
+  function subtree(row) {
+    const children = (row.children ?? []).map(subtree);
+    if (Boolean(row.checked) === checked && children.every((child, index) => child === row.children[index])) return row;
+    return { ...row, checked, children };
   }
-  const rows = update(document.rows);
-  return changed ? { ...document, rows } : document;
+  function update(row) {
+    if (row.id === id) return subtree(row);
+    const children = (row.children ?? []).map(update);
+    return children.some((child, index) => child !== row.children[index]) ? { ...row, children } : row;
+  }
+  const rows = document.rows.map(update);
+  return rows.some((row, index) => row !== document.rows[index]) ? { ...document, rows } : document;
 }
 
 export function createCheckboxToggle(dom, context) {
@@ -43,7 +51,10 @@ export function renderCheckbox(row, item, context) {
   label.className = 'outliner-check';
   const input = item.ownerDocument.createElement('input');
   input.type = 'checkbox';
-  input.checked = Boolean(row.checked);
+  const state = checkboxState(row);
+  input.checked = state === 'checked';
+  input.indeterminate = state === 'mixed';
+  input.setAttribute('aria-checked', state === 'mixed' ? 'mixed' : String(input.checked));
   input.setAttribute('aria-label', `Mark ${row.text || 'untitled row'} complete`);
   input.addEventListener('change', () => {
     context.change((document) => setRowChecked(document, row.id, input.checked), {

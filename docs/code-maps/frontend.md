@@ -29,7 +29,7 @@
 | [expansion.js](../../js/expansion.js) | Recursive whole-outline/subtree expansion, toolbar controls, Alt+Left/Right, and visible-focus correction. |
 | [row-actions.js](../../js/row-actions.js) | Explicit subtree deletion and sibling movement; buttons, Alt+Delete and Alt+Up/Down. |
 | [notes.js](../../js/notes.js) | Immutable note/visibility edits and per-row note controls. Shift+Enter opens a note; Escape returns to the topic. |
-| [checkboxes.js](../../js/checkboxes.js) | Document visibility toggle, checked-state edits and accessible per-row checkboxes. Hiding retains checked states. |
+| [checkboxes.js](../../js/checkboxes.js) | Document visibility toggle, checked-state edits and accessible per-row checkboxes. Hiding retains checked states. Parent state derives recursively from children, renders mixed via native indeterminate state, and parent toggles update the full subtree in one edit. |
 | [search.js](../../js/search.js) | `matchingRowIds()` returns literal case-insensitive matches plus ancestors. Editor filtering reveals matching paths without changing saved collapse state. |
 | [timestamp.js](../../js/timestamp.js) | Localized date/time formats and insertion into the last selected topic or note range. Uses the shared edit/history boundary. |
 
