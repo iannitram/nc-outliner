@@ -1,18 +1,24 @@
 import { importOutline, mountImport } from './import.js';
 import { mountExport } from './export.js';
 import { mountTheme } from './theme.js';
+import { createAutosave } from './autosave.js';
 
 /** File shell. F02 supplies editor.js; F01 can also display outlines read-only. */
 export function createApi(base, fetcher = globalThis.fetch) {
-  return async function request(path = '', method = 'GET', data) {
+  return async function request(path = '', method = 'GET', data, options = {}) {
     const response = await fetcher(`${base}/outlines${path}`, {
       method,
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', requesttoken: globalThis.OC?.requestToken ?? '' },
+      headers: { 'Content-Type': 'application/json', requesttoken: globalThis.OC?.requestToken ?? '', ...(data?.etag ? { 'If-Match': `"${data.etag}"` } : {}) },
+      keepalive: options.keepalive ?? false,
       ...(data === undefined ? {} : { body: JSON.stringify(data) }),
     });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error || `Request failed (${response.status})`);
+    if (!response.ok) {
+      const error = new Error(result.error || `Request failed (${response.status})`);
+      error.status = response.status;
+      throw error;
+    }
     return result;
   };
 }
@@ -40,15 +46,18 @@ export async function start(el) {
   let toolbar = workspace;
   workspace.className = 'outliner-workspace';
   const title = make('h2', 'Choose or create an outline');
-  const save = make('button', 'Save');
-  save.type = 'button';
-  save.disabled = true;
+  const conflicts = make('div');
+  conflicts.hidden = true;
+  const reload = make('button', 'Reload');
+  const copy = make('button', 'Keep mine as a copy');
+  reload.type = copy.type = 'button';
+  conflicts.append(reload, copy);
   let status = make('p');
   status.setAttribute('role', 'status');
   const content = make('div');
   form.append(name, create);
   sidebar.append(heading, form, list);
-  workspace.append(title, save, status, content);
+  workspace.append(title, conflicts, status, content);
   el.replaceChildren(sidebar, workspace);
   let importHost = sidebar;
   try {
@@ -56,9 +65,9 @@ export async function start(el) {
     const shell = mountShell(el);
     shell.navigation.append(heading, form, list);
     importHost = shell.navigation;
-    shell.toolbar.append(title, save);
     toolbar = shell.toolbar;
     mountTheme(el, shell.toolbar);
+    shell.toolbar.append(title, conflicts);
     shell.content.append(content);
     status = shell.status;
     status.setAttribute('role', 'status');
@@ -67,7 +76,7 @@ export async function start(el) {
   }
   let current = null;
   let editor = null;
-  let dirty = false;
+  let autosave = null;
   let busy = false;
   let mountEditor;
   try {
@@ -80,7 +89,7 @@ export async function start(el) {
   } : null, api, error => { status.textContent = error.message; });
   function controls() {
     exportControls.refresh();
-    save.disabled = !current || !dirty || busy;
+    reload.disabled = copy.disabled = busy;
     create.disabled = busy;
     name.disabled = busy;
     list.querySelectorAll('button').forEach(button => { button.disabled = busy; });
@@ -98,15 +107,22 @@ export async function start(el) {
     controls();
   }
   function display(result) {
+    autosave?.dispose();
     editor?.destroy();
     current = result;
-    dirty = false;
+    conflicts.hidden = true;
+    autosave = createAutosave({
+      document: result.document, etag: result.etag,
+      save: (document, etag, options) => api(`/${encodeURIComponent(result.name)}`, 'PUT', { document, etag }, options),
+      onStatus: text => { status.textContent = text; },
+      onConflict: () => { conflicts.hidden = false; },
+    });
     title.textContent = result.document.title || result.name;
     content.replaceChildren();
+    status.textContent = 'Saved';
     if (mountEditor) {
-      editor = mountEditor(content, result.document, () => {
-        dirty = true;
-        status.textContent = 'Unsaved changes';
+      editor = mountEditor(content, result.document, (document) => {
+        autosave.update(document);
         controls();
       });
     } else {
@@ -121,24 +137,26 @@ export async function start(el) {
       };
       content.append(render(result.document.rows));
     }
-    status.textContent = 'Opened';
     controls();
   }
-  function mayLeave() {
-    return !dirty || globalThis.confirm('Discard unsaved changes?');
+  async function mayLeave() {
+    await autosave?.flush();
+    return !autosave?.hasPending() || globalThis.confirm('Discard unsaved changes?');
   }
   async function open(filename) {
-    if (busy || !mayLeave()) return;
+    if (busy) return;
     busy = true;
     controls();
+    if (!await mayLeave()) { busy = false; controls(); return; }
     try { display(await api(`/${encodeURIComponent(filename)}`)); }
     finally { busy = false; controls(); }
   }
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (busy || !mayLeave()) return;
+    if (busy) return;
     busy = true;
     controls();
+    if (!await mayLeave()) { busy = false; controls(); return; }
     try {
       let filename = name.value.trim();
       if (!filename.toLowerCase().endsWith('.opml')) filename += '.opml';
@@ -148,23 +166,35 @@ export async function start(el) {
     } catch (e) { error(e); }
     finally { busy = false; controls(); }
   });
-  save.addEventListener('click', async () => {
-    if (busy || !current || !dirty) return;
-    busy = true;
-    controls();
-    const document = structuredClone(editor.getDocument());
-    status.textContent = 'Saving';
+  reload.addEventListener('click', async () => {
+    if (busy || !current) return;
+    busy = true; controls();
+    try { display(await api(`/${encodeURIComponent(current.name)}`)); }
+    catch (e) { error(e); }
+    finally { busy = false; controls(); }
+  });
+  copy.addEventListener('click', async () => {
+    if (busy || !current) return;
+    busy = true; controls();
+    const snapshot = structuredClone(editor.getDocument());
     try {
-      const result = await api(`/${encodeURIComponent(current.name)}`, 'PUT', { document, etag: current.etag });
-      current.etag = result.etag;
-      // Keep edits made while the request was in flight marked as unsaved.
-      dirty = JSON.stringify(document) !== JSON.stringify(editor.getDocument());
-      status.textContent = dirty ? 'Unsaved changes' : 'Saved';
+      const result = await api(`/${encodeURIComponent(current.name)}/copy`, 'POST', { document: snapshot });
+      const latest = structuredClone(editor.getDocument());
+      display(result);
+      if (JSON.stringify(latest) !== JSON.stringify(snapshot)) editor.replaceDocument(latest);
+      await refresh();
     } catch (e) { error(e); }
     finally { busy = false; controls(); }
   });
+  doc.addEventListener('visibilitychange', () => {
+    if (doc.visibilityState === 'hidden') void autosave?.flush({ keepalive: true });
+  });
+  globalThis.addEventListener('pagehide', () => { void autosave?.flush({ keepalive: true }); });
   globalThis.addEventListener('beforeunload', event => {
-    if (dirty) { event.preventDefault(); event.returnValue = ''; }
+    if (autosave?.hasPending()) {
+      void autosave.flush({ keepalive: true });
+      event.preventDefault(); event.returnValue = '';
+    }
   });
   mountImport(importHost, async input => {
     if (busy) throw new Error('Wait for the current file operation to finish.');

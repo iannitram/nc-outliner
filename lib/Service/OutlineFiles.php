@@ -92,6 +92,31 @@ class OutlineFiles
         }
     }
 
+    /** Keep the local outline as a new file; the conflicting original is never written. */
+    public function keepCopy(string $name, array $document): array
+    {
+        $source = $this->file($name);
+        $source->lock(ILockingProvider::LOCK_SHARED);
+        try {
+            $xml = $this->opml->write($document, $source->getContent());
+        } finally {
+            $source->unlock(ILockingProvider::LOCK_SHARED);
+        }
+        $folder = $this->folder();
+        $folder->lock(ILockingProvider::LOCK_EXCLUSIVE);
+        try {
+            $stem = substr($name, 0, -5);
+            do {
+                // Reserve room below the filename limit and never replace a previous copy.
+                $copyName = mb_strcut($stem, 0, 190, 'UTF-8') . ' (copy ' . bin2hex(random_bytes(6)) . ').opml';
+            } while ($folder->nodeExists($copyName));
+            $folder->newFile($copyName, $xml);
+        } finally {
+            $folder->unlock(ILockingProvider::LOCK_EXCLUSIVE);
+        }
+        return $this->open($copyName);
+    }
+
     public function save(string $name, array $document, string $etag): array
     {
         $file = $this->file($name);

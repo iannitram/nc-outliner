@@ -47,8 +47,25 @@ class OutlineController extends Controller
     public function show(string $name): JSONResponse { return $this->respond(fn () => $this->files->open($name)); }
 
     #[NoAdminRequired]
-    public function update(string $name, array $document = [], string $etag = ''): JSONResponse { return $this->respond(fn () => $this->files->save($name, $document, $etag)); }
+    public function update(string $name, array $document = []): JSONResponse
+    {
+        // Only a strong, exact If-Match value can authorize replacing this file.
+        $header = $this->request->getHeader('If-Match');
+        $etag = '';
+        if (strlen($header) >= 2 && $header[0] === '"' && str_ends_with($header, '"')) {
+            $candidate = substr($header, 1, -1);
+            if (!str_contains($candidate, '"') && !str_contains($candidate, "\r") && !str_contains($candidate, "\n")) {
+                $etag = $candidate;
+            }
+        }
+        return $this->respond(fn () => $this->files->save($name, $document, $etag));
+    }
 
+    #[NoAdminRequired]
+    public function copy(string $name, array $document = []): JSONResponse
+    {
+        return $this->respond(fn () => $this->files->keepCopy($name, $document));
+    }
     #[NoAdminRequired]
     public function export(string $name, array $document = []): JSONResponse { return $this->respond(fn () => $this->files->export($name, $document)); }
 }

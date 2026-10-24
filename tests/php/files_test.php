@@ -128,4 +128,15 @@ check('anonymous requests never get a home folder', function () use ($files, $se
     catch (\RuntimeException $e) { same(401, $e->getCode()); }
     $session->uid = 'alice';
 });
+check('keeping a local copy preserves the conflicting original and creates distinct names', function () use ($files): void {
+    $original = $files->open('Plan.opml');
+    $local = $original['document'];
+    $local['title'] = 'Local rewrite';
+    $first = $files->keepCopy('Plan.opml', $local);
+    $second = $files->keepCopy('Plan.opml', $local);
+    same('Local rewrite', $first['document']['title']);
+    same(false, $first['name'] === $second['name']);
+    same($original, $files->open('Plan.opml'));
+});
+
 }
