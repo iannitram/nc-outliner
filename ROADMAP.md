@@ -34,8 +34,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/61 |
 | F14 | **Search field:** show only rows matching the text (with their parents) | Medium | Needs F04; https://github.com/iannitram/nc-outliner/pull/62 |
 | F26 | **Insert timestamp:** short or long date, time, or both | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/63 |
-
-| F34 | **Import plain text** (tab-indented or bulleted) and Markdown lists as a new outline | Low | Needs F01; https://github.com/iannitram/nc-outliner/pull/36 |
+| F34 | **Import plain text** (tab-indented or bulleted) and Markdown lists as a new outline | Low | Needs F01; https://github.com/iannitram/nc-outliner/pull/64 |
 
 ## Unwritten
 
