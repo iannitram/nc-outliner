@@ -56,3 +56,17 @@ test('missing targets and unchanged edits are no-ops', () => {
   assert.equal(insertAfter(document, 'missing').document, document);
   assert.equal(deleteEmpty(document, 'missing').document, document);
 });
+
+
+test('deleting after a collapsed parent focuses its visible row rather than hidden descendants', () => {
+  const document = { rows: [
+    { id: 'parent', text: 'Parent', collapsed: true, children: [
+      { id: 'child', text: 'Hidden', children: [{ id: 'grandchild', text: 'Also hidden', children: [] }] },
+    ] },
+    { id: 'empty', text: '', children: [] },
+  ] };
+  const result = deleteEmpty(document, 'empty');
+  assert.deepEqual(result.focus, { id: 'parent', offset: 6 });
+  assert.equal(result.document.rows.length, 1);
+  assert.deepEqual(result.document.rows[0].children, document.rows[0].children);
+});
