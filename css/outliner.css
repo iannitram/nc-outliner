@@ -145,3 +145,10 @@
 #outliner-app[data-outliner-theme] :is(button, select):hover { background-color: var(--ol-hover); }
 #outliner-app .outliner-theme { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 #outliner-app .outliner-theme [role="status"] { color: var(--ol-muted); }
+
+[data-rich-input] { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 2em; }
+.outliner-format-bold { font-weight: bold; }
+.outliner-format-italic { font-style: italic; }
+.outliner-format-underline { text-decoration-line: underline; }
+.outliner-format-strikethrough { text-decoration-line: line-through; }
+.outliner-format-underline.outliner-format-strikethrough { text-decoration-line: underline line-through; }

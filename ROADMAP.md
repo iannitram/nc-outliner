@@ -39,6 +39,8 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it; https://github.com/iannitram/nc-outliner/pull/66 |
 | F72 | **Autosave:** saves on its own a second or two after you stop typing, and again when you leave the page; a status shows Saved, Saving or Can't save (retrying). If the file changed somewhere else (another tab or device), it never overwrites it silently: it offers to reload, or to keep yours as a copy | Medium | Needs F01, F02. Ian's request (2026-10-22). Overwrite guard: Nextcloud's ETag with If-Match on every save. There's no Save button at all once this works; https://github.com/iannitram/nc-outliner/pull/67 |
 
+| F15 | **Bold, italic, underline, strikethrough** in row text and notes | Medium | Needs F02 and F01. https://github.com/iannitram/nc-outliner/pull/73 |
+
 ## Unwritten
 
 | Rank | ID | Feature | Complexity | Notes (dependencies) |
@@ -48,7 +50,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 12 | F09 | **Drag and drop** rows by their handle to reorder or nest | Medium | Needs F03, F04 |
 | 14 | F11 | **Select several rows** (Shift/Ctrl+click, Shift+arrow) and act on them together | Medium | Needs F02. Needed by F12, F21, F22 |
 | 15 | F12 | **Cut, copy, paste rows** with their structure, between outlines too; pasting tab-indented or bulleted text becomes rows | Medium | Needs F11 |
-| 18 | F15 | **Bold, italic, underline, strikethrough** in row text and notes | Medium | Needs F02. Needs the rich-text storage from F01 |
 | 19 | F16 | **Links in text:** paste or add a URL and it's clickable | Low | Needs F15 |
 | 20 | F17 | **Calculated checkboxes:** a parent shows checked, unchecked or mixed from its children; checking a parent checks them all | Medium | Needs F10 |
 | 21 | F18 | **Focus** on a row or section (hide everything else), and unfocus | Medium | Needs F04 |

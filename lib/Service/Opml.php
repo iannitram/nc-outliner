@@ -77,9 +77,46 @@ class Opml
             if ($node->hasAttributeNS(self::NS, 'checked')) {
                 $row['checked'] = $node->getAttributeNS(self::NS, 'checked') === 'true';
             }
+            foreach (['textFormats' => 'text-formats', 'noteFormats' => 'note-formats'] as $key => $attribute) {
+                if ($node->hasAttributeNS(self::NS, $attribute)) {
+                    try {
+                        $ranges = json_decode($node->getAttributeNS(self::NS, $attribute), true, 64, JSON_THROW_ON_ERROR);
+                    } catch (\JsonException $error) {
+                        throw new InvalidArgumentException('Invalid rich text.', 0, $error);
+                    }
+                    $this->validateFormats($ranges, $key === 'noteFormats' ? ($row['note'] ?? '') : $row['text']);
+                    $row[$key] = $ranges;
+                }
+            }
             $rows[] = $row;
         }
         return $rows;
+    }
+
+    /** Annotation offsets use JavaScript UTF-16 units, including astral characters. */
+    private function validateFormats(mixed $ranges, string $text): void
+    {
+        if (!is_array($ranges) || !array_is_list($ranges) || count($ranges) > 10000) {
+            throw new InvalidArgumentException('Invalid rich text ranges.');
+        }
+        $length = intdiv(strlen(mb_convert_encoding($text, 'UTF-16LE', 'UTF-8')), 2);
+        $previousEnd = 0;
+        foreach ($ranges as $range) {
+            if (!is_array($range) || array_diff(array_keys($range), ['start', 'end', 'marks']) ||
+                !is_int($range['start'] ?? null) || !is_int($range['end'] ?? null) ||
+                $range['start'] < $previousEnd || $range['end'] <= $range['start'] || $range['end'] > $length ||
+                !is_array($range['marks'] ?? null) || !array_is_list($range['marks']) || count($range['marks']) < 1 || count($range['marks']) > 4) {
+                throw new InvalidArgumentException('Invalid rich text range.');
+            }
+            $seen = [];
+            foreach ($range['marks'] as $mark) {
+                if (!is_string($mark) || !in_array($mark, ['bold', 'italic', 'underline', 'strikethrough'], true) || isset($seen[$mark])) {
+                    throw new InvalidArgumentException('Invalid rich text mark.');
+                }
+                $seen[$mark] = true;
+            }
+            $previousEnd = $range['end'];
+        }
     }
 
     public function read(string $xml): array
@@ -158,6 +195,15 @@ class Opml
                         throw new InvalidArgumentException('Invalid note visibility.');
                     }
                     $node->setAttributeNS(self::NS, 'nc:note-visible', $row['noteVisible'] ? 'true' : 'false');
+                }
+                foreach (['textFormats' => 'text-formats', 'noteFormats' => 'note-formats'] as $key => $attribute) {
+                    if (array_key_exists($key, $row)) {
+                        $this->validateFormats($row[$key], $key === 'noteFormats' ? ($row['note'] ?? '') : $row['text']);
+                        $node->setAttributeNS(self::NS, 'nc:' . $attribute, json_encode($row[$key], JSON_THROW_ON_ERROR));
+                    } else {
+                        // Known annotations cannot survive against unrelated replacement text.
+                        $node->removeAttributeNS(self::NS, $attribute);
+                    }
                 }
                 foreach ($build($row['children'], $depth + 1) as $child) {
                     $node->appendChild($child);

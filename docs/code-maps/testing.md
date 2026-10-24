@@ -30,6 +30,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | `collapse.test.mjs`, `collapse-editor.test.mjs`, `expansion.test.mjs` | Visibility, disclosure controls, recursive actions, focus and combined structural undo |
 | `notes.test.mjs`, `checkboxes.test.mjs` | Notes/checklist edits, visibility, retained state, history and persistence notifications |
 | `search.test.mjs` | Ancestor paths, collapsed matches, hidden-tree preservation and filtered note caret regression |
+| `richtext.test.mjs` | Topic/note selection marks, range normalization and rebasing, history and autosave snapshots. Optional `node tests/browser/richtext.mjs` requires Playwright and installed Chromium; exercises the actual contenteditable DOM, controls, typing, history, multiline and hostile paste. |
 | `timestamp.test.mjs` | Locale/timezone formatting, range replacement, notes and metadata preservation |
 | `files.test.mjs`, `autosave.test.mjs` | Request options, strong If-Match, debounce, in-flight edits, retry, conflict and lifecycle disposal |
 | `import.test.mjs`, `export.test.mjs` | Parsing/validation, create-only workflow, unsaved snapshots, escaping, download lifecycle and failed requests |
@@ -39,6 +40,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 |---|---|
 | [routes_test.php](../../tests/php/routes_test.php) | Page route scaffold; inspect `appinfo/routes.php` when changing other endpoints |
 | [opml_test.php](../../tests/php/opml_test.php) | Codec round trips, extension retention, moves, XML rejection, IDs and notes |
+| [richtext_test.php](../../tests/php/richtext_test.php) | Topic/note annotations, UTF-16 offsets, explicit clearing, unknown XML retention, malformed JSON and unsafe annotation rejection. |
 | [checkboxes_test.php](../../tests/php/checkboxes_test.php) | Checklist persistence, hiding and boolean validation |
 | [files_test.php](../../tests/php/files_test.php) | User isolation, duplicate protection, paths, locks, ETags, copies and read-only export |
 | [autosave_controller_test.php](../../tests/php/autosave_controller_test.php) | Strong/missing/weak/multiple If-Match handling and copy dispatch |

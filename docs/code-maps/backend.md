@@ -56,7 +56,10 @@ The extension namespace is `https://nextcloud.com/ns/outliner/1`, conventionally
 | `row.collapsed` | `outline/@nc:collapsed` boolean |
 | `row.note` | `outline/@nc:note` string |
 | `row.noteVisible` | `outline/@nc:note-visible` boolean |
+| `row.textFormats` / `row.noteFormats` | `outline/@nc:text-formats` / `outline/@nc:note-formats`: JSON arrays of `{start,end,marks}` using UTF-16 offsets, disjoint ranges and allowlisted bold/italic/underline/strikethrough marks |
 | `row.checked` | `outline/@nc:checked` boolean |
+
+Rich annotations are validated on read and write; no HTML is interpreted. Empty arrays clear formatting, and omitted format fields remove old annotations to avoid applying stale ranges to replacement text. Plain text remains in the standard attributes for other OPML readers.
 
 Optional fields are read when their attributes exist and written when supplied. New client rows receive UUID-style identities. Legacy rows without an ID receive a deterministic position-derived ID while reading; a subsequent write persists it. Duplicate IDs are rejected.
 

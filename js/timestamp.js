@@ -1,4 +1,5 @@
-import { findRow } from './model.js';
+import { updateNote } from './notes.js';
+import { findRow, updateText } from './model.js';
 
 export const timestampFormats = [
   ['date-short', 'Short date'], ['date-long', 'Long date'], ['time', 'Time'],
@@ -25,8 +26,8 @@ export function insertTimestamp(document, selection, text) {
   const old = row[field] ?? '';
   const start = Math.max(0, Math.min(selection.offset ?? old.length, old.length));
   const end = Math.max(start, Math.min(selection.end ?? start, old.length));
-  const next = structuredClone(document);
-  findRow(next.rows, row.id).row[field] = old.slice(0, start) + text + old.slice(end);
+  const value = old.slice(0, start) + text + old.slice(end);
+  const next = field === 'note' ? updateNote(document, row.id, value, { offset: start, end }) : updateText(document, row.id, value, { offset: start, end });
   return { document: next, focus: { id: row.id, offset: start + text.length, end: start + text.length, direction: 'none', ...(field === 'note' ? { field: 'note' } : {}) } };
 }
 

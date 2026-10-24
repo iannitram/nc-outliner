@@ -1,3 +1,4 @@
+import { rebaseFormats } from './richtext.js';
 /** A row's identity and extension data survive every editing operation. */
 export function createRow(text = '') {
   return { id: globalThis.crypto?.randomUUID?.() ?? `row-${Date.now()}-${Math.random().toString(36).slice(2)}`, text, children: [], collapsed: false };
@@ -21,11 +22,13 @@ export function flattenVisibleRows(rows) {
   return rows.flatMap((row) => [row, ...(row.collapsed ? [] : flattenVisibleRows(row.children ?? []))]);
 }
 
-export function updateText(document, id, text) {
+export function updateText(document, id, text, selection) {
   const found = findRow(document.rows, id);
   if (!found || found.row.text === text) return document;
   const next = structuredClone(document);
-  findRow(next.rows, id).row.text = text;
+  const row = findRow(next.rows, id).row;
+  if (row.textFormats) row.textFormats = rebaseFormats(row.textFormats, row.text, text, selection);
+  row.text = text;
   return next;
 }
 

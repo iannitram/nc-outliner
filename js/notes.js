@@ -1,11 +1,15 @@
+import { rebaseFormats } from './richtext.js';
+import { createRichInput } from './rich-input.js';
 import { findRow } from './model.js';
 
 /** Notes travel with rows, including extension data and descendants. */
-export function updateNote(document, id, note) {
+export function updateNote(document, id, note, selection) {
   const found = findRow(document.rows, id);
   if (!found || (found.row.note ?? '') === note) return document;
   const next = structuredClone(document);
-  findRow(next.rows, id).row.note = note;
+  const row = findRow(next.rows, id).row;
+  if (row.noteFormats) row.noteFormats = rebaseFormats(row.noteFormats, row.note ?? '', note, selection);
+  row.note = note;
   return next;
 }
 
@@ -35,10 +39,9 @@ export function renderNote(row, item, context) {
   ));
   item.appendChild(button);
   if (!visible) return;
-  const note = dom.createElement('textarea');
+  const note = createRichInput(dom, row.note ?? '', row.noteFormats);
   note.className = 'outliner-note';
   note.dataset.noteId = row.id;
-  note.value = row.note ?? '';
   note.rows = Math.max(2, note.value.split('\n').length);
   note.spellcheck = true;
   note.setAttribute('aria-label', 'Row note');

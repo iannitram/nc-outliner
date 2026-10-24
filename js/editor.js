@@ -1,6 +1,8 @@
+import { createRichInput } from './rich-input.js';
+import { mountFormattingControls, applyFormat, formatCommand, formatField } from './richtext.js';
 import { createCheckboxToggle, updateCheckboxToggle, renderCheckbox } from './checkboxes.js';
 import { createHistory, historyCommand } from './history.js';
-import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
+import { createRow, updateText, insertAfter, deleteEmpty, findRow } from './model.js';
 import { handleIndentKey } from './indent.js';
 import { createCollapseExtension } from './collapse.js';
 import { updateNote, setNoteVisible, renderNote } from './notes.js';
@@ -89,7 +91,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   function focusRow(id, offset = 0, end = offset, direction = 'none', field = 'text') {
     const attribute = field === 'note' ? 'noteId' : 'rowId';
-    const target = [...root.querySelectorAll(field === 'note' ? 'textarea[data-note-id]' : 'textarea[data-row-id]')].find((input) => input.dataset[attribute] === id);
+    const target = [...root.querySelectorAll(field === 'note' ? 'textarea[data-note-id], [data-rich-input][data-note-id]' : 'textarea[data-row-id], [data-rich-input][data-row-id]')].find((input) => input.dataset[attribute] === id);
     if (!target) return;
     target.focus();
     target.setSelectionRange(Math.min(offset, target.value.length), Math.min(end, target.value.length), direction);
@@ -123,6 +125,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   mountExpansionControls(toolbar, context, () => getSelection() ?? lastRowSelection);
 
   mountTimestampControls(toolbar, context, () => getSelection() ?? lastRowSelection, options.timestamp);
+  mountFormattingControls(toolbar, context, () => getSelection() ?? lastRowSelection);
 
   function render() {
     if (destroyed) return;
@@ -145,10 +148,9 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         const item = dom.createElement('li');
         item.className = 'outliner-row';
         item.dataset.rowId = row.id;
-        const input = dom.createElement('textarea');
+        const input = createRichInput(dom, row.text ?? '', row.textFormats);
         input.className = 'outliner-row-text';
         input.dataset.rowId = row.id;
-        input.value = row.text ?? '';
         input.rows = Math.max(1, input.value.split('\n').length);
         input.spellcheck = true;
         input.setAttribute('aria-label', 'Row text');
@@ -170,11 +172,17 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   function onInput(event) {
     const input = event.target;
     const isNote = Boolean(input.dataset?.noteId);
-    if (!isNote && !input.matches?.('textarea[data-row-id]')) return;
-    change((old) => isNote ? updateNote(old, input.dataset.noteId, input.value) : updateText(old, input.dataset.rowId, input.value), {
+    if (!isNote && !input.matches?.('textarea[data-row-id], [data-rich-input][data-row-id]')) return;
+    change((old) => isNote ? updateNote(old, input.dataset.noteId, input.value, pendingSelection) : updateText(old, input.dataset.rowId, input.value, pendingSelection), {
       type: 'input', selection: pendingSelection ?? getSelection(), skipRender: true,
     });
     pendingSelection = null;
+    if (input.paint && !event.isComposing) {
+      const selection = getSelection();
+      const row = findRow(document.rows, input.dataset.noteId ?? input.dataset.rowId)?.row;
+      input.paint(input.value, row?.[formatField(isNote ? 'note' : 'text')]);
+      if (selection) input.setSelectionRange(selection.offset, selection.end, selection.direction);
+    }
     input.rows = Math.max(1, input.value.split('\n').length);
     if (searchQuery.trim()) {
       const selection = getSelection();
@@ -188,7 +196,9 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   function onKeyDown(event) {
     const input = event.target;
     const isNote = Boolean(input.dataset?.noteId);
-    if ((!isNote && !input.matches?.('textarea[data-row-id]')) || event.isComposing || event.keyCode === 229) return;
+    if ((!isNote && !input.matches?.('textarea[data-row-id], [data-rich-input][data-row-id]')) || event.isComposing || event.keyCode === 229) return;
+    const format = formatCommand(event);
+    if (format) { event.preventDefault(); applyFormat(context, getSelection(), format); return; }
     const command = historyCommand(event);
     if (command) { event.preventDefault(); replay(command); return; }
     if (isNote) {
@@ -214,7 +224,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
       const atBoundary = event.key === 'ArrowUp' ? input.selectionStart === 0 : input.selectionEnd === input.value.length;
       if (!atBoundary || event.shiftKey) return;
-      const inputs = [...root.querySelectorAll('textarea[data-row-id]')];
+      const inputs = [...root.querySelectorAll('textarea[data-row-id], [data-rich-input][data-row-id]')];
       const next = inputs[inputs.indexOf(input) + (event.key === 'ArrowUp' ? -1 : 1)];
       if (next) { event.preventDefault(); focusRow(next.dataset.rowId, Math.min(input.selectionStart, next.value.length)); }
       return;
@@ -225,7 +235,9 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   }
 
   function onBeforeInput(event) {
-    if (event.target.matches?.('textarea[data-row-id]') || event.target.dataset?.noteId) pendingSelection = getSelection();
+    const mark = { formatBold: 'bold', formatItalic: 'italic', formatUnderline: 'underline', formatStrikeThrough: 'strikethrough' }[event.inputType];
+    if (mark) { event.preventDefault(); applyFormat(context, getSelection(), mark); return; }
+    if (event.target.matches?.('textarea[data-row-id], [data-rich-input][data-row-id]') || event.target.dataset?.noteId) pendingSelection = getSelection();
     if (event.inputType === 'historyUndo' || event.inputType === 'historyRedo') {
       event.preventDefault();
       replay(event.inputType === 'historyUndo' ? 'undo' : 'redo');
@@ -234,10 +246,11 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   function onFocusOut(event) {
     const target = event.target;
     const id = target.dataset?.rowId ?? target.dataset?.noteId;
-    if (id && (target.matches?.('textarea[data-row-id]') || target.dataset?.noteId)) {
+    if (id && (target.matches?.('textarea[data-row-id], [data-rich-input][data-row-id]') || target.dataset?.noteId)) {
       lastRowSelection = { id, offset: target.selectionStart, end: target.selectionEnd, direction: target.selectionDirection, ...(target.dataset.noteId ? { field: 'note' } : {}) };
     }
   }
+  root.addEventListener('compositionend', onInput);
   root.addEventListener('focusout', onFocusOut);
   root.addEventListener('beforeinput', onBeforeInput);
   root.addEventListener('input', onInput);
@@ -251,6 +264,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   return { ...context, destroy() {
     destroyed = true;
     unsubscribe();
+    root.removeEventListener('compositionend', onInput);
     root.removeEventListener('focusout', onFocusOut);
     root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);

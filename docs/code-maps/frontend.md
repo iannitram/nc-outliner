@@ -31,13 +31,15 @@
 | [notes.js](../../js/notes.js) | Immutable note/visibility edits and per-row note controls. Shift+Enter opens a note; Escape returns to the topic. |
 | [checkboxes.js](../../js/checkboxes.js) | Document visibility toggle, checked-state edits and accessible per-row checkboxes. Hiding retains checked states. |
 | [search.js](../../js/search.js) | `matchingRowIds()` returns literal case-insensitive matches plus ancestors. Editor filtering reveals matching paths without changing saved collapse state. |
+| [richtext.js](../../js/richtext.js) | Safe UTF-16 mark ranges, immutable selection toggles, edit rebasing, toolbar controls and Ctrl/Cmd+B/I/U or Shift+X. |
+| [rich-input.js](../../js/rich-input.js) | Contenteditable rendering using text nodes and allowlisted CSS classes; textarea-compatible value/selection adapter, plain-text paste and line breaks. |
 | [timestamp.js](../../js/timestamp.js) | Localized date/time formats and insertion into the last selected topic or note range. Uses the shared edit/history boundary. |
 
 ## Editor contract
 
 `mountEditor()` returns `getDocument`, `getSelection`, `change`, `replaceDocument`, `focusRow`, `render`, `undo`, `redo`, `getHistoryState` and `destroy`.
 
-Selections are `{ id, offset, end, direction }`, with `field: 'note'` for a note. `focusRow(id, offset, end, direction, field)` restores the appropriate textarea. Topic inputs use `data-row-id`; note inputs use `data-note-id`. Toolbar focus tracking retains the last text selection for bulk actions and timestamps.
+Selections are `{ id, offset, end, direction }`, with `field: 'note'` for a note. `focusRow(id, offset, end, direction, field)` restores the appropriate editable control. Rich controls expose the textarea value/selection API; hosts without DOM Range use a textarea fallback. Topic inputs use `data-row-id`; note inputs use `data-note-id`. Toolbar focus tracking retains the last text selection for bulk actions and timestamps.
 
 `change(mutator, meta)` applies an immutable document updater. A same-reference return is a no-op. Metadata carries the edit type, prior selection, target focus, optional render/notification suppression and history replay flag. Successful edits render as needed, record history, call hooks, and notify `onChange(document)`.
 
