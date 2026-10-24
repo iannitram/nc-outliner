@@ -38,19 +38,19 @@ class Element {
   replaceChildren() { for (const child of this.children) child.parent = null; this.children = []; }
   setAttribute(k, v) { this.attributes[k] = v; }
   contains(target) { return target === this || this.children.some((child) => child.contains(target)); }
-  matches(selector) { return this.tag === 'textarea' && Boolean(this.dataset.rowId); }
-  querySelectorAll() { return this.children.flatMap((child) => [...(child.matches() ? [child] : []), ...child.querySelectorAll()]); }
+  matches(selector) { return this.tag === 'textarea' && Boolean(this.dataset[selector?.includes('note-id') ? 'noteId' : 'rowId']); }
+  querySelectorAll(selector) { return this.children.flatMap((child) => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]); }
   addEventListener(type, fn) { this.listeners[type] = fn; }
   removeEventListener(type) { delete this.listeners[type]; }
   focus() { this.ownerDocument.activeElement = this; }
   setSelectionRange(start, end, direction = 'none') { Object.assign(this, { selectionStart: start, selectionEnd: end, selectionDirection: direction }); }
   remove() { this.parent.children = this.parent.children.filter((child) => child !== this); }
 }
-function mounted() {
+function mounted(document = fixture()) {
   const dom = { createElement(tag) { return new Element(tag, this); } };
   const element = new Element('div', dom);
   const changes = [];
-  const editor = mountEditor(element, fixture(), (doc) => changes.push(doc));
+  const editor = mountEditor(element, document, (doc) => changes.push(doc));
   const root = element.children[0];
   const searchPanel = root.children.find(el => el.className === 'outliner-search');
   const [input, clear, status] = searchPanel.children;
@@ -111,4 +111,26 @@ test('editing a filtered match updates results without removing data from the st
   assert.equal(f.editor.getDocument().rows[0].children.length, 2);
   assert.equal(f.dom.activeElement, f.input);
   assert.equal(f.status.hidden, false);
+});
+
+test('typing a visible note while filtering keeps the note caret and hidden outline data', () => {
+  const document = fixture();
+  Object.assign(document.rows[0].children[0], { note: 'Original note', noteVisible: true });
+  const f = mounted(document);
+  f.query('literal');
+  const note = f.root.querySelectorAll('textarea[data-note-id]')[0];
+  note.focus(); note.setSelectionRange(2, 5, 'backward');
+  f.root.listeners.beforeinput({ target: note, inputType: 'insertText' });
+  note.value = 'Changed note'; note.setSelectionRange(3, 7, 'backward');
+  f.root.listeners.input({ target: note });
+  const renderedNote = f.root.querySelectorAll('textarea[data-note-id]')[0];
+  assert.equal(f.dom.activeElement, renderedNote);
+  assert.deepEqual(f.editor.getSelection(), { id: 'b', field: 'note', offset: 3, end: 7, direction: 'backward' });
+  assert.equal(renderedNote.value, 'Changed note');
+  assert.deepEqual(f.rows(), ['a', 'b']);
+  const saved = f.changes.at(-1);
+  assert.equal(saved.rows[0].children[0].note, 'Changed note');
+  assert.equal(saved.rows[0].children[1].text, 'Other child');
+  assert.equal(saved.rows[1].text, 'Unrelated');
+  assert.equal(saved.rows[0].collapsed, true);
 });

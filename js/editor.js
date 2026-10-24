@@ -180,7 +180,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       const selection = getSelection();
       const included = matchingRowIds(document.rows, searchQuery);
       render();
-      if (selection && included.has(selection.id)) focusRow(selection.id, selection.offset, selection.end, selection.direction);
+      if (selection && included.has(selection.id)) focusRow(selection.id, selection.offset, selection.end, selection.direction, selection.field);
       else searchInput.focus();
     }
   }
