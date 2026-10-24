@@ -17,6 +17,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   const history = createHistory({ document, selection: null });
   let pendingSelection = null;
   let lastRowSelection = null;
+  let editingRowId = null;
   const dom = element.ownerDocument;
   const root = dom.createElement('div');
   root.className = 'outliner-editor';
@@ -149,7 +150,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         input.className = 'outliner-row-text';
         input.dataset.rowId = row.id;
         input.value = row.text ?? '';
-        input.rows = Math.max(1, input.value.split('\n').length);
+        input.rows = row.id === editingRowId ? Math.max(1, input.value.split('\n').length) : 1;
+        input.classList.add(row.id === editingRowId ? 'outliner-row-text-editing' : 'outliner-row-text-folded');
         input.spellcheck = true;
         input.setAttribute('aria-label', 'Row text');
         input.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown Alt+Delete');
@@ -236,8 +238,26 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     const id = target.dataset?.rowId ?? target.dataset?.noteId;
     if (id && (target.matches?.('textarea[data-row-id]') || target.dataset?.noteId)) {
       lastRowSelection = { id, offset: target.selectionStart, end: target.selectionEnd, direction: target.selectionDirection, ...(target.dataset.noteId ? { field: 'note' } : {}) };
+      if (target.matches?.('textarea[data-row-id]') && editingRowId === id) {
+        editingRowId = null;
+        target.rows = 1;
+        target.scrollTop = 0;
+        target.scrollLeft = 0;
+        target.style.height = '';
+        target.classList.remove('outliner-row-text-editing');
+        target.classList.add('outliner-row-text-folded');
+      }
     }
   }
+  function onFocusIn(event) {
+    const target = event.target;
+    if (!target.matches?.('textarea[data-row-id]')) return;
+    editingRowId = target.dataset.rowId;
+    target.rows = Math.max(1, target.value.split('\n').length);
+    target.classList.remove('outliner-row-text-folded');
+    target.classList.add('outliner-row-text-editing');
+  }
+  root.addEventListener('focusin', onFocusIn);
   root.addEventListener('focusout', onFocusOut);
   root.addEventListener('beforeinput', onBeforeInput);
   root.addEventListener('input', onInput);
@@ -251,6 +271,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   return { ...context, destroy() {
     destroyed = true;
     unsubscribe();
+    root.removeEventListener('focusin', onFocusIn);
     root.removeEventListener('focusout', onFocusOut);
     root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);
