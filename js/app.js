@@ -171,7 +171,7 @@ export async function start(el, runtime = {}) {
     busy = true;
     controls();
     if (!await mayLeave()) { busy = false; controls(); return; }
-    try { display(await api(`/${encodeURIComponent(filename)}`), linkedRowId); }
+    try { display(await api(`/${filename.split('/').map(encodeURIComponent).join('/')}`), linkedRowId); }
     finally { busy = false; controls(); }
   }
   form.addEventListener('submit', async event => {

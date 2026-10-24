@@ -117,11 +117,11 @@ test('browser app opens an authorized outline from a row URL, expands ancestors,
 
 test('browser app reopens a nested outline name through the normal encoded API path', async () => {
   const f = await mountedApp({
-    href: 'https://cloud.example/apps/outliner/?outline=Work%2FPlan.opml&row=row+%2F%3F%C3%A9',
-    outlineName: 'Work/Plan.opml',
+    href: 'https://cloud.example/apps/outliner/?outline=Work%2FPlan%20Notes.opml&row=row+%2F%3F%C3%A9',
+    outlineName: 'Work/Plan Notes.opml',
   });
   assert.deepEqual(f.calls.map(call => [call.method, call.path]), [
-    ['GET', ''], ['GET', '/Work%2FPlan.opml'],
+    ['GET', ''], ['GET', '/Work/Plan%20Notes.opml'],
   ]);
   assert.equal(f.document.activeElement.dataset.rowId, 'row /?é');
 });
