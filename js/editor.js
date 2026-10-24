@@ -7,6 +7,7 @@ import { updateNote, setNoteVisible, renderNote } from './notes.js';
 import { handleRowActionKey, renderRowActions } from './row-actions.js';
 import { handleExpansionKey, mountExpansionControls } from './expansion.js';
 import { matchingRowIds } from './search.js';
+import { mountTimestampControls } from './timestamp.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
@@ -32,7 +33,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   undoButton.addEventListener('click', () => replay('undo'));
   redoButton.addEventListener('click', () => replay('redo'));
   // Keep the editing selection when clicking a history control.
-  toolbar.addEventListener('mousedown', (event) => event.preventDefault());
+  undoButton.addEventListener('mousedown', (event) => event.preventDefault());
+  redoButton.addEventListener('mousedown', (event) => event.preventDefault());
   toolbar.appendChild(undoButton);
   toolbar.appendChild(redoButton);
   const searchPanel = dom.createElement('div');
@@ -119,6 +121,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   let checkboxToggle;
   const context = { undo: () => replay('undo'), redo: () => replay('redo'), getHistoryState: history.getState, getDocument: () => document, getSelection, change, replaceDocument, focusRow, render };
   mountExpansionControls(toolbar, context, () => getSelection() ?? lastRowSelection);
+
+  mountTimestampControls(toolbar, context, () => getSelection() ?? lastRowSelection, options.timestamp);
 
   function render() {
     if (destroyed) return;
@@ -228,9 +232,10 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     }
   }
   function onFocusOut(event) {
-    const input = event.target;
-    if (input.matches?.('textarea[data-row-id]')) {
-      lastRowSelection = { id: input.dataset.rowId, offset: input.selectionStart, end: input.selectionEnd, direction: input.selectionDirection };
+    const target = event.target;
+    const id = target.dataset?.rowId ?? target.dataset?.noteId;
+    if (id && (target.matches?.('textarea[data-row-id]') || target.dataset?.noteId)) {
+      lastRowSelection = { id, offset: target.selectionStart, end: target.selectionEnd, direction: target.selectionDirection, ...(target.dataset.noteId ? { field: 'note' } : {}) };
     }
   }
   root.addEventListener('focusout', onFocusOut);

@@ -222,3 +222,19 @@ test('delete-row button removes subtree through history while plain text Delete 
   assert.equal(f.editor.getDocument().rows[0].children[0].id, 'c');
   assert.equal(f.dom.activeElement.dataset.rowId, 'a');
 });
+test('timestamp toolbar remembers a text range after focus moves and supports undo', () => {
+  const f = fixture(undefined, { timestamp: { date: new Date('2026-10-24T14:05:00Z'), locale: 'en-GB', timeZone: 'UTC' } });
+  const input = f.inputs()[0]; input.tagName = 'TEXTAREA'; input.focus(); input.setSelectionRange(1, 4, 'backward');
+  f.root.listeners.focusout({ target: input });
+  const toolbar = f.root.children[0];
+  const select = toolbar.children.find((node) => node.tag === 'select');
+  const insert = toolbar.children.find((node) => node.textContent === 'Insert timestamp');
+  select.focus(); select.value = 'time'; insert.focus(); insert.listeners.click();
+  assert.equal(f.editor.getDocument().rows[0].text, 'A14:05a');
+  assert.equal(f.dom.activeElement.dataset.rowId, 'a');
+  assert.equal(f.dom.activeElement.selectionStart, 6);
+  assert.equal(f.changes.length, 1);
+  f.editor.undo();
+  assert.equal(f.editor.getDocument().rows[0].text, 'Alpha');
+  assert.deepEqual(f.editor.getSelection(), { id: 'a', offset: 1, end: 4, direction: 'backward' });
+});
