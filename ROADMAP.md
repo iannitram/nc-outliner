@@ -23,7 +23,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 
 | ID | Feature | Complexity | Notes |
 |---|---|---|---|
-| F26 | **Insert timestamp:** short or long date, time, or both | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/28 |
 | F01 | **Outline files:** create and open `.opml` outlines in the user's `Outlines/` folder (created on first use), as the signed-in user | Medium | Foundation: everything depends on it. The file format needs room for row IDs, rich text, styles and columns later (OPML attributes plus an app namespace); https://github.com/iannitram/nc-outliner/pull/1 |
 | F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Needs F01. The editing core: keyboard handling and caret movement between rows; https://github.com/iannitram/nc-outliner/pull/2 |
 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/5 |
@@ -34,6 +33,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/60 |
 | F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/61 |
 | F14 | **Search field:** show only rows matching the text (with their parents) | Medium | Needs F04; https://github.com/iannitram/nc-outliner/pull/62 |
+| F26 | **Insert timestamp:** short or long date, time, or both | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/63 |
 
 ## Unwritten
 
