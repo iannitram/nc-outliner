@@ -8,6 +8,9 @@ class Element {
     Object.assign(this, { tag, ownerDocument, children: [], dataset: {}, listeners: {}, value: '', selectionStart: 0, selectionEnd: 0, selectionDirection: 'none' });
   }
   appendChild(child) { this.children.push(child); child.parent = this; return child; }
+  get classList() { return { add() {} }; }
+  get firstChild() { return this.children[0]; }
+  insertBefore(child, before) { this.children.splice(Math.max(0, this.children.indexOf(before)), 0, child); child.parent = this; }
   replaceChildren() { for (const child of this.children) child.parent = null; this.children = []; }
   setAttribute() {}
   contains(target) { return target === this || this.children.some((child) => child.contains(target)); }

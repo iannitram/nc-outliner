@@ -1,9 +1,11 @@
 import { createHistory, historyCommand } from './history.js';
 import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
 import { handleIndentKey } from './indent.js';
+import { createCollapseExtension } from './collapse.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
+  options = { ...createCollapseExtension(), ...options };
   let document = initialDocument;
   let destroyed = false;
   const history = createHistory({ document, selection: null });
