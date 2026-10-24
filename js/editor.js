@@ -2,6 +2,7 @@ import { createHistory, historyCommand } from './history.js';
 import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
 import { handleIndentKey } from './indent.js';
 import { createCollapseExtension } from './collapse.js';
+import { mountTimestampControls } from './timestamp.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
@@ -10,6 +11,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   let destroyed = false;
   const history = createHistory({ document, selection: null });
   let pendingSelection = null;
+  let timestampSelection = null;
   const dom = element.ownerDocument;
   const root = dom.createElement('div');
   root.className = 'outliner-editor';
@@ -26,7 +28,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   undoButton.addEventListener('click', () => replay('undo'));
   redoButton.addEventListener('click', () => replay('redo'));
   // Keep the editing selection when clicking a history control.
-  toolbar.addEventListener('mousedown', (event) => event.preventDefault());
+  undoButton.addEventListener('mousedown', (event) => event.preventDefault());
+  redoButton.addEventListener('mousedown', (event) => event.preventDefault());
   toolbar.appendChild(undoButton);
   toolbar.appendChild(redoButton);
   const unsubscribe = history.subscribe(({ canUndo, canRedo }) => {
@@ -73,10 +76,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   function replaceDocument(next, { selection, notify = true, replay = false } = {}) {
     pendingSelection = null;
+    if (!replay) timestampSelection = null;
     return change(() => next, { type: 'replace', replay, focus: selection, notify });
   }
 
   const context = { undo: () => replay('undo'), redo: () => replay('redo'), getHistoryState: history.getState, getDocument: () => document, getSelection, change, replaceDocument, focusRow, render };
+
+  mountTimestampControls(toolbar, context, () => getSelection() ?? timestampSelection, options.timestamp);
 
   function render() {
     if (destroyed) return;
@@ -147,6 +153,14 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       replay(event.inputType === 'historyUndo' ? 'undo' : 'redo');
     }
   }
+  function rememberTimestampSelection(event) {
+    const target = event.target;
+    const id = target.dataset?.rowId ?? target.dataset?.noteId;
+    if (id && target.tagName?.toLowerCase() === 'textarea') {
+      timestampSelection = { id, offset: target.selectionStart, end: target.selectionEnd, direction: target.selectionDirection, ...(target.dataset.noteId ? { field: 'note' } : {}) };
+    }
+  }
+  root.addEventListener('focusout', rememberTimestampSelection);
   root.addEventListener('beforeinput', onBeforeInput);
   root.addEventListener('input', onInput);
   root.addEventListener('keydown', onKeyDown);
@@ -159,6 +173,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   return { ...context, destroy() {
     destroyed = true;
     unsubscribe();
+    root.removeEventListener('focusout', rememberTimestampSelection);
     root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);
     root.removeEventListener('keydown', onKeyDown);
