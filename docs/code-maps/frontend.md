@@ -30,6 +30,7 @@
 | [row-actions.js](../../js/row-actions.js) | Explicit subtree deletion and sibling movement; buttons, Alt+Delete and Alt+Up/Down. |
 | [notes.js](../../js/notes.js) | Immutable note/visibility edits and per-row note controls. Shift+Enter opens a note; Escape returns to the topic. |
 | [checkboxes.js](../../js/checkboxes.js) | Document visibility toggle, checked-state edits and accessible per-row checkboxes. Hiding retains checked states. |
+| [numbering.js](../../js/numbering.js) | Document numbering style/suffix controls, immutable settings, and full-tree labels; labels remain stable through collapse/search and recompute after structural edits. |
 | [search.js](../../js/search.js) | `matchingRowIds()` returns literal case-insensitive matches plus ancestors. Editor filtering reveals matching paths without changing saved collapse state. |
 | [timestamp.js](../../js/timestamp.js) | Localized date/time formats and insertion into the last selected topic or note range. Uses the shared edit/history boundary. |
 

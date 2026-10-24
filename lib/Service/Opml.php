@@ -95,7 +95,21 @@ class Opml
         if ($dom->documentElement->hasAttributeNS(self::NS, 'showCheckboxes')) {
             $document['showCheckboxes'] = $dom->documentElement->getAttributeNS(self::NS, 'showCheckboxes') === 'true';
         }
+        if ($dom->documentElement->hasAttributeNS(self::NS, 'numbering-style')) {
+            $style = $dom->documentElement->getAttributeNS(self::NS, 'numbering-style');
+            $suffix = $dom->documentElement->getAttributeNS(self::NS, 'numbering-suffix');
+            $document['numbering'] = $this->numbering(['style' => $style, 'suffix' => $suffix]);
+        }
         return $document;
+    }
+
+    private function numbering(mixed $settings): array
+    {
+        if (!is_array($settings) || !in_array($settings['style'] ?? null, ['none', 'decimal', 'alpha', 'roman', 'section'], true)
+            || !in_array($settings['suffix'] ?? null, ['.', ')', ':', ''], true)) {
+            throw new InvalidArgumentException('Invalid row numbering.');
+        }
+        return ['style' => $settings['style'], 'suffix' => $settings['suffix']];
     }
 
     public function write(array $document, string $original): string
@@ -105,6 +119,11 @@ class Opml
         }
         $dom = $this->xml($original);
         $root = $dom->documentElement;
+        if (array_key_exists('numbering', $document)) {
+            $numbering = $this->numbering($document['numbering']);
+            $root->setAttributeNS(self::NS, 'nc:numbering-style', $numbering['style']);
+            $root->setAttributeNS(self::NS, 'nc:numbering-suffix', $numbering['suffix']);
+        }
         if (array_key_exists('showCheckboxes', $document)) {
             if (!is_bool($document['showCheckboxes'])) {
                 throw new InvalidArgumentException('Invalid checklist visibility.');

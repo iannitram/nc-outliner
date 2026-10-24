@@ -63,3 +63,9 @@ Optional fields are read when their attributes exist and written when supplied. 
 `Opml::write(document, original)` indexes original rows by ID, clones their XML, replaces known text/state/child structure, and preserves unknown attributes and non-outline XML. Head metadata also survives. Unknown XML is not sent as arbitrary JSON extension fields; new persistent fields need explicit read/write support.
 
 XML parsing rejects DOCTYPE/entity declarations, malformed OPML, and input above 5 MiB, and uses `LIBXML_NONET`. Writes validate required document/row types, unique IDs matching `[A-Za-z0-9_-]{1,128}`, at most 10,000 rows and recursion depth no greater than 100. The emitted XML is parsed again before use. Future column, style or rich-text support must extend this codec deliberately.
+
+## Row numbering
+
+`Opml` maps document `numbering: { style, suffix }` to namespaced root attributes `nc:numbering-style` and `nc:numbering-suffix`. Style is none/decimal/alpha/roman/section; suffix is period/closing parenthesis/colon/empty. Legacy files default to no numbering in the editor. Unknown XML remains preserved.
+
+Publishers should call `OdtBuilder::buildDocument($document)` to retain saved numbering. The legacy `build($title, $rows)` signature remains supported with an optional third settings argument. Labels derive from all sibling positions, including collapsed rows, and appear in heading/list text; a markerless list style avoids duplicate bullets while retaining indentation. Notes are not numbered. The current base contains the builder without the F07 publishing endpoint.

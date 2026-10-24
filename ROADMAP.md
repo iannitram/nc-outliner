@@ -39,6 +39,8 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it; https://github.com/iannitram/nc-outliner/pull/66 |
 | F72 | **Autosave:** saves on its own a second or two after you stop typing, and again when you leave the page; a status shows Saved, Saving or Can't save (retrying). If the file changed somewhere else (another tab or device), it never overwrites it silently: it offers to reload, or to keep yours as a copy | Medium | Needs F01, F02. Ian's request (2026-10-22). Overwrite guard: Nextcloud's ETag with If-Match on every save. There's no Save button at all once this works; https://github.com/iannitram/nc-outliner/pull/67 |
 
+| F30 | **Row numbering:** 1. / a. / i. / section numbers (1.1.2), with suffix choices | Medium | Needs F01 (saved per document). Should carry into F07's output; https://github.com/iannitram/nc-outliner/pull/72 |
+
 ## Unwritten
 
 | Rank | ID | Feature | Complexity | Notes (dependencies) |
@@ -61,7 +63,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 29 | F27 | **Print and Save as PDF:** expand all, include notes, selected rows only, flatten indentation, checked or unchecked rows only | Medium | Needs F06, F13. A print stylesheet plus a print-options dialog |
 | 30 | F28 | **Export to Word (.docx),** indented and outline styles | Medium | Shares F07's publisher, with a second output format |
 | 31 | F29 | **Sort rows** permanently: topic A–Z or Z–A, by status, by note | Low | Needs F11 for "selected rows" |
-| 32 | F30 | **Row numbering:** 1. / a. / i. / section numbers (1.1.2), with suffix choices | Medium | Needs F01 (saved per document). Should carry into F07's output |
 | 33 | F32 | **Level styles:** font, size and colour per outline level, for the whole document | Medium | Needs F15. The base of the style system |
 | 34 | F31 | **Themes:** built-in looks that follow Nextcloud's light and dark mode | Medium | Needs F32, F71. Adds whole looks on top of the light/dark switch |
 | 35 | F33 | **Text formatting controls:** font, size, colour, highlight, alignment, line height, row padding, space above and below children | Medium | Needs F32 |

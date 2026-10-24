@@ -1,3 +1,4 @@
+import { rowNumbers, mountNumberingControls } from './numbering.js';
 import { createCheckboxToggle, updateCheckboxToggle, renderCheckbox } from './checkboxes.js';
 import { createHistory, historyCommand } from './history.js';
 import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
@@ -124,6 +125,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   mountTimestampControls(toolbar, context, () => getSelection() ?? lastRowSelection, options.timestamp);
 
+  const updateNumberingControls = mountNumberingControls(toolbar, context);
+
   function render() {
     if (destroyed) return;
     root.replaceChildren();
@@ -132,6 +135,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       toolbar.appendChild(checkboxToggle);
     }
     updateCheckboxToggle(checkboxToggle, document);
+    updateNumberingControls(document);
+    const numbers = rowNumbers(document);
     root.appendChild(toolbar);
     root.appendChild(searchPanel);
     const included = matchingRowIds(document.rows, searchQuery);
@@ -159,6 +164,17 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         renderNote(row, item, context);
         renderCheckbox(row, item, context);
         renderRowActions(row, item, context);
+        if (numbers.has(row.id)) {
+          const label = numbers.get(row.id);
+          const number = dom.createElement('span');
+          number.className = 'outliner-number';
+          number.textContent = label;
+          number.setAttribute('aria-hidden', 'true');
+          item.classList.add('outliner-numbered-row');
+          item.setAttribute('style', `--ol-number-width: ${label.length + 2}ch`);
+          item.appendChild(number);
+          input.setAttribute('aria-label', `Row text, ${label}`);
+        }
         if (row.children?.length && (included || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
         list.appendChild(item);
       }

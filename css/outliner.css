@@ -145,3 +145,14 @@
 #outliner-app[data-outliner-theme] :is(button, select):hover { background-color: var(--ol-hover); }
 #outliner-app .outliner-theme { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 #outliner-app .outliner-theme [role="status"] { color: var(--ol-muted); }
+
+.outliner-number {
+  position: absolute;
+  inset-inline-start: 24px;
+  inset-block-start: 5px;
+  color: var(--ol-muted);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.outliner-check-row > .outliner-number { inset-inline-start: 3.5rem; }
+.outliner-numbered-row > .outliner-row-text { padding-inline-start: var(--ol-number-width); }
