@@ -2,6 +2,7 @@ import { importOutline, mountImport } from './import.js';
 import { mountExport } from './export.js';
 import { mountTheme } from './theme.js';
 import { createAutosave } from './autosave.js';
+import { createRowLinkUrl, readRowLink } from './row-links.js';
 
 /** File shell. F02 supplies editor.js; F01 can also display outlines read-only. */
 export function createApi(base, fetcher = globalThis.fetch) {
@@ -23,9 +24,12 @@ export function createApi(base, fetcher = globalThis.fetch) {
   };
 }
 
-export async function start(el) {
+export async function start(el, runtime = {}) {
   const doc = el.ownerDocument;
-  const api = createApi(el.dataset.apiBase);
+  const api = runtime.api ?? createApi(el.dataset.apiBase);
+  const href = runtime.href ?? globalThis.location?.href;
+  const clipboard = runtime.clipboard ?? globalThis.navigator?.clipboard;
+  const rowLink = readRowLink(href);
   const make = (tag, text) => {
     const node = doc.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -66,7 +70,7 @@ export async function start(el) {
     shell.navigation.append(heading, form, list);
     importHost = shell.navigation;
     toolbar = shell.toolbar;
-    mountTheme(el, shell.toolbar);
+    (runtime.mountTheme ?? mountTheme)(el, shell.toolbar);
     shell.toolbar.append(title, conflicts);
     shell.content.append(content);
     status = shell.status;
@@ -106,7 +110,7 @@ export async function start(el) {
     }
     controls();
   }
-  function display(result) {
+  function display(result, linkedRowId = null) {
     autosave?.dispose();
     editor?.destroy();
     current = result;
@@ -124,7 +128,26 @@ export async function start(el) {
       editor = mountEditor(content, result.document, (document) => {
         autosave.update(document);
         controls();
+      }, {
+        renderRowControls(row, item) {
+          const button = make('button', 'Copy link');
+          button.type = 'button';
+          button.setAttribute('aria-label', `Copy link to row: ${row.text || 'Untitled row'}`);
+          button.title = 'Copy a link to this row';
+          button.addEventListener('mousedown', event => event.preventDefault());
+          button.addEventListener('click', async () => {
+            try {
+              if (typeof clipboard?.writeText !== 'function') throw new Error('Clipboard unavailable');
+              await clipboard.writeText(createRowLinkUrl(current.name, row.id, href));
+              status.textContent = 'Row link copied.';
+            } catch {
+              status.textContent = 'Could not copy the row link. Check clipboard permissions and try again.';
+            }
+          });
+          item.appendChild(button);
+        },
       });
+      if (linkedRowId && !editor.revealRow(linkedRowId)) status.textContent = 'The linked row was not found in this outline.';
     } else {
       const render = rows => {
         const ul = make('ul');
@@ -143,12 +166,12 @@ export async function start(el) {
     await autosave?.flush();
     return !autosave?.hasPending() || globalThis.confirm('Discard unsaved changes?');
   }
-  async function open(filename) {
+  async function open(filename, linkedRowId = null) {
     if (busy) return;
     busy = true;
     controls();
     if (!await mayLeave()) { busy = false; controls(); return; }
-    try { display(await api(`/${encodeURIComponent(filename)}`)); }
+    try { display(await api(`/${encodeURIComponent(filename)}`), linkedRowId); }
     finally { busy = false; controls(); }
   }
   form.addEventListener('submit', async event => {
@@ -210,4 +233,10 @@ export async function start(el) {
   });
   try { await refresh(); }
   catch (e) { error(e); }
+  if (rowLink?.invalid) status.textContent = 'This row link is invalid.';
+  else if (rowLink) {
+    try {
+      await open(rowLink.outline, rowLink.row);
+    } catch (e) { error(e); }
+  }
 }

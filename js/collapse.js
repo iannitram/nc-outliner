@@ -69,12 +69,17 @@ export function createCollapseExtension() {
       const hasChildren = Boolean(row.children?.length);
       const disclosure = dom.createElement(hasChildren ? 'button' : 'span');
       disclosure.className = hasChildren ? 'ol-disclosure' : 'ol-bullet';
-      disclosure.textContent = hasChildren ? (row.collapsed ? '▸' : '▾') : '•';
+      const expanded = context.isExpanded?.(row) ?? !row.collapsed;
+      disclosure.textContent = hasChildren ? (expanded ? '▾' : '▸') : '•';
       if (hasChildren) {
         disclosure.type = 'button';
-        disclosure.setAttribute('aria-expanded', String(!row.collapsed));
-        disclosure.setAttribute('aria-label', row.collapsed ? 'Expand row' : 'Collapse row');
+        disclosure.setAttribute('aria-expanded', String(expanded));
+        disclosure.setAttribute('aria-label', expanded ? 'Collapse row' : 'Expand row');
         disclosure.addEventListener('click', () => {
+          if (context.isForcedExpanded?.(row.id)) {
+            context.clearReveal?.(row.id);
+            return;
+          }
           context.change((document) => setCollapsed(document, row.id, !row.collapsed), {
             type: 'collapse', selection: context.getSelection?.(),
             focus: { id: row.id, offset: 0 },

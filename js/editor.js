@@ -17,6 +17,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   const history = createHistory({ document, selection: null });
   let pendingSelection = null;
   let lastRowSelection = null;
+  let revealedRowId = null;
+  let revealedAncestors = new Set();
   const dom = element.ownerDocument;
   const root = dom.createElement('div');
   root.className = 'outliner-editor';
@@ -95,6 +97,40 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     target.setSelectionRange(Math.min(offset, target.value.length), Math.min(end, target.value.length), direction);
   }
 
+  function revealRow(id) {
+    if (!hasRow(document.rows, id)) return false;
+    revealedRowId = id;
+    updateRevealedAncestors();
+    render();
+    focusRow(id);
+    const target = [...root.querySelectorAll('textarea[data-row-id]')].find(input => input.dataset.rowId === id);
+    target?.scrollIntoView?.({ block: 'center' });
+    return true;
+  }
+
+  function updateRevealedAncestors() {
+    const path = [];
+    function visit(rows) {
+      for (const row of rows) {
+        if (row.id === revealedRowId) return true;
+        path.push(row.id);
+        if (visit(row.children ?? [])) return true;
+        path.pop();
+      }
+      return false;
+    }
+    revealedAncestors = visit(document.rows) ? new Set(path) : new Set();
+  }
+
+  function clearReveal(rowId = null) {
+    if (!revealedRowId) return false;
+    revealedRowId = null;
+    revealedAncestors = new Set();
+    render();
+    if (rowId && hasRow(document.rows, rowId)) focusRow(rowId);
+    return true;
+  }
+
   function change(mutator, meta = {}) {
     if (destroyed) return false;
     const previous = document;
@@ -114,18 +150,29 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
 
   function replaceDocument(next, { selection, notify = true, replay = false } = {}) {
     pendingSelection = null;
-    if (!replay) lastRowSelection = null;
+    if (!replay) {
+      lastRowSelection = null;
+      revealedRowId = null;
+      revealedAncestors = new Set();
+    }
     return change(() => next, { type: 'replace', replay, focus: selection, notify });
   }
 
   let checkboxToggle;
-  const context = { undo: () => replay('undo'), redo: () => replay('redo'), getHistoryState: history.getState, getDocument: () => document, getSelection, change, replaceDocument, focusRow, render };
+  const context = {
+    undo: () => replay('undo'), redo: () => replay('redo'), getHistoryState: history.getState,
+    getDocument: () => document, getSelection, change, replaceDocument, focusRow, revealRow, render,
+    isForcedExpanded: id => revealedAncestors.has(id), clearReveal,
+    isExpanded: row => revealedAncestors.has(row.id) || !row.collapsed,
+  };
   mountExpansionControls(toolbar, context, () => getSelection() ?? lastRowSelection);
 
   mountTimestampControls(toolbar, context, () => getSelection() ?? lastRowSelection, options.timestamp);
 
   function render() {
     if (destroyed) return;
+    if (revealedRowId && !hasRow(document.rows, revealedRowId)) revealedRowId = null;
+    updateRevealedAncestors();
     root.replaceChildren();
     if (!checkboxToggle) {
       checkboxToggle = createCheckboxToggle(dom, context);
@@ -156,10 +203,11 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         input.title = 'Move row: Alt+Up/Down. Delete row and children: Alt+Delete.';
         item.appendChild(input);
         options.renderRow?.(row, item, context);
+        options.renderRowControls?.(row, item, context);
         renderNote(row, item, context);
         renderCheckbox(row, item, context);
         renderRowActions(row, item, context);
-        if (row.children?.length && (included || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
+        if (row.children?.length && (included || context.isForcedExpanded(row.id) || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
         list.appendChild(item);
       }
       container.appendChild(list);
@@ -257,4 +305,11 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     root.removeEventListener('keydown', onKeyDown);
     root.remove();
   } };
+}
+
+function hasRow(rows, id) {
+  for (const row of rows) {
+    if (row.id === id || hasRow(row.children ?? [], id)) return true;
+  }
+  return false;
 }
