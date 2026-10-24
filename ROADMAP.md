@@ -31,8 +31,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F06 | **Row notes:** a note under any row, shown or hidden per row | Medium | Needs F02; https://github.com/iannitram/nc-outliner/pull/58 |
 | F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/59 |
 | F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/60 |
-
-| F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/16 |
+| F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/61 |
 
 ## Unwritten
 
