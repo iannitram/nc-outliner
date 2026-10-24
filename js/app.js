@@ -1,3 +1,5 @@
+import { mountTheme } from './theme.js';
+
 /** File shell. F02 supplies editor.js; F01 can also display outlines read-only. */
 export function createApi(base, fetcher = globalThis.fetch) {
   return async function request(path = '', method = 'GET', data) {
@@ -50,6 +52,7 @@ export async function start(el) {
     const shell = mountShell(el);
     shell.navigation.append(heading, form, list);
     shell.toolbar.append(title, save);
+    mountTheme(el, shell.toolbar);
     shell.content.append(content);
     status = shell.status;
     status.setAttribute('role', 'status');
