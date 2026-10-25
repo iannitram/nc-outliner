@@ -145,3 +145,21 @@
 #outliner-app[data-outliner-theme] :is(button, select):hover { background-color: var(--ol-hover); }
 #outliner-app .outliner-theme { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
 #outliner-app .outliner-theme [role="status"] { color: var(--ol-muted); }
+
+#outliner-app .outliner-print-dialog {
+  width: min(32rem, calc(100vw - 2rem));
+  max-width: calc(100vw - 2rem);
+  padding: 1.5rem;
+  color: var(--ol-fg);
+  background: var(--ol-bg);
+  border: 1px solid var(--ol-border);
+  border-radius: .5rem;
+}
+#outliner-app .outliner-print-dialog::backdrop { background: rgb(0 0 0 / .45); }
+#outliner-app .outliner-print-dialog form { display: grid; gap: 1rem; }
+#outliner-app .outliner-print-dialog h2 { margin: 0; }
+#outliner-app .outliner-print-dialog label { display: flex; align-items: center; gap: .5rem; }
+#outliner-app .outliner-print-dialog input[type="checkbox"] { flex: none; }
+#outliner-app .outliner-print-dialog select { margin-inline-start: .5rem; }
+#outliner-app .outliner-print-dialog .outliner-print-hint { margin: -.75rem 0 0 1.5rem; color: var(--ol-muted); }
+#outliner-app .outliner-print-actions { display: flex; justify-content: flex-end; gap: .5rem; }

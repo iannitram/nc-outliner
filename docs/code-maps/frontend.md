@@ -19,6 +19,7 @@
 | [theme.js](../../js/theme.js) | Appearance selector and `/theme` API. Auto removes app overrides and inherits Nextcloud variables; explicit choice is saved per user on the server. |
 | [import.js](../../js/import.js) | `parseOutlineText()`, filename validation, create-then-save workflow, paste/file import form. |
 | [export.js](../../js/export.js) | Current-document snapshots, text/Markdown formatting, OPML API request, safe download names and Blob URL cleanup. |
+| [print.js](../../js/print.js) | Read-only print snapshots, print-options dialog and browser print view for PDF output. Selected-row printing uses the editor's transient row selection API. |
 
 ## Row features
 

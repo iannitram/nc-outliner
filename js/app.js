@@ -1,5 +1,6 @@
 import { importOutline, mountImport } from './import.js';
 import { mountExport } from './export.js';
+import { mountPrint } from './print.js';
 import { mountTheme } from './theme.js';
 import { createAutosave } from './autosave.js';
 
@@ -87,8 +88,14 @@ export async function start(el) {
   const exportControls = mountExport(toolbar, () => current ? {
     name: current.name, document: editor?.getDocument() ?? current.document,
   } : null, api, error => { status.textContent = error.message; });
+  const printControls = mountPrint(toolbar, () => current ? {
+    name: current.name,
+    document: editor?.getDocument() ?? current.document,
+    getSelectedRowIds: editor?.getSelectedRowIds,
+  } : null, error => { status.textContent = error.message; });
   function controls() {
     exportControls.refresh();
+    printControls.refresh();
     reload.disabled = copy.disabled = busy;
     create.disabled = busy;
     name.disabled = busy;

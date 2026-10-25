@@ -33,6 +33,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | `timestamp.test.mjs` | Locale/timezone formatting, range replacement, notes and metadata preservation |
 | `files.test.mjs`, `autosave.test.mjs` | Request options, strong If-Match, debounce, in-flight edits, retry, conflict and lifecycle disposal |
 | `import.test.mjs`, `export.test.mjs` | Parsing/validation, create-only workflow, unsaved snapshots, escaping, download lifecycle and failed requests |
+| `print.test.mjs` | Read-only print snapshots, notes/expansion options, checkbox filtering and selected-row filtering |
 | `theme.test.mjs` | Auto inheritance, preference transport, selector state, failure rollback and disposal |
 
 | PHP tests | Main behavior |
@@ -51,3 +52,5 @@ JS editor tests use small DOM doubles; they do not establish browser layout or f
 The latest reviewed feature batch passed 122 JS tests, 31 PHP checks and PHP lint. Separate Chromium workflows exercised the combined app with a mocked HTTP API. Those checks covered import/export, autosave retries and conflicts, page-leave flush, note timestamps, checkboxes, appearance and keyboard actions; they were session-level checks, not a committed live-Nextcloud test harness. See [batch-two-review.md](../batch-two-review.md).
 
 When adding a saved field, check both JS edit/history behavior and PHP XML round trips, including unknown metadata. When changing a save endpoint, check the controller precondition and service lock/write behavior separately. Browser/API checks and any live deployment verification must be reported with their actual environment; standalone tests are not deployment evidence.
+
+`node tests/browser/print-smoke.mjs` opens the print-options dialog in Chromium, captures the native print request and writes a PDF with the DevTools print command. It needs Playwright on `NODE_PATH` and Chromium at `/usr/bin/chromium` (or `CHROMIUM_BIN`). It is a local browser smoke, not a live Nextcloud check.
