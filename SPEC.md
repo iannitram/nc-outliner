@@ -1,6 +1,6 @@
 # nc-outliner: spec for 1.0
 
-**Approval:** not yet.
+**Approval:** 2026-10-25, in a session with the coordinator.
 
 ## 1.0 means
 
