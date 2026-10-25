@@ -1,7 +1,7 @@
 import { createCheckboxToggle, updateCheckboxToggle, renderCheckbox } from './checkboxes.js';
 import { createHistory, historyCommand } from './history.js';
-import { createRowSelection, actOnRows } from './selection.js';
-import { createRow, updateText, insertAfter, deleteEmpty, flattenRows } from './model.js';
+import { createRowSelection, actOnRows, canGroupSelectedRows, groupSelectedRows, selectedRootIds, ungroupSelectedRows } from './selection.js';
+import { createRow, findRow, updateText, insertAfter, deleteEmpty, flattenRows } from './model.js';
 import { handleIndentKey } from './indent.js';
 import { createCollapseExtension } from './collapse.js';
 import { updateNote, setNoteVisible, renderNote } from './notes.js';
@@ -142,6 +142,19 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     button.addEventListener('click', () => applySelectionAction(action));
     toolbar.appendChild(button); selectionButtons.push(button);
   }
+  const groupButton = dom.createElement('button');
+  groupButton.type = 'button';
+  groupButton.textContent = 'Group selected';
+  groupButton.title = 'Group a contiguous range of sibling rows.';
+  const ungroupButton = dom.createElement('button');
+  ungroupButton.type = 'button';
+  ungroupButton.textContent = 'Ungroup selected';
+  for (const button of [groupButton, ungroupButton]) {
+    button.addEventListener('mousedown', event => event.preventDefault());
+    toolbar.appendChild(button);
+  }
+  groupButton.addEventListener('click', () => applySelectionAction('group'));
+  ungroupButton.addEventListener('click', () => applySelectionAction('ungroup'));
   function visibleIds() { return renderedRows.map(row => row.id); }
   function updateSelectionUI() {
     rowSelection.reconcile(visibleIds());
@@ -152,13 +165,33 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     }
     selectionStatus.textContent = `${selected.length} rows selected`;
     for (const button of selectionButtons) button.disabled = !selected.length;
+    groupButton.disabled = !canGroupSelectedRows(document, selected);
+    ungroupButton.disabled = !selected.some(id => (findRow(document.rows, id)?.row.children ?? []).length > 0);
   }
   function applySelectionAction(action) {
     const selected = rowSelection.get();
     if (!selected.ids.length) return;
     const selection = getSelection();
-    const next = actOnRows(document, selected.ids, action);
-    const focusId = flattenRows(next.rows).some(row => row.id === selected.active) ? selected.active : next.rows[0]?.id;
+    const previous = document;
+    const next = action === 'group' ? groupSelectedRows(previous, selected.ids)
+      : action === 'ungroup' ? ungroupSelectedRows(previous, selected.ids)
+        : actOnRows(previous, selected.ids, action);
+    if (next === previous) return;
+    let focusId;
+    if (action === 'group') {
+      focusId = flattenRows(next.rows).some(row => row.id === selected.active) ? selected.active : undefined;
+      if (!focusId) {
+        const oldIds = new Set(flattenRows(previous.rows).map(row => row.id));
+        focusId = flattenRows(next.rows).find(row => !oldIds.has(row.id))?.id;
+      }
+    } else if (action === 'ungroup') {
+      const group = selectedRootIds(previous, selected.ids).map(id => findRow(previous.rows, id)?.row)
+        .find(row => row?.children?.length);
+      focusId = group?.children[0]?.id;
+    }
+    if (!focusId || !flattenRows(next.rows).some(row => row.id === focusId)) {
+      focusId = flattenRows(next.rows).some(row => row.id === selected.active) ? selected.active : next.rows[0]?.id;
+    }
     change(() => next, { type: `selection-${action}`, selection, focus: selection?.id === focusId ? selection : { id: focusId, offset: 0 } });
   }
   function onRowClick(event) {

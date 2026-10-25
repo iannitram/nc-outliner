@@ -24,7 +24,7 @@
 
 | Module | Editing or display behavior |
 |---|---|
-| [selection.js](../../js/selection.js) | Transient ranges/toggled row IDs in displayed order. Atomic selected-row delete, indent/outdent, movement and checkbox actions retain subtrees and metadata. |
+| [selection.js](../../js/selection.js) | Transient ranges/toggled row IDs in displayed order. Atomic selected-row actions retain subtrees and metadata; grouping wraps a contiguous sibling range, and ungrouping splices selected parents' children into place. |
 | [indent.js](../../js/indent.js) | Tab/Shift+Tab move complete subtrees. Boundary operations keep the document identity unchanged. |
 | [collapse.js](../../js/collapse.js) | Disclosure buttons, leaf bullets, visible preorder and boundary-aware left/right navigation. Supplies default editor hooks. |
 | [expansion.js](../../js/expansion.js) | Recursive whole-outline/subtree expansion, toolbar controls, Alt+Left/Right, and visible-focus correction. |

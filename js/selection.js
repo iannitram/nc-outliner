@@ -87,3 +87,68 @@ export function actOnRows(document, ids, action) {
   }
   return next;
 }
+
+/** Grouping only accepts a contiguous sibling range so no rows silently reorder. */
+export function canGroupSelectedRows(document, ids) {
+  const roots = selectedRootIds(document, ids);
+  if (!roots.length) return false;
+  const locations = roots.map(id => findRow(document.rows, id));
+  if (locations.some(location => !location) || !locations.every(location => location.siblings === locations[0].siblings)) return false;
+  const indexes = locations.map(location => location.index).sort((a, b) => a - b);
+  return indexes.at(-1) - indexes[0] + 1 === indexes.length;
+}
+
+/** Wrap selected roots in one new parent at the first selected row's position. */
+export function groupSelectedRows(document, ids) {
+  const roots = selectedRootIds(document, ids);
+  if (!canGroupSelectedRows(document, ids)) return document;
+  const selected = new Set(roots);
+  const children = roots.map(id => findRow(document.rows, id)?.row).filter(Boolean);
+  if (!children.length) return document;
+  const firstId = roots[0];
+  const group = { ...createRow(), children };
+  let inserted = false;
+  function transform(rows) {
+    const result = [];
+    let changed = false;
+    for (const row of rows ?? []) {
+      if (row.id === firstId) {
+        result.push(group);
+        inserted = true;
+        changed = true;
+      }
+      if (selected.has(row.id)) { changed = true; continue; }
+      const children = row.children ?? [];
+      const nested = transform(children);
+      if (nested !== children) changed = true;
+      result.push(nested === children ? row : { ...row, children: nested });
+    }
+    return changed ? result : rows;
+  }
+  const rows = transform(document.rows);
+  return inserted ? { ...document, rows } : document;
+}
+
+/** Remove selected parent rows and splice their children into their position. */
+export function ungroupSelectedRows(document, ids) {
+  const roots = selectedRootIds(document, ids);
+  const groups = new Set(roots.filter(id => (findRow(document.rows, id)?.row.children ?? []).length));
+  if (!groups.size) return document;
+  function transform(rows) {
+    const result = [];
+    let changed = false;
+    for (const row of rows ?? []) {
+      if (groups.has(row.id)) {
+        result.push(...row.children);
+        changed = true;
+        continue;
+      }
+      const children = row.children ?? [];
+      const nested = transform(children);
+      if (nested !== children) changed = true;
+      result.push(nested === children ? row : { ...row, children: nested });
+    }
+    return changed ? result : rows;
+  }
+  return { ...document, rows: transform(document.rows) };
+}

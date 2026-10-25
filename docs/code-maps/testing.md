@@ -33,6 +33,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | `timestamp.test.mjs` | Locale/timezone formatting, range replacement, notes and metadata preservation |
 | `files.test.mjs`, `autosave.test.mjs` | Request options, strong If-Match, debounce, in-flight edits, retry, conflict and lifecycle disposal |
 | `import.test.mjs`, `export.test.mjs` | Parsing/validation, create-only workflow, unsaved snapshots, escaping, download lifecycle and failed requests |
+| `selection.test.mjs`, group editor case | Selection-root normalization, group/ungroup structure and metadata, caret restoration and history |
 | `theme.test.mjs` | Auto inheritance, preference transport, selector state, failure rollback and disposal |
 
 | PHP tests | Main behavior |
@@ -45,6 +46,8 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | [theme_test.php](../../tests/php/theme_test.php) | Per-user preferences, defaults, validation and anonymous access |
 
 ## Scope and maintenance
+
+`node tests/browser/group-smoke.mjs` uses Chromium and Playwright to exercise multi-selection, grouping, ungrouping, caret restoration and undo/redo with the real editor DOM. It needs Playwright on `NODE_PATH` and Chromium at `/usr/bin/chromium` (or `CHROMIUM_BIN`). This local browser smoke does not require a live Nextcloud server.
 
 JS editor tests use small DOM doubles; they do not establish browser layout or full event behavior. Autosave tests inject timers/transports. PHP tests use standalone Nextcloud interface/service doubles, so passing inside the pinned image verifies PHP runtime behavior, not a running Nextcloud installation.
 

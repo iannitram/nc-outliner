@@ -281,6 +281,38 @@ test('bulk deletion records one history/autosave change, removes subtrees once a
   assert.deepEqual(f.editor.getSelectedRowIds(),['b','b1','c']);
   f.editor.redo();assert.deepEqual(f.editor.getDocument().rows.map(r=>r.id),['a','d']);
 });
+test('group and ungroup selected rows preserve caret, tree identity and undo as single edits', () => {
+  const f=fixture(selectionRows());
+  clickRow(f,'b');clickRow(f,'c',{ctrlKey:true});
+  const c=f.inputs().find(input=>input.dataset.rowId==='c');
+  c.focus();c.setSelectionRange(2,4,'backward');
+  const group=selectedButton(f,'Group selected');
+  assert.equal(group.disabled,false);
+  group.listeners.click();
+  let grouped=f.editor.getDocument();
+  assert.deepEqual(grouped.rows.map(row=>row.id),['a',grouped.rows[1].id,'d']);
+  const wrapper=grouped.rows[1];
+  assert.deepEqual(wrapper.children.map(row=>row.id),['b','c']);
+  assert.equal(wrapper.children[0].children[0].custom,'keep');
+  assert.deepEqual(f.editor.getSelectedRowIds(),['b','c']);
+  assert.equal(f.dom.activeElement.dataset.rowId,'c');
+  assert.equal(f.dom.activeElement.selectionStart,2);assert.equal(f.dom.activeElement.selectionEnd,4);
+  assert.equal(f.changes.length,1);
+
+  f.editor.focusRow(wrapper.id);
+  clickRow(f,wrapper.id,{ctrlKey:true});
+  assert.deepEqual(f.editor.getSelectedRowIds(),['b','c',wrapper.id]);
+  assert.equal(selectedButton(f,'Ungroup selected').disabled,false);
+  selectedButton(f,'Ungroup selected').listeners.click();
+  assert.deepEqual(f.editor.getDocument().rows.map(row=>row.id),['a','b','c','d']);
+  assert.equal(f.editor.getDocument().rows[1].children[0].custom,'keep');
+  assert.equal(f.changes.length,2);
+  f.editor.undo();
+  assert.equal(f.editor.getDocument().rows[1].id,wrapper.id);
+  assert.deepEqual(f.editor.getSelectedRowIds(),['b','c',wrapper.id]);
+  f.editor.redo();
+  assert.deepEqual(f.editor.getDocument().rows.map(row=>row.id),['a','b','c','d']);
+});
 test('multi-row Tab, Alt movement and toolbar status changes share history and preserve metadata', () => {
   const f=fixture(selectionRows());clickRow(f,'b');clickRow(f,'c',{shiftKey:true});
   f.event('Tab',f.dom.activeElement);assert.deepEqual(f.editor.getDocument().rows[0].children.map(r=>r.id),['b','c']);

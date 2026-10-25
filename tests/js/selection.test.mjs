@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRowSelection, selectedRootIds, actOnRows } from '../../js/selection.js';
+import { createRowSelection, selectedRootIds, actOnRows, canGroupSelectedRows, groupSelectedRows, ungroupSelectedRows } from '../../js/selection.js';
 const row = (id, children = []) => ({ id, text: id, children, note: 'Keep', richText: `<b>${id}</b>`, custom: { id } });
 const fixture = () => ({ metadata: { author: 'Owner' }, rows: [row('a'), row('b', [row('b1')]), row('c'), row('d')] });
 test('Shift ranges extend, contract and reverse around a fixed anchor in displayed order', () => {
@@ -56,4 +56,43 @@ test('checking acts on explicit selection and reveals checkboxes without checkin
   assert.equal(actOnRows(next,[],'delete'),next);
   assert.equal(actOnRows(next,['missing'],'delete'),next);
   assert.equal(actOnRows(next,['b'],'unknown'),next);
+});
+
+test('group wraps selected roots at the first row, retaining selected order, subtrees and metadata', () => {
+  const original=fixture();
+  const next=groupSelectedRows(original,['c','b1','b']);
+  const wrapper=next.rows[1];
+  assert.notEqual(wrapper.id,'b');assert.equal(wrapper.text,'');
+  assert.deepEqual(wrapper.children.map(row=>row.id),['b','c']);
+  assert.deepEqual(wrapper.children[0],original.rows[1]);
+  assert.deepEqual(wrapper.children[1],original.rows[2]);
+  assert.deepEqual(next.rows.map(row=>row.id),['a',wrapper.id,'d']);
+  assert.deepEqual(next.metadata,original.metadata);
+  assert.deepEqual(original.rows.map(row=>row.id),['a','b','c','d']);
+  assert.equal(groupSelectedRows(original,[]),original);
+  assert.equal(groupSelectedRows(original,['missing']),original);
+  assert.equal(canGroupSelectedRows(original,['b','d']),false);
+  assert.equal(groupSelectedRows(original,['b','d']),original);
+});
+
+test('ungroup dissolves selected parents in place and preserves child subtrees and identities', () => {
+  const original=fixture();
+  const grouped=groupSelectedRows(original,['b','c']);
+  const wrapper=grouped.rows[1];
+  const next=ungroupSelectedRows(grouped,[wrapper.id]);
+  assert.deepEqual(next.rows.map(row=>row.id),['a','b','c','d']);
+  assert.deepEqual(next.rows[1],original.rows[1]);
+  assert.deepEqual(next.rows[2],original.rows[2]);
+  assert.deepEqual(next.metadata,original.metadata);
+  assert.equal(ungroupSelectedRows(original,['a']),original);
+  assert.equal(ungroupSelectedRows(original,['missing']),original);
+});
+
+test('grouping a nested row keeps its parent and subtree intact; selecting ancestor and child acts once', () => {
+  const original=fixture();
+  const next=groupSelectedRows(original,['b1','b']);
+  const wrapper=next.rows[1];
+  assert.deepEqual(wrapper.children.map(row=>row.id),['b']);
+  assert.deepEqual(wrapper.children[0],original.rows[1]);
+  assert.deepEqual(next.rows.map(row=>row.id),['a',wrapper.id,'c','d']);
 });
