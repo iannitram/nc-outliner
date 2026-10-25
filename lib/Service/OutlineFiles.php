@@ -228,7 +228,11 @@ class OutlineFiles
         $sourceFile = $this->file($source);
         $sourceFile->lock(ILockingProvider::LOCK_SHARED);
         try {
-            if ($etag === '' || !hash_equals($sourceFile->getEtag(), $etag)) {
+            // FileInfo can be cached on this node before the shared lock is
+            // acquired. Re-fetch the node now so the ETag check sees a writer
+            // that committed between lookup and lock acquisition.
+            $currentEtag = $this->file($source)->getEtag();
+            if ($etag === '' || !hash_equals($currentEtag, $etag)) {
                 throw new RuntimeException('This outline changed elsewhere. Reopen it before saving a template.', 412);
             }
             $xml = $this->opml->write($document, $sourceFile->getContent());

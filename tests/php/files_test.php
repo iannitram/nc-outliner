@@ -24,13 +24,19 @@ namespace OCP\Files {
     class NotFoundException extends \RuntimeException {}
     class AlreadyExistsException extends \RuntimeException {}
     class File {
+        public static mixed $onSharedLock = null;
         public int $locks = 0;
         public function __construct(public string $name, public string $content = '', public string $etag = 'initial') {}
         public function getName(): string { return $this->name; }
         public function getContent(): string { return $this->content; }
         public function putContent(string $content): void { $this->content = $content; $this->etag = hash('sha256', $content); }
         public function getEtag(): string { return $this->etag; }
-        public function lock(int $type): void { $this->locks++; }
+        public function lock(int $type): void {
+            $this->locks++;
+            if ($type === \OCP\Lock\ILockingProvider::LOCK_SHARED && self::$onSharedLock) {
+                $onLock = self::$onSharedLock; self::$onSharedLock = null; $onLock($this);
+            }
+        }
         public function unlock(int $type): void { $this->locks--; }
     }
     class Folder {
@@ -190,6 +196,24 @@ check('template collisions and stale source ETags never replace user files', fun
     catch (\RuntimeException $e) { same(412, $e->getCode()); }
     same(false, $root->homes['alice']->get('Outlines')->get('Templates')->nodeExists('Stale.opml'));
     same(0, $root->homes['alice']->get('Outlines')->get('Templates')->locks);
+});
+
+check('template save re-fetches the source ETag after acquiring its shared lock', function () use ($files, $root): void {
+    $opened = $files->create('Lock race source.opml');
+    $folder = $root->homes['alice']->get('Outlines');
+    $staleNode = $folder->get('Lock race source.opml');
+    $concurrent = new File('Lock race source.opml', '<opml><head><title>Concurrent</title></head><body/></opml>', 'concurrent-etag');
+    File::$onSharedLock = function () use ($folder, $concurrent): void {
+        // Replace the cached node as Files does for a fresh lookup after a
+        // concurrent write completes immediately before lock acquisition.
+        $folder->nodes['Lock race source.opml'] = $concurrent;
+    };
+    try {
+        $files->saveTemplate('Must not save.opml', 'Lock race source.opml', $opened['etag'], $opened['document']);
+        throw new \LogicException('Template used the stale pre-lock ETag');
+    } catch (\RuntimeException $e) { same(412, $e->getCode()); }
+    same(0, $staleNode->locks);
+    same(false, $root->homes['alice']->get('Outlines')->get('Templates')->nodeExists('Must not save.opml'));
 });
 
 check('native write collision guard cancels a template create without replacing data', function () use ($files, $root): void {
