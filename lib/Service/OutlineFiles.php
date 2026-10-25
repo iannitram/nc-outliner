@@ -53,6 +53,73 @@ class OutlineFiles
         return $node;
     }
 
+    private function templateFolder(): Folder
+    {
+        $outlines = $this->folder();
+        if (!$outlines->nodeExists('Templates')) {
+            try { $outlines->newFolder('Templates'); }
+            catch (\OCP\Files\AlreadyExistsException) { /* Another request created it. */ }
+        }
+        $templates = $outlines->get('Templates');
+        if (!$templates instanceof Folder) throw new RuntimeException('Templates exists and is not a folder.', 409);
+        return $templates;
+    }
+
+    private function templateName(string $name): string
+    {
+        return $this->name($name);
+    }
+
+    private function templateFile(string $name): File
+    {
+        $node = $this->templateFolder()->get($this->templateName($name));
+        if (!$node instanceof File) throw new InvalidArgumentException('This template is not a file.');
+        return $node;
+    }
+
+    /** Native Files calls acquire a shared lock before their exclusive upgrade.
+     * Validate at the cancellable NC33 hook boundary instead of wrapping them in
+     * an explicit exclusive Node lock, which fails under the Redis lock provider.
+     */
+    private function guarded(string $path, callable $check, callable $action): mixed
+    {
+        $user = $this->session->getUser();
+        if (!$user) throw new RuntimeException('Sign in to open outlines.', 401);
+        $home = $this->root->getUserFolder($user->getUID());
+        if (!\OC\Files\Filesystem::$loaded
+            || \OC\Files\Filesystem::getRoot() !== $home->getPath()
+            || \OCP\Server::get(ILockingProvider::class) instanceof \OC\Lock\NoopLockingProvider) {
+            throw new RuntimeException('Safe file updates require the signed-in Files context and file locking.');
+        }
+        $guard = new class($path, $check) {
+            public bool $active = true;
+            public bool $ran = false;
+            public ?\Throwable $error = null;
+            public function __construct(private string $path, private mixed $check) {}
+            public function validate(array $params): void
+            {
+                if (!$this->active || ($params['oldpath'] ?? $params['path'] ?? null) !== '/Outlines/' . $this->path) return;
+                $this->ran = true;
+                try { ($this->check)(); }
+                catch (\Throwable $error) { $this->error = $error; $params['run'] = false; }
+            }
+        };
+        \OCP\Util::connectHook('OC_Filesystem', 'write', $guard, 'validate');
+        try {
+            try { $result = $action(); }
+            catch (\Throwable $error) { throw $guard->error ?? $error; }
+            if ($guard->error) throw $guard->error;
+            if (!$guard->ran) throw new RuntimeException('The native Files update guard did not run.');
+            return $result;
+        } finally { $guard->active = false; }
+    }
+
+    private function createOnly(Folder $folder, string $relativePath, string $name, string $xml, callable $available): void
+    {
+        if ($folder->nodeExists($name)) throw new RuntimeException('A file with that name already exists.', 409);
+        $this->guarded($relativePath, $available, fn () => $folder->newFile($name, $xml));
+    }
+
     public function listing(): array
     {
         $names = [];
@@ -142,5 +209,55 @@ class OutlineFiles
         } finally {
             $file->unlock(ILockingProvider::LOCK_SHARED);
         }
+    }
+
+    public function templates(): array
+    {
+        $names = [];
+        foreach ($this->templateFolder()->getDirectoryListing() as $node) {
+            if ($node instanceof File && str_ends_with(strtolower($node->getName()), '.opml')) $names[] = $node->getName();
+        }
+        natcasesort($names);
+        return array_values($names);
+    }
+
+    /** Save a point-in-time editor snapshot under the current user's Files. */
+    public function saveTemplate(string $name, string $source, string $etag, array $document): array
+    {
+        $name = $this->templateName($name);
+        $sourceFile = $this->file($source);
+        $sourceFile->lock(ILockingProvider::LOCK_SHARED);
+        try {
+            if ($etag === '' || !hash_equals($sourceFile->getEtag(), $etag)) {
+                throw new RuntimeException('This outline changed elsewhere. Reopen it before saving a template.', 412);
+            }
+            $xml = $this->opml->write($document, $sourceFile->getContent());
+        } finally { $sourceFile->unlock(ILockingProvider::LOCK_SHARED); }
+        $folder = $this->templateFolder();
+        $available = static function () use ($folder, $name): void {
+            if ($folder->nodeExists($name)) throw new RuntimeException('A template with that name already exists.', 409);
+        };
+        $this->createOnly($folder, 'Templates/' . $name, $name, $xml, $available);
+        return ['name' => $name, 'document' => $document];
+    }
+
+    /** Create a distinct outline from a template; the stored template stays untouched. */
+    public function fromTemplate(string $templateName, string $newName): array
+    {
+        $template = $this->templateFile($templateName);
+        $template->lock(ILockingProvider::LOCK_SHARED);
+        try {
+            $xml = $template->getContent();
+            $document = $this->opml->read($xml);
+        } finally { $template->unlock(ILockingProvider::LOCK_SHARED); }
+        $newName = $this->name($newName);
+        $document['title'] = substr($newName, 0, -5);
+        $xml = $this->opml->write($document, $xml);
+        $folder = $this->folder();
+        $available = static function () use ($folder, $newName): void {
+            if ($folder->nodeExists($newName)) throw new RuntimeException('An outline with that name already exists.', 409);
+        };
+        $this->createOnly($folder, $newName, $newName, $xml, $available);
+        return $this->open($newName);
     }
 }

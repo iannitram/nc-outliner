@@ -34,6 +34,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | `files.test.mjs`, `autosave.test.mjs` | Request options, strong If-Match, debounce, in-flight edits, retry, conflict and lifecycle disposal |
 | `import.test.mjs`, `export.test.mjs` | Parsing/validation, create-only workflow, unsaved snapshots, escaping, download lifecycle and failed requests |
 | `theme.test.mjs` | Auto inheritance, preference transport, selector state, failure rollback and disposal |
+| [templates.cjs](../../tests/browser/templates.cjs) | Desktop browser flow with mocked Files APIs: save an unsaved editor snapshot, create a distinct outline from it, and retain the template |
 
 | PHP tests | Main behavior |
 |---|---|
@@ -51,3 +52,14 @@ JS editor tests use small DOM doubles; they do not establish browser layout or f
 The latest reviewed feature batch passed 122 JS tests, 31 PHP checks and PHP lint. Separate Chromium workflows exercised the combined app with a mocked HTTP API. Those checks covered import/export, autosave retries and conflicts, page-leave flush, note timestamps, checkboxes, appearance and keyboard actions; they were session-level checks, not a committed live-Nextcloud test harness. See [batch-two-review.md](../batch-two-review.md).
 
 When adding a saved field, check both JS edit/history behavior and PHP XML round trips, including unknown metadata. When changing a save endpoint, check the controller precondition and service lock/write behavior separately. Browser/API checks and any live deployment verification must be reported with their actual environment; standalone tests are not deployment evidence.
+
+## Templates native Files check
+
+[native-templates.php](../../tests/integration/native-templates.php) exercises the template service against an installed Nextcloud 33 app and a disposable signed-in user. It verifies snapshot persistence, source/template preservation and a write collision injected at the native Files hook boundary. Run it in a disposable Nextcloud container after enabling the app and creating a test user:
+
+```sh
+docker cp tests/integration/native-templates.php NEXTCLOUD_CONTAINER:/tmp/native-templates.php
+docker exec --user www-data NEXTCLOUD_CONTAINER php /tmp/native-templates.php DISPOSABLE_USER_ID
+```
+
+The fixture writes only within that user's `Outlines/` Files folder. Use a disposable instance and discard its data after the run.

@@ -27,6 +27,9 @@ The API base is generated from the app page URL plus `/api`; browser code must n
 | `PUT /outlines/{name}` | `{ document }`, strong `If-Match: "etag"` | `{ name, etag }` |
 | `POST /outlines/{name}/copy` | `{ document }` | `{ name, etag, document }` for a distinct copy |
 | `POST /outlines/{name}/export` | `{ document }` | `{ content }`, with OPML XML as a JSON string |
+| `GET /templates` | None | Array of template filenames in the user's `Outlines/Templates/` folder |
+| `POST /templates` | `{ name, source, etag, document }` | `{ name, document }` after saving the current editor snapshot as a distinct OPML file |
+| `POST /templates/{name}/outlines` | `{ newName }` | `{ name, etag, document }` for a new outline copied from that template |
 | `GET /theme` | None | `{ theme }` |
 | `PUT /theme` | `{ theme }` | `{ theme }` |
 
@@ -35,6 +38,10 @@ The client currently also includes `etag` in save JSON; the controller authorize
 ## Files and concurrency
 
 `OutlineFiles` resolves `IRootFolder::getUserFolder()` using `IUserSession`. Its fixed `Outlines/` folder is created on first use. Listings include files only, not folders with an `.opml` suffix. Filenames must be nonempty OPML basenames, at most 240 bytes, without paths, leading dots or control characters.
+
+Templates are OPML files in the signed-in user's `Outlines/Templates/` folder and do not appear in the outline list. Saving a template serializes the supplied current editor snapshot against the opened source XML while checking its ETag, so unsaved row edits are included and unknown OPML metadata survives. Starting an outline creates a separate OPML file with a title from the requested filename; it never modifies the template.
+
+Template creation uses Nextcloud 33's cancellable native `write` hook to check the target again at the native lock boundary. It does not wrap `newFile()` in an explicit exclusive Node lock. The native Files integration fixture covers a colliding concurrent template write against Nextcloud 33.
 
 Create holds an exclusive folder lock, checks `nodeExists()`, then calls `newFile()`. This check matters because Nextcloud's `newFile()` can overwrite an existing file. Open holds a shared file lock while reading the ETag and content. Save holds an exclusive file lock across ETag comparison, codec serialization and `putContent()`. Locks are released in `finally` blocks.
 

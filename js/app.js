@@ -4,9 +4,9 @@ import { mountTheme } from './theme.js';
 import { createAutosave } from './autosave.js';
 
 /** File shell. F02 supplies editor.js; F01 can also display outlines read-only. */
-export function createApi(base, fetcher = globalThis.fetch) {
+export function createApi(base, fetcher = globalThis.fetch, collection = 'outlines') {
   return async function request(path = '', method = 'GET', data, options = {}) {
-    const response = await fetcher(`${base}/outlines${path}`, {
+    const response = await fetcher(`${base}/${collection}${path}`, {
       method,
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', requesttoken: globalThis.OC?.requestToken ?? '', ...(data?.etag ? { 'If-Match': `"${data.etag}"` } : {}) },
@@ -26,6 +26,7 @@ export function createApi(base, fetcher = globalThis.fetch) {
 export async function start(el) {
   const doc = el.ownerDocument;
   const api = createApi(el.dataset.apiBase);
+  const templatesApi = createApi(el.dataset.apiBase, globalThis.fetch, 'templates');
   const make = (tag, text) => {
     const node = doc.createElement(tag);
     if (text !== undefined) node.textContent = text;
@@ -42,6 +43,15 @@ export async function start(el) {
   const create = make('button', 'Create outline');
   create.type = 'submit';
   const list = make('div');
+  const templateHeading = make('h3', 'Templates');
+  const templateForm = make('form');
+  const templateName = make('input');
+  templateName.placeholder = 'Template name';
+  templateName.setAttribute('aria-label', 'Template name');
+  templateName.required = true;
+  const saveTemplate = make('button', 'Save current as template');
+  saveTemplate.type = 'submit';
+  const templateList = make('div');
   const workspace = make('section');
   let toolbar = workspace;
   workspace.className = 'outliner-workspace';
@@ -56,14 +66,15 @@ export async function start(el) {
   status.setAttribute('role', 'status');
   const content = make('div');
   form.append(name, create);
-  sidebar.append(heading, form, list);
+  templateForm.append(templateName, saveTemplate);
+  sidebar.append(heading, form, templateHeading, templateForm, templateList, list);
   workspace.append(title, conflicts, status, content);
   el.replaceChildren(sidebar, workspace);
   let importHost = sidebar;
   try {
     const { mountShell } = await import('./shell.js');
     const shell = mountShell(el);
-    shell.navigation.append(heading, form, list);
+    shell.navigation.append(heading, form, templateHeading, templateForm, templateList, list);
     importHost = shell.navigation;
     toolbar = shell.toolbar;
     mountTheme(el, shell.toolbar);
@@ -92,11 +103,36 @@ export async function start(el) {
     reload.disabled = copy.disabled = busy;
     create.disabled = busy;
     name.disabled = busy;
+    templateName.disabled = busy;
+    saveTemplate.disabled = busy || !current;
+    templateList.querySelectorAll('button').forEach(button => { button.disabled = busy; });
     list.querySelectorAll('button').forEach(button => { button.disabled = busy; });
   }
   const error = e => { status.textContent = e.message; };
   async function refresh() {
-    const names = await api();
+    const [names, templates] = await Promise.all([api(), templatesApi()]);
+    templateList.replaceChildren();
+    templateHeading.hidden = templates.length === 0 && !current;
+    for (const filename of templates) {
+      const button = make('button', `New from ${filename.slice(0, -5)}`);
+      button.type = 'button';
+      button.addEventListener('click', async () => {
+        if (busy) return;
+        const entered = globalThis.prompt('New outline name', filename.slice(0, -5));
+        if (entered === null || !entered.trim()) return;
+        busy = true; controls();
+        try {
+          if (!await mayLeave()) return;
+          let newName = entered.trim();
+          if (!newName.toLowerCase().endsWith('.opml')) newName += '.opml';
+          const result = await templatesApi(`/${encodeURIComponent(filename)}/outlines`, 'POST', { newName });
+          display(result);
+          await refresh();
+        } catch (e) { error(e); }
+        finally { busy = false; controls(); }
+      });
+      templateList.append(button);
+    }
     list.replaceChildren();
     for (const filename of names) {
       const button = make('button', filename.slice(0, -5));
@@ -162,6 +198,21 @@ export async function start(el) {
       if (!filename.toLowerCase().endsWith('.opml')) filename += '.opml';
       display(await api('', 'POST', { name: filename }));
       name.value = '';
+      await refresh();
+    } catch (e) { error(e); }
+    finally { busy = false; controls(); }
+  });
+  templateForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (busy || !current) return;
+    busy = true; controls();
+    try {
+      let filename = templateName.value.trim();
+      if (!filename.toLowerCase().endsWith('.opml')) filename += '.opml';
+      const document = structuredClone(editor?.getDocument() ?? current.document);
+      await templatesApi('', 'POST', { name: filename, source: current.name, etag: autosave.getEtag(), document });
+      templateName.value = '';
+      status.textContent = 'Template saved';
       await refresh();
     } catch (e) { error(e); }
     finally { busy = false; controls(); }

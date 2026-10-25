@@ -12,3 +12,10 @@ check('routes is an array', function () use ($r): void {
 check('page route is declared', function () use ($r): void {
     same(['name' => 'page#index', 'url' => '/', 'verb' => 'GET'], $r['routes'][0]);
 });
+
+check('template list, save and instantiate routes are declared', function () use ($r): void {
+    $routes = array_column($r['routes'], null, 'name');
+    same(['name' => 'outline#templates', 'url' => '/api/templates', 'verb' => 'GET'], $routes['outline#templates']);
+    same(['name' => 'outline#saveTemplate', 'url' => '/api/templates', 'verb' => 'POST'], $routes['outline#saveTemplate']);
+    same(['name' => 'outline#fromTemplate', 'url' => '/api/templates/{name}/outlines', 'verb' => 'POST'], $routes['outline#fromTemplate']);
+});

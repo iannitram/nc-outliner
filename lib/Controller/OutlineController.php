@@ -68,4 +68,19 @@ class OutlineController extends Controller
     }
     #[NoAdminRequired]
     public function export(string $name, array $document = []): JSONResponse { return $this->respond(fn () => $this->files->export($name, $document)); }
+
+    #[NoAdminRequired]
+    public function templates(): JSONResponse { return $this->respond(fn () => $this->files->templates()); }
+
+    #[NoAdminRequired]
+    public function saveTemplate(string $name = '', string $source = '', string $etag = '', array $document = []): JSONResponse
+    {
+        return $this->respond(fn () => $this->files->saveTemplate($name, $source, $etag, $document));
+    }
+
+    #[NoAdminRequired]
+    public function fromTemplate(string $name, string $newName = ''): JSONResponse
+    {
+        return $this->respond(fn () => $this->files->fromTemplate($name, $newName));
+    }
 }

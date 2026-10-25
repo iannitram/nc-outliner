@@ -31,3 +31,16 @@ test('API errors carry status so a conflict cannot enter the transient retry loo
   const api = createApi('/api', async () => ({ ok: false, status: 412, json: async () => ({ error: 'Conflict' }) }));
   await assert.rejects(api('/Plan.opml', 'PUT', { etag: 'old' }), error => error.status === 412);
 });
+
+test('template API uses the same authenticated JSON transport under the templates route', async () => {
+  let observed;
+  const api = createApi('/apps/outliner/api', async (...args) => {
+    observed = args;
+    return { ok: true, json: async () => ({ name: 'Meeting.opml' }) };
+  }, 'templates');
+  const input = { name: 'Meeting.opml', source: 'Current.opml', etag: 'v1', document: { title: 'Unsaved', rows: [] } };
+  assert.deepEqual(await api('', 'POST', input), { name: 'Meeting.opml' });
+  assert.equal(observed[0], '/apps/outliner/api/templates');
+  assert.equal(observed[1].credentials, 'same-origin');
+  assert.deepEqual(JSON.parse(observed[1].body), input);
+});

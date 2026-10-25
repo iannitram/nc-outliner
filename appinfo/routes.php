@@ -12,5 +12,8 @@ return [
         ['name' => 'outline#copy', 'url' => '/api/outlines/{name}/copy', 'verb' => 'POST'],
         ['name' => 'outline#update', 'url' => '/api/outlines/{name}', 'verb' => 'PUT'],
         ['name' => 'outline#export', 'url' => '/api/outlines/{name}/export', 'verb' => 'POST'],
+        ['name' => 'outline#templates', 'url' => '/api/templates', 'verb' => 'GET'],
+        ['name' => 'outline#saveTemplate', 'url' => '/api/templates', 'verb' => 'POST'],
+        ['name' => 'outline#fromTemplate', 'url' => '/api/templates/{name}/outlines', 'verb' => 'POST'],
     ],
 ];
