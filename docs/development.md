@@ -16,6 +16,8 @@ npm run check
 
 This runs the JavaScript suite, syntax-checks PHP in `appinfo`, `lib`, `templates` and `tests`, and runs each `tests/php/**/*_test.php` file in a separate PHP process. A failed syntax check or test produces a nonzero exit code. It does not enable, install or deploy the app.
 
+The notes layout also has a real Chromium smoke in `tests/browser/notes-display-smoke.mjs`. Run it with `node tests/browser/notes-display-smoke.mjs` in an environment with Playwright available through `NODE_PATH` and Chromium at `/usr/bin/chromium` (or set `CHROMIUM_PATH`). It exercises the native select with pointer and keyboard input.
+
 PHP checks use PHP 8.4 or newer on your PATH. Set `PHP_BIN` to select a specific executable. If no suitable local PHP is available, checks use a throwaway container from the existing `nextcloud:33.0.10-apache` image. Prepare it once with:
 
 ```sh

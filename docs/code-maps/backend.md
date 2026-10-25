@@ -51,6 +51,7 @@ The extension namespace is `https://nextcloud.com/ns/outliner/1`, conventionally
 | `document.title` | `opml/head/title` text |
 | `document.rows` | Nested `outline` elements in `opml/body` |
 | `document.showCheckboxes` | Root `nc:showCheckboxes` boolean |
+| `document.noteDisplayMode` | Root `nc:noteDisplayMode` value (`inline` or `bottom`) |
 | `row.id` | `outline/@nc:id` |
 | `row.text` | `outline/@text` |
 | `row.collapsed` | `outline/@nc:collapsed` boolean |

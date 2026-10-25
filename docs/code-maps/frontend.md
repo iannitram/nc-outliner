@@ -28,7 +28,7 @@
 | [collapse.js](../../js/collapse.js) | Disclosure buttons, leaf bullets, visible preorder and boundary-aware left/right navigation. Supplies default editor hooks. |
 | [expansion.js](../../js/expansion.js) | Recursive whole-outline/subtree expansion, toolbar controls, Alt+Left/Right, and visible-focus correction. |
 | [row-actions.js](../../js/row-actions.js) | Explicit subtree deletion and sibling movement; buttons, Alt+Delete and Alt+Up/Down. |
-| [notes.js](../../js/notes.js) | Immutable note/visibility edits and per-row note controls. Shift+Enter opens a note; Escape returns to the topic. |
+| [notes.js](../../js/notes.js) | Immutable note and visibility edits, per-row controls, and the saved inline/bottom-pane preference. Shift+Enter opens a note; Escape returns to the topic. |
 | [checkboxes.js](../../js/checkboxes.js) | Document visibility toggle, checked-state edits and accessible per-row checkboxes. Hiding retains checked states. |
 | [search.js](../../js/search.js) | `matchingRowIds()` returns literal case-insensitive matches plus ancestors. Editor filtering reveals matching paths without changing saved collapse state. |
 | [timestamp.js](../../js/timestamp.js) | Localized date/time formats and insertion into the last selected topic or note range. Uses the shared edit/history boundary. |
@@ -38,6 +38,8 @@
 `mountEditor()` returns `getDocument`, `getSelection`, `change`, `replaceDocument`, `focusRow`, `render`, `undo`, `redo`, `getHistoryState` and `destroy`.
 
 Selections are `{ id, offset, end, direction }`, with `field: 'note'` for a note. `focusRow(id, offset, end, direction, field)` restores the appropriate textarea. Topic inputs use `data-row-id`; note inputs use `data-note-id`. Toolbar focus tracking retains the last text selection for bulk actions and timestamps.
+
+The notes placement selector and show/hide all button use the same editor mutation boundary as row notes. Placement is stored as `document.noteDisplayMode` (`inline` or `bottom`) in the outline; in bottom mode, the selected row's note is edited in a pane beneath the rows. Global visibility updates per-row `noteVisible` flags while retaining note text.
 
 `change(mutator, meta)` applies an immutable document updater. A same-reference return is a no-op. Metadata carries the edit type, prior selection, target focus, optional render/notification suppression and history replay flag. Successful edits render as needed, record history, call hooks, and notify `onChange(document)`.
 

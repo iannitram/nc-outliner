@@ -17,11 +17,18 @@
 }
 
 .outliner-editor {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
-  overflow: auto;
-  padding: 16px;
+  min-height: 12rem;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
 }
+.outliner-row-area { flex: 1; min-height: 0; overflow: auto; padding: 16px; }
+.outliner-editor [role="toolbar"] { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; padding: .5rem 1rem; border-block-end: 1px solid var(--ol-border); }
+.outliner-editor [role="toolbar"] label { display: inline-flex; align-items: center; gap: .35rem; }
 .outliner-rows {
   list-style: none;
   margin: 0;
@@ -99,6 +106,15 @@
   font: inherit;
   resize: vertical;
 }
+.outliner-note-pane {
+  flex: 0 0 auto;
+  max-height: 38%;
+  overflow: auto;
+  padding: .5rem 1rem;
+  border-block-start: 1px solid var(--ol-border);
+}
+.outliner-note-pane h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+.outliner-note-pane .outliner-note { width: 100%; max-height: 24vh; margin-inline: 0; }
 #outliner-app .outliner-check-row { padding-inline-start: 3.5rem; }
 #outliner-app .outliner-check {
   position: absolute;

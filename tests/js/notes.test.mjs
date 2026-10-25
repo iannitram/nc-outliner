@@ -115,3 +115,66 @@ test('Backspace on an empty topic never silently deletes a nonempty note', () =>
   const document = { rows: [{ id: 'a', text: '', note: 'Important', children: [] }, { id: 'b', text: 'Other', children: [] }] };
   assert.equal(deleteEmpty(document, 'a').document, document);
 });
+
+test('bottom note pane follows the selected row and edits through shared history', () => {
+  const f = fixture({ noteDisplayMode: 'bottom', rows: [
+    { id: 'a', text: 'Alpha', note: 'First', children: [] },
+    { id: 'b', text: 'Beta', note: 'Second', children: [] },
+  ] });
+  const all = element => [element, ...element.children.flatMap(all)];
+  const pane = all(f.root).find(el => el.className === 'outliner-note-pane');
+  assert.equal(pane.hidden, false);
+  assert.equal(notes(f).length, 1);
+  assert.equal(notes(f)[0].value, 'First');
+  const beta = f.inputs()[1];
+  beta.focus();
+  f.root.listeners.focusin({ target: beta });
+  assert.match(pane.children[0].textContent, /Beta/);
+  assert.equal(notes(f)[0].value, 'Second');
+  const note = notes(f)[0];
+  note.focus(); note.setSelectionRange(1, 1);
+  f.root.listeners.beforeinput({ target: note, inputType: 'insertText' });
+  note.value = 'S!econd'; note.setSelectionRange(2, 2);
+  f.root.listeners.input({ target: note });
+  assert.equal(f.editor.getDocument().rows[1].note, 'S!econd');
+  f.editor.undo();
+  assert.equal(notes(f)[0].value, 'Second');
+  f.editor.redo();
+  assert.equal(notes(f)[0].value, 'S!econd');
+});
+
+test('notes display controls switch layout and hide or restore notes without losing text', () => {
+  const f = fixture({ rows: [
+    { id: 'a', text: 'Alpha', note: 'First', children: [] },
+    { id: 'b', text: 'Beta', note: 'Second', children: [] },
+  ] });
+  const all = element => [element, ...element.children.flatMap(all)];
+  const select = all(f.root).find(el => el.tag === 'select');
+  const visibility = () => all(f.root).find(el => el.className === 'outliner-notes-visibility');
+  f.inputs()[0].focus(); f.inputs()[0].setSelectionRange(3, 3);
+  f.root.listeners.focusout({ target: f.inputs()[0] });
+  select.value = 'bottom'; select.listeners.change();
+  assert.equal(f.editor.getDocument().noteDisplayMode, 'bottom');
+  assert.equal(f.dom.activeElement.dataset.rowId, 'a');
+  visibility().listeners.click();
+  assert.equal(visibility().textContent, 'Show all notes');
+  assert.equal(f.editor.getDocument().rows[0].note, 'First');
+  assert.equal(f.editor.getDocument().rows[0].noteVisible, false);
+  assert.equal(f.editor.getDocument().rows[1].noteVisible, false);
+  assert.equal(notes(f).length, 0);
+  visibility().listeners.click();
+  assert.equal(f.editor.getDocument().rows[0].note, 'First');
+  assert.equal(f.editor.getDocument().rows[1].note, 'Second');
+  assert.equal(notes(f)[0].value, 'First');
+  assert.equal(f.editor.getDocument().rows[0].noteVisible, true);
+  assert.equal(f.changes.length, 3);
+});
+
+test('display listeners and selected row state are disposed with an editor instance', () => {
+  const f = fixture({ noteDisplayMode: 'bottom', rows: [{ id: 'a', text: 'Alpha', note: 'Keep', children: [] }] });
+  const root = f.root;
+  f.editor.destroy();
+  assert.equal(Object.keys(root.listeners).length, 0);
+  const second = fixture({ noteDisplayMode: 'bottom', rows: [{ id: 'b', text: 'Beta', note: 'Other', children: [] }] });
+  assert.equal(notes(second)[0].dataset.noteId, 'b');
+});

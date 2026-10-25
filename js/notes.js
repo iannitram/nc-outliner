@@ -21,6 +21,33 @@ export function setNoteVisible(document, id, visible) {
   return next;
 }
 
+/** The note layout is an outline preference and travels with the OPML file. */
+export function setNoteDisplayMode(document, mode) {
+  if (!['inline', 'bottom'].includes(mode) || (document.noteDisplayMode ?? 'inline') === mode) return document;
+  return { ...document, noteDisplayMode: mode };
+}
+
+/** Change visibility without dropping any note text or changing row identity. */
+export function setAllNotesVisible(document, visible) {
+  const update = rows => {
+    let changed = false;
+    const nextRows = rows.map(row => {
+      const oldChildren = row.children ?? [];
+      const children = update(oldChildren);
+      const hasNote = typeof row.note === 'string' && row.note.length > 0;
+      const nextVisible = hasNote ? visible : row.noteVisible;
+      if (children !== oldChildren || nextVisible !== row.noteVisible) {
+        changed = true;
+        return { ...row, ...(hasNote ? { noteVisible: visible } : {}), children };
+      }
+      return row;
+    });
+    return changed ? nextRows : rows;
+  };
+  const rows = update(document.rows ?? []);
+  return rows === document.rows ? document : { ...document, rows };
+}
+
 export function renderNote(row, item, context) {
   const dom = item.ownerDocument;
   const visible = noteIsVisible(row);

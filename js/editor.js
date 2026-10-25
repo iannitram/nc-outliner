@@ -3,7 +3,7 @@ import { createHistory, historyCommand } from './history.js';
 import { createRow, updateText, insertAfter, deleteEmpty } from './model.js';
 import { handleIndentKey } from './indent.js';
 import { createCollapseExtension } from './collapse.js';
-import { updateNote, setNoteVisible, renderNote } from './notes.js';
+import { updateNote, setNoteVisible, setAllNotesVisible, setNoteDisplayMode, noteIsVisible, renderNote } from './notes.js';
 import { handleRowActionKey, renderRowActions } from './row-actions.js';
 import { handleExpansionKey, mountExpansionControls } from './expansion.js';
 import { matchingRowIds } from './search.js';
@@ -37,6 +37,22 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   redoButton.addEventListener('mousedown', (event) => event.preventDefault());
   toolbar.appendChild(undoButton);
   toolbar.appendChild(redoButton);
+  const noteModeLabel = dom.createElement('label');
+  noteModeLabel.textContent = 'Notes';
+  const noteMode = dom.createElement('select');
+  noteMode.setAttribute('aria-label', 'Notes display');
+  for (const [value, label] of [['inline', 'Inline'], ['bottom', 'Bottom pane']]) {
+    const option = dom.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    noteMode.appendChild(option);
+  }
+  noteModeLabel.appendChild(noteMode);
+  toolbar.appendChild(noteModeLabel);
+  const allNotesButton = dom.createElement('button');
+  allNotesButton.type = 'button';
+  allNotesButton.className = 'outliner-notes-visibility';
+  toolbar.appendChild(allNotesButton);
   const searchPanel = dom.createElement('div');
   searchPanel.className = 'outliner-search';
   const searchInput = dom.createElement('input');
@@ -71,6 +87,81 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   const unsubscribe = history.subscribe(({ canUndo, canRedo }) => {
     undoButton.disabled = !canUndo;
     redoButton.disabled = !canRedo;
+  });
+
+  let selectedRowId = document.rows?.[0]?.id ?? null;
+  const rowArea = dom.createElement('div');
+  rowArea.className = 'outliner-row-area';
+  const notePane = dom.createElement('section');
+  notePane.className = 'outliner-note-pane';
+  notePane.setAttribute('aria-label', 'Selected row note');
+
+  function selectedNoteRow() {
+    const visit = rows => {
+      for (const row of rows ?? []) {
+        if (row.id === selectedRowId) return row;
+        const found = visit(row.children);
+        if (found) return found;
+      }
+      return null;
+    };
+    return visit(document.rows);
+  }
+
+  function renderNotePane() {
+    notePane.replaceChildren();
+    const row = selectedNoteRow();
+    notePane.hidden = (document.noteDisplayMode ?? 'inline') !== 'bottom';
+    if (notePane.hidden || !row) return;
+    const heading = dom.createElement('h2');
+    heading.textContent = `Note: ${row.text || 'Untitled row'}`;
+    notePane.appendChild(heading);
+    const visible = noteIsVisible(row);
+    const toggle = dom.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'outliner-note-toggle';
+    toggle.textContent = visible ? 'Hide note' : (row.note ? 'Show note' : 'Add note');
+    toggle.setAttribute('aria-expanded', String(visible));
+    toggle.addEventListener('mousedown', event => event.preventDefault());
+    toggle.addEventListener('click', () => change(
+      old => setNoteVisible(old, row.id, !visible),
+      { type: 'note-visibility', focus: { id: row.id, offset: 0, field: visible ? 'text' : 'note' } },
+    ));
+    notePane.appendChild(toggle);
+    if (visible) {
+      const note = dom.createElement('textarea');
+      note.className = 'outliner-note';
+      note.dataset.noteId = row.id;
+      note.value = row.note ?? '';
+      note.rows = Math.max(2, note.value.split('\n').length);
+      note.spellcheck = true;
+      note.setAttribute('aria-label', `Note for ${row.text || 'untitled row'}`);
+      notePane.appendChild(note);
+    }
+  }
+
+  function preserveSelection() {
+    return getSelection() ?? lastRowSelection ?? (selectedRowId ? { id: selectedRowId, offset: 0 } : undefined);
+  }
+
+  noteMode.addEventListener('change', () => {
+    const selection = preserveSelection();
+    change(old => setNoteDisplayMode(old, noteMode.value), {
+      type: 'note-display-mode', focus: selection,
+    });
+  });
+  allNotesButton.addEventListener('mousedown', event => event.preventDefault());
+  allNotesButton.addEventListener('click', () => {
+    const notes = [];
+    const collect = rows => (rows ?? []).forEach(row => {
+      if (row.note) notes.push(row);
+      collect(row.children);
+    });
+    collect(document.rows);
+    if (!notes.length) return;
+    const show = !notes.every(noteIsVisible);
+    const selection = preserveSelection();
+    change(old => setAllNotesVisible(old, show), { type: 'notes-visibility', focus: selection });
   });
 
   function replay(command) {
@@ -132,8 +223,20 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       toolbar.appendChild(checkboxToggle);
     }
     updateCheckboxToggle(checkboxToggle, document);
+    noteMode.value = document.noteDisplayMode ?? 'inline';
+    const notes = [];
+    const collectNotes = rows => (rows ?? []).forEach(row => {
+      if (row.note) notes.push(row);
+      collectNotes(row.children);
+    });
+    collectNotes(document.rows);
+    allNotesButton.disabled = notes.length === 0;
+    allNotesButton.textContent = notes.length && notes.every(noteIsVisible) ? 'Hide all notes' : 'Show all notes';
     root.appendChild(toolbar);
     root.appendChild(searchPanel);
+    root.appendChild(rowArea);
+    root.appendChild(notePane);
+    rowArea.replaceChildren();
     const included = matchingRowIds(document.rows, searchQuery);
     clearSearch.disabled = included === null;
     searchStatus.hidden = included === null || included.size > 0;
@@ -156,7 +259,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         input.title = 'Move row: Alt+Up/Down. Delete row and children: Alt+Delete.';
         item.appendChild(input);
         options.renderRow?.(row, item, context);
-        renderNote(row, item, context);
+        if ((document.noteDisplayMode ?? 'inline') === 'inline') renderNote(row, item, context);
         renderCheckbox(row, item, context);
         renderRowActions(row, item, context);
         if (row.children?.length && (included || options.shouldRenderChildren?.(row) !== false)) renderRows(row.children, item);
@@ -164,7 +267,9 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       }
       container.appendChild(list);
     }
-    renderRows(document.rows, root);
+    renderRows(document.rows, rowArea);
+    if (!selectedNoteRow()) selectedRowId = document.rows?.[0]?.id ?? null;
+    renderNotePane();
   }
 
   function onInput(event) {
@@ -238,6 +343,13 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       lastRowSelection = { id, offset: target.selectionStart, end: target.selectionEnd, direction: target.selectionDirection, ...(target.dataset.noteId ? { field: 'note' } : {}) };
     }
   }
+  function onFocusIn(event) {
+    const id = event.target.dataset?.rowId;
+    if (!id || id === selectedRowId) return;
+    selectedRowId = id;
+    renderNotePane();
+  }
+  root.addEventListener('focusin', onFocusIn);
   root.addEventListener('focusout', onFocusOut);
   root.addEventListener('beforeinput', onBeforeInput);
   root.addEventListener('input', onInput);
@@ -252,6 +364,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     destroyed = true;
     unsubscribe();
     root.removeEventListener('focusout', onFocusOut);
+    root.removeEventListener('focusin', onFocusIn);
     root.removeEventListener('beforeinput', onBeforeInput);
     root.removeEventListener('input', onInput);
     root.removeEventListener('keydown', onKeyDown);

@@ -95,6 +95,13 @@ class Opml
         if ($dom->documentElement->hasAttributeNS(self::NS, 'showCheckboxes')) {
             $document['showCheckboxes'] = $dom->documentElement->getAttributeNS(self::NS, 'showCheckboxes') === 'true';
         }
+        if ($dom->documentElement->hasAttributeNS(self::NS, 'noteDisplayMode')) {
+            $mode = $dom->documentElement->getAttributeNS(self::NS, 'noteDisplayMode');
+            if (!in_array($mode, ['inline', 'bottom'], true)) {
+                throw new InvalidArgumentException('Invalid notes display mode.');
+            }
+            $document['noteDisplayMode'] = $mode;
+        }
         return $document;
     }
 
@@ -110,6 +117,12 @@ class Opml
                 throw new InvalidArgumentException('Invalid checklist visibility.');
             }
             $root->setAttributeNS(self::NS, 'nc:showCheckboxes', $document['showCheckboxes'] ? 'true' : 'false');
+        }
+        if (array_key_exists('noteDisplayMode', $document)) {
+            if (!is_string($document['noteDisplayMode']) || !in_array($document['noteDisplayMode'], ['inline', 'bottom'], true)) {
+                throw new InvalidArgumentException('Invalid notes display mode.');
+            }
+            $root->setAttributeNS(self::NS, 'nc:noteDisplayMode', $document['noteDisplayMode']);
         }
         $head = $this->child($root, 'head') ?? $root->insertBefore($dom->createElement('head'), $root->firstChild);
         $title = $this->child($head, 'title') ?? $head->appendChild($dom->createElement('title'));

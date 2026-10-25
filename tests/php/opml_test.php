@@ -52,6 +52,14 @@ check('notes and visibility round trip with multiline text and XML characters', 
     $doc['rows'][0]['noteVisible'] = true;
     same($doc, $codec->read($codec->write($doc, $codec->create(''))));
 });
+check('notes display mode round trips as a namespaced document preference', function () use ($codec): void {
+    $doc = ['title' => 'Notes', 'rows' => [['id' => 'a', 'text' => 'Topic', 'collapsed' => false, 'children' => [], 'note' => 'Body']], 'noteDisplayMode' => 'bottom'];
+    same($doc, $codec->read($codec->write($doc, $codec->create(''))));
+    try { $codec->write(array_merge($doc, ['noteDisplayMode' => 'sideways']), $codec->create('')); throw new RuntimeException('Accepted invalid notes mode'); }
+    catch (InvalidArgumentException) {}
+    try { $codec->read('<opml xmlns:nc="https://nextcloud.com/ns/outliner/1" nc:noteDisplayMode="sideways"><body/></opml>'); throw new RuntimeException('Read invalid notes mode'); }
+    catch (InvalidArgumentException) {}
+});
 check('invalid notes and note visibility are rejected', function () use ($codec): void {
     foreach ([['note' => ['invalid']], ['noteVisible' => 'false']] as $invalid) {
         $row = array_merge(['id' => 'a', 'text' => '', 'children' => []], $invalid);
