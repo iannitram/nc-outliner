@@ -38,6 +38,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F35 | **Export plain text, OPML and Markdown** | Low | Needs F01. Markdown isn't in Omni, but it's a cheap win; https://github.com/iannitram/nc-outliner/pull/65 |
 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it; https://github.com/iannitram/nc-outliner/pull/66 |
 | F72 | **Autosave:** saves on its own a second or two after you stop typing, and again when you leave the page; a status shows Saved, Saving or Can't save (retrying). If the file changed somewhere else (another tab or device), it never overwrites it silently: it offers to reload, or to keep yours as a copy | Medium | Needs F01, F02. Ian's request (2026-10-22). Overwrite guard: Nextcloud's ETag with If-Match on every save. There's no Save button at all once this works; https://github.com/iannitram/nc-outliner/pull/67 |
+| F37 | **Templates:** save an outline as a template, and start a new one from a template | Medium | Needs F01; worth more after F31 and F32; https://github.com/iannitram/nc-outliner/pull/81 |
 
 ## Unwritten
 
@@ -66,7 +67,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 34 | F31 | **Themes:** built-in looks that follow Nextcloud's light and dark mode | Medium | Needs F32, F71. Adds whole looks on top of the light/dark switch |
 | 35 | F33 | **Text formatting controls:** font, size, colour, highlight, alignment, line height, row padding, space above and below children | Medium | Needs F32 |
 | 38 | F36 | **Links to a row:** copy a link to one row, and open the outline scrolled to it (Omni Links) | Medium | Needs F01 (stable row IDs). Links only work for people who can open the file |
-| 39 | F37 | **Templates:** save an outline as a template, and start a new one from a template | Medium | Needs F01; worth more after F31 and F32 |
 | 40 | F38 | **Attachments:** link a Nextcloud file to a row (picker), shown as a chip that opens it | Medium | Needs F02. Links to Files instead of embedding copies |
 | 41 | F39 | **Inline images** in rows and notes | Medium | Needs F38 |
 | 42 | F40 | **Notes display options:** inline or in a bottom pane; show or hide all notes | Low | Needs F06 |
