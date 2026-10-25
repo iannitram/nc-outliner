@@ -38,6 +38,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | F35 | **Export plain text, OPML and Markdown** | Low | Needs F01. Markdown isn't in Omni, but it's a cheap win; https://github.com/iannitram/nc-outliner/pull/65 |
 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it; https://github.com/iannitram/nc-outliner/pull/66 |
 | F72 | **Autosave:** saves on its own a second or two after you stop typing, and again when you leave the page; a status shows Saved, Saving or Can't save (retrying). If the file changed somewhere else (another tab or device), it never overwrites it silently: it offers to reload, or to keep yours as a copy | Medium | Needs F01, F02. Ian's request (2026-10-22). Overwrite guard: Nextcloud's ETag with If-Match on every save. There's no Save button at all once this works; https://github.com/iannitram/nc-outliner/pull/67 |
+| F21 | **Group / ungroup:** put selected rows under a new parent, or dissolve one | Low | Needs F11. Group wraps a contiguous sibling range; ungroup replaces selected parents in place. Draft targets F11 PR #75; https://github.com/iannitram/nc-outliner/pull/80 |
 
 | F11 | **Select several rows** (Shift/Ctrl+click, Shift+arrow) and act on them together | Medium | Needs F02. Needed by F12, F21, F22; https://github.com/iannitram/nc-outliner/pull/75 |
 
@@ -55,7 +56,6 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 21 | F18 | **Focus** on a row or section (hide everything else), and unfocus | Medium | Needs F04 |
 | 22 | F19 | **Full keyboard set:** add inside / add outside, move left / right, toggle checkbox, edit note, focus | Low | Needs F03, F06, F10, F18 |
 | 23 | F20 | **Outline file management:** rename, duplicate and move outlines; a list of recent outlines | Low | Needs F01. Uses Nextcloud's file APIs |
-| 24 | F21 | **Group / ungroup:** put selected rows under a new parent, or dissolve one | Low | Needs F11 |
 | 25 | F22 | **Duplicate selection** in place | Low | Needs F11, F12 |
 | 26 | F23 | **Find with Next / Previous** and highlighted matches, including inside collapsed rows and notes | Medium | Needs F14. A regex option comes later |
 | 27 | F25 | **Import OPML,** including OmniOutliner's own OPML exports (notes, checkbox state) | Low | Needs F01. Test against real OmniOutliner exports |
