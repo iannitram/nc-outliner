@@ -33,12 +33,15 @@
 | [search.js](../../js/search.js) | `matchingRowIds()` returns literal case-insensitive matches plus ancestors. Editor filtering reveals matching paths without changing saved collapse state. |
 | [editor.js](../../js/editor.js) | Focus and Unfocus toolbar controls show a selected row and its descendants as view state; focus does not change the saved document or history. |
 | [timestamp.js](../../js/timestamp.js) | Localized date/time formats and insertion into the last selected topic or note range. Uses the shared edit/history boundary. |
+| [keyboard.js](../../js/keyboard.js) | Add inside/outside and toggle selected checkbox shortcuts. `Tab`/`Shift+Tab` move right/left; notes and focus commands remain in `editor.js`. |
 
 ## Editor contract
 
 `mountEditor()` returns `getDocument`, `getSelection`, `change`, `replaceDocument`, `focusRow`, `render`, `undo`, `redo`, `getHistoryState` and `destroy`.
 
 Selections are `{ id, offset, end, direction }`, with `field: 'note'` for a note. `focusRow(id, offset, end, direction, field)` restores the appropriate textarea. Topic inputs use `data-row-id`; note inputs use `data-note-id`. Toolbar focus tracking retains the last text selection for bulk actions and timestamps.
+
+The keyboard help in the editor lists add outside (`Ctrl/⌘+Enter`), add inside (`Ctrl/⌘+Shift+Enter`), move right/left (`Tab`/`Shift+Tab`), checkbox toggle (`Ctrl/⌘+Shift+X`), note edit (`Shift+Enter`), and focus/unfocus (`Alt+Shift+F`). These commands preserve the selected row and caret through the normal editor history path; focus remains display state.
 
 `change(mutator, meta)` applies an immutable document updater. A same-reference return is a no-op. Metadata carries the edit type, prior selection, target focus, optional render/notification suppression and history replay flag. Successful edits render as needed, record history, call hooks, and notify `onChange(document)`.
 

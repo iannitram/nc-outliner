@@ -57,11 +57,11 @@ test('Enter creates a sibling, focuses it; Backspace returns to previous row', (
   assert.equal(f.dom.activeElement.selectionStart, 5);
 });
 
-test('IME Enter and modified Enter do not create unwanted rows', () => {
+test('IME Enter and unsupported modified Enter do not create unwanted rows', () => {
   const f = fixture(); const input = f.inputs()[0];
   f.event('Enter', input, { isComposing: true });
   f.event('Enter', input, { keyCode: 229 });
-  f.event('Enter', input, { ctrlKey: true });
+  f.event('Enter', input, { ctrlKey: true, altKey: true });
   assert.equal(f.editor.getDocument().rows.length, 1);
   assert.equal(f.changes.length, 0);
 });

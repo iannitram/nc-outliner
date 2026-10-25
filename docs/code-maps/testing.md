@@ -26,7 +26,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 | `scaffold.test.mjs` | Package metadata, app registration, theme variables and test-count utility |
 | `model.test.mjs`, `editor.test.mjs` | Row identity, text/insertion/deletion, delegated input/keys, focus, history wiring and toolbar integration |
 | `history.test.mjs` | Snapshot isolation, undo/redo, limits, reset and shortcut recognition |
-| `indent.test.mjs`, `row-actions.test.mjs` | Subtree preservation, structural boundaries, movement/deletion and keyboard guards |
+| `indent.test.mjs`, `row-actions.test.mjs`, `keyboard.test.mjs` | Subtree preservation, structural boundaries, movement/deletion, keyboard guards, and the full keyboard set |
 | `collapse.test.mjs`, `collapse-editor.test.mjs`, `expansion.test.mjs` | Visibility, disclosure controls, recursive actions, focus and combined structural undo |
 | `notes.test.mjs`, `checkboxes.test.mjs` | Notes/checklist edits, visibility, retained state, history and persistence notifications |
 | `search.test.mjs` | Ancestor paths, collapsed matches, hidden-tree preservation and filtered note caret regression |
@@ -49,5 +49,7 @@ All paths in the next table are relative to [tests/js](../../tests/js).
 JS editor tests use small DOM doubles; they do not establish browser layout or full event behavior. Autosave tests inject timers/transports. PHP tests use standalone Nextcloud interface/service doubles, so passing inside the pinned image verifies PHP runtime behavior, not a running Nextcloud installation.
 
 The latest reviewed feature batch passed 122 JS tests, 31 PHP checks and PHP lint. Separate Chromium workflows exercised the combined app with a mocked HTTP API. Those checks covered import/export, autosave retries and conflicts, page-leave flush, note timestamps, checkboxes, appearance and keyboard actions; they were session-level checks, not a committed live-Nextcloud test harness. See [batch-two-review.md](../batch-two-review.md).
+
+The keyboard set also has a real Chromium smoke at [keyboard-shortcuts-smoke.mjs](../../tests/browser/keyboard-shortcuts-smoke.mjs), covering add inside/outside, indent/outdent, checkbox state, note editing, focus/unfocus, and the help control.
 
 When adding a saved field, check both JS edit/history behavior and PHP XML round trips, including unknown metadata. When changing a save endpoint, check the controller precondition and service lock/write behavior separately. Browser/API checks and any live deployment verification must be reported with their actual environment; standalone tests are not deployment evidence.

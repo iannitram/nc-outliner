@@ -22,6 +22,8 @@
   overflow: auto;
   padding: 16px;
 }
+.outliner-keyboard-help summary { cursor: pointer; }
+.outliner-keyboard-help ul { margin: .5rem 0; padding-inline-start: 1.5rem; }
 .outliner-rows {
   list-style: none;
   margin: 0;

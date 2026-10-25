@@ -8,6 +8,7 @@ import { handleRowActionKey, renderRowActions } from './row-actions.js';
 import { handleExpansionKey, mountExpansionControls } from './expansion.js';
 import { matchingRowIds } from './search.js';
 import { mountTimestampControls } from './timestamp.js';
+import { handleKeyboardCommand } from './keyboard.js';
 
 /** Browser editor. Hooks allow later commands to share one mutation boundary. */
 export function mountEditor(element, initialDocument, onChange = () => {}, options = {}) {
@@ -45,15 +46,9 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   unfocusButton.textContent = 'Unfocus';
   focusButton.setAttribute('aria-label', 'Focus selected row and its section');
   unfocusButton.setAttribute('aria-label', 'Show the full outline');
-  focusButton.addEventListener('click', () => {
-    const selection = getSelection() ?? lastRowSelection;
-    if (!selection || !hasRow(document.rows, selection.id)) return;
-    focusedRowId = selection.id;
-    searchQuery = '';
-    searchInput.value = '';
-    render();
-    focusRow(selection.id, selection.offset, selection.end, selection.direction, selection.field);
-  });
+  focusButton.title = 'Focus selected row and section (Alt+Shift+F)';
+  focusButton.setAttribute('aria-keyshortcuts', 'Alt+Shift+F');
+  focusButton.addEventListener('click', () => focusCurrentRow(false));
   unfocusButton.addEventListener('click', () => {
     if (!focusedRowId) return;
     focusedRowId = null;
@@ -63,6 +58,26 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
   });
   toolbar.appendChild(focusButton);
   toolbar.appendChild(unfocusButton);
+  const keyboardHelp = dom.createElement('details');
+  keyboardHelp.className = 'outliner-keyboard-help';
+  const keyboardSummary = dom.createElement('summary');
+  keyboardSummary.textContent = 'Keyboard shortcuts';
+  const keyboardList = dom.createElement('ul');
+  for (const [action, keys] of [
+    ['Add a row outside the current row', 'Ctrl/⌘+Enter'],
+    ['Add a child inside the current row', 'Ctrl/⌘+Shift+Enter'],
+    ['Move right (indent) / move left (outdent)', 'Tab / Shift+Tab'],
+    ['Toggle the selected row checkbox', 'Ctrl/⌘+Shift+X'],
+    ['Edit the row note / return to its topic', 'Shift+Enter / Escape'],
+    ['Focus or unfocus the selected row', 'Alt+Shift+F'],
+  ]) {
+    const item = dom.createElement('li');
+    item.textContent = `${action}: ${keys}`;
+    keyboardList.appendChild(item);
+  }
+  keyboardHelp.appendChild(keyboardSummary);
+  keyboardHelp.appendChild(keyboardList);
+  toolbar.appendChild(keyboardHelp);
   const searchPanel = dom.createElement('div');
   searchPanel.className = 'outliner-search';
   const searchInput = dom.createElement('input');
@@ -117,6 +132,18 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     const selection = getSelection() ?? lastRowSelection;
     focusButton.disabled = !selection || !hasRow(document.rows, selection.id);
     unfocusButton.disabled = !focusedRowId;
+  }
+
+  function focusCurrentRow(toggle) {
+    const selection = getSelection() ?? lastRowSelection;
+    if (!selection || !hasRow(document.rows, selection.id)) return false;
+    focusedRowId = toggle && focusedRowId === selection.id ? null : selection.id;
+    searchQuery = '';
+    searchInput.value = '';
+    render();
+    focusRow(selection.id, selection.offset, selection.end, selection.direction, selection.field);
+    updateFocusControls();
+    return true;
   }
 
   function focusRow(id, offset = 0, end = offset, direction = 'none', field = 'text') {
@@ -192,8 +219,8 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
         input.rows = Math.max(1, input.value.split('\n').length);
         input.spellcheck = true;
         input.setAttribute('aria-label', 'Row text');
-        input.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown Alt+Delete');
-        input.title = 'Move row: Alt+Up/Down. Delete row and children: Alt+Delete.';
+        input.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown Alt+Delete Control+Enter Meta+Enter Control+Shift+Enter Meta+Shift+Enter Tab Shift+Tab Control+Shift+X Meta+Shift+X Shift+Enter Alt+Shift+F');
+        input.title = 'Move row: Alt+Up/Down. Delete row and children: Alt+Delete. Keyboard shortcuts: Ctrl/⌘+Enter add outside; Ctrl/⌘+Shift+Enter add inside; Tab/Shift+Tab move right/left; Ctrl/⌘+Shift+X toggle checkbox; Shift+Enter edit note; Alt+Shift+F focus.';
         item.appendChild(input);
         options.renderRow?.(row, item, context);
         renderNote(row, item, context);
@@ -231,6 +258,10 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
     if ((!isNote && !input.matches?.('textarea[data-row-id]')) || event.isComposing || event.keyCode === 229) return;
     const command = historyCommand(event);
     if (command) { event.preventDefault(); replay(command); return; }
+    if (event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey && ['f', 'F'].includes(event.key)) {
+      if (focusCurrentRow(true)) event.preventDefault();
+      return;
+    }
     if (isNote) {
       if (event.key === 'Escape' || (event.key === 'Enter' && event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey)) {
         event.preventDefault(); focusRow(input.dataset.noteId);
@@ -243,6 +274,7 @@ export function mountEditor(element, initialDocument, onChange = () => {}, optio
       if (!change((old) => setNoteVisible(old, input.dataset.rowId, true), { type: 'note-visibility', focus })) focusRow(input.dataset.rowId, 0, 0, 'none', 'note');
       return;
     }
+    if (handleKeyboardCommand(event, context)) { event.preventDefault(); return; }
     if (handleExpansionKey(event, context)) { event.preventDefault(); return; }
     if (options.onKeyDown?.(event, context)) { event.preventDefault(); return; }
     if (handleIndentKey(event, context)) { event.preventDefault(); return; }
