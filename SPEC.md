@@ -4,7 +4,7 @@
 
 ## 1.0 means
 
-In Nextcloud on a desktop browser, I can write a nested outline with notes, and **Publish to Doc** gives me a headed document open in Nextcloud Office; and I have used it on the production Nextcloud for a week of real school and work notes without losing anything.
+In Nextcloud on a desktop browser, I can write a nested outline with notes, and **Publish to Doc** gives me a headed document open in Nextcloud Office; and I have used it on my production Nextcloud for a week of real school and work notes without losing anything.
 
 ## Musts
 
@@ -18,11 +18,11 @@ Each Must has a "done looks like" line and a check someone else can repeat. Feat
 | M4 (F04) | WHEN I click a row's disclosure triangle or use the arrow keys, THE APP SHALL **collapse** or expand it, and remember that in the file. | Collapsed rows stay collapsed after reload. | Collapse, reload, compare. |
 | M5 (F05) | WHEN I undo or redo, THE APP SHALL reverse or repeat every kind of change in this list, one step at a time. | Ctrl+Z walks back any edit, move, indent or delete. | Test per change type: do, undo, redo, compare the outline. |
 | M6 (F06) | WHEN I add a **note** to a row, THE APP SHALL keep it under that row and let me show or hide it per row. | Notes survive reload and Publish. | Add notes, reload, publish, read the doc. |
-| M7 (F07) | WHEN I press Publish to Doc, THE APP SHALL ask where to save (folder picker over my Files; first time: the outline's folder and name; after that: the last spot), write an `.odt` by the **heading rule**, overwrite any earlier copy there, and open it in Nextcloud Office. | The doc opens in Nextcloud Office with the right headings and bullets. | Publish a sample outline; Ian opens the sample `.odt` and approves it before this Must counts as done. |
+| M7 (F07) | WHEN I press Publish to Doc, THE APP SHALL ask where to save (folder picker over my Files; first time: the outline's folder and name; after that: the last spot), write an `.odt` by the **heading rule**, overwrite any earlier copy there, and open it in Nextcloud Office. | The doc opens in Nextcloud Office with the right headings and bullets. | Publish a sample outline; I open the sample `.odt` and approve it before this Must counts as done. |
 | M8 (F08) | WHEN I delete a row or move it up or down from the keyboard, THE APP SHALL do it with its children. | Reordering needs no mouse. | Test move and delete with children. |
 | M9 (F09) | WHEN I drag a row by its handle, THE APP SHALL reorder or nest it where I drop it, with its children. | Drag to a new parent works. | Drag test in a browser plus a by-hand run. |
 | M10 (F24) | WHEN I open an outline's **versions**, THE APP SHALL list them with times, show any one read-only, restore one (keeping the current state as a version first), and let me name a version so it is never cleaned up. | A bad edit can be rolled back from the app. | Make edits, restore an older version, find the pre-restore state in the list. |
-| M11 (F25) | WHEN I import an OPML file, including an OmniOutliner OPML export, THE APP SHALL open it as a new outline with its tree, notes and checkbox state. | Ian's own Omni exports open. | Import a real OmniOutliner export and compare by hand. |
+| M11 (F25) | WHEN I import an OPML file, including an OmniOutliner OPML export, THE APP SHALL open it as a new outline with its tree, notes and checkbox state. | My own OmniOutliner exports open. | Import a real OmniOutliner export and compare by hand. |
 | M12 (F71) | WHEN Nextcloud is in dark or light mode, THE APP SHALL follow it, and SHALL let me override it (Auto, Light, Dark). Published docs always come out light. | Switching Nextcloud's theme switches the app. | Toggle each setting and look. |
 | M13 (F72) | WHEN I stop typing or leave the page, THE APP SHALL **autosave** and show Saved, Saving or Can't save (retrying); and WHEN the file changed elsewhere, it SHALL never overwrite it silently, offering to reload or keep mine as a copy. | No Save button; no lost edits. | Test: edit the same outline in two tabs; the second save offers reload or copy. |
 
@@ -37,7 +37,7 @@ Everything else in `ROADMAP.md` comes after 1.0, in its rank order.
 
 ## Problem
 
-Ian plans school and work in outlines, the way OmniOutliner works, but needs the result as a normal document in Nextcloud, where everything else of his lives. No Nextcloud app does this (551 store apps checked, 2026-10-22).
+I plan school and work in outlines, the way OmniOutliner works, but I need the result as a normal document in Nextcloud, where everything else of mine lives. No Nextcloud app does this (551 store apps checked, 2026-10-22).
 
 ## Solution
 
@@ -45,31 +45,31 @@ A per-user Nextcloud app: a keyboard-first outline editor whose files are OPML i
 
 ## User stories
 
-1. As Ian, I open the app and start an outline without setting anything up.
-2. As Ian, I write a plan from the keyboard: rows, indents, notes.
-3. As Ian, I fold away parts I'm not working on.
-4. As Ian, I never press Save, and never lose an edit, even with two tabs open.
-5. As Ian, I go back to an earlier version when I've wrecked a section.
-6. As Ian, I bring my old OmniOutliner outlines over.
-7. As Ian, I press Publish to Doc and get a document I can hand in or share.
-8. As another user on the same Nextcloud, I see only my own outlines.
+1. I open the app and start an outline without setting anything up.
+2. I write a plan from the keyboard: rows, indents, notes.
+3. I fold away the parts I'm not working on.
+4. I never press Save, and never lose an edit, even with two tabs open.
+5. I go back to an earlier version when I've wrecked a section.
+6. I bring my old OmniOutliner outlines over.
+7. I press Publish to Doc and get a document I can hand in or share.
+8. Another user on the same Nextcloud sees only their own outlines.
 
 ## Implementation decisions
 
-- **Start fresh** (Ian, 2026-10-25): the plain-JavaScript code on main and the 16-PR stack are not carried forward. (ADR 0002)
-- **Front end: Vue 3 with Nextcloud's own components and build tool** (Ian, 2026-10-25). (ADR 0001)
+- **Start fresh** (2026-10-25): the plain-JavaScript code on main and the 16-PR stack are not carried forward (ADR 0002).
+- **Front end: Vue 3 with Nextcloud's own components and build tool** (2026-10-25, ADR 0001).
 - Storage: one `.opml` file per outline in the user's Outlines folder; the format leaves room for stable row IDs, rich text, styles and columns later (OPML attributes plus an app namespace), so no migration is forced after 1.0.
-- Publish copies: the outline stays the source; re-publishing overwrites the doc, and Nextcloud keeps the old versions (Ian, 2026-10-22).
+- Publish copies: the outline stays the source; re-publishing overwrites the doc, and Nextcloud keeps the old versions (2026-10-22).
 - Versions are Nextcloud's own file versions and version labels.
 - Overwrite guard for autosave: the file's ETag, sent with If-Match on every save.
-- The heading rule is locked (Ian, 2026-10-25). (ADR 0003)
-- Desktop browser only (Ian, 2026-10-22).
+- The heading rule is locked (2026-10-25, ADR 0003).
+- Desktop browser only (2026-10-22).
 
 ## Testing decisions
 
 - Every Must's check above is the test of record.
 - Automated tests run against a throwaway test Nextcloud, never production.
-- The 1.0 dogfood week runs on the production Nextcloud on Hyperion (Ian, 2026-10-25). Each deploy to production still needs Ian's yes. "Without losing anything" means: every outline reopens as he left it, and no Can't save is left unresolved.
+- The 1.0 dogfood week runs on my production Nextcloud (2026-10-25). Each deploy to production still needs my yes. "Without losing anything" means: every outline reopens as I left it, and no Can't save is left unresolved.
 
 ## Further notes
 

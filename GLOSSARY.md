@@ -16,4 +16,4 @@ Terms used in `SPEC.md`. One meaning each.
 | Nextcloud Office | The Collabora-based office suite inside Nextcloud that opens `.odt` files. |
 | Version | A saved earlier state of an outline file, from Nextcloud's own file versions. A named version is never cleaned up. |
 | Autosave | Saving on its own shortly after typing stops and when the page is left, with no Save button. |
-| Dogfood week | A week of Ian's real school and work notes in the app on the production Nextcloud, the last check before 1.0. |
+| Dogfood week | A week of my real school and work notes in the app on my production Nextcloud, the last check before 1.0. |

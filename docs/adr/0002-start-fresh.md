@@ -1,6 +1,6 @@
 # 0002: Start fresh
 
-Date: 2026-10-25. Decided by Ian in the spec interview.
+Date: 2026-10-25. Decided in the spec interview.
 
 **Decision.** The code now on main (plain-JavaScript editor, PHP storage, OPML and .odt code) and the 16-PR stack built on it are not carried forward. 1.0 is rebuilt from `SPEC.md`.
 

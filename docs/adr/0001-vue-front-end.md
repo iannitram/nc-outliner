@@ -1,6 +1,6 @@
 # 0001: The front end is Vue 3 on Nextcloud's own stack
 
-Date: 2026-10-25. Decided by Ian in the spec interview.
+Date: 2026-10-25. Decided in the spec interview.
 
 **Decision.** Build the browser side with Vue 3, Nextcloud's own component library and its usual build tool.
 
