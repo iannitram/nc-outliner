@@ -8,7 +8,7 @@ In Nextcloud on a desktop browser, I can write a nested outline with notes, and 
 
 ## Musts
 
-Each Must has a "done looks like" line and a check someone else can repeat. Feature IDs match `ROADMAP.md`.
+Each Must has a "done looks like" line and a check someone else can repeat. Feature IDs match the project roadmap.
 
 | # | Must | Done looks like | Check |
 |---|---|---|---|
@@ -33,7 +33,7 @@ Each Must has a "done looks like" line and a check someone else can repeat. Feat
 - No text styling: no bold, fonts, level styles or themes beyond dark and light.
 - No live co-editing, and no sharing outlines with other users.
 
-Everything else in `ROADMAP.md` comes after 1.0, in its rank order.
+Everything else on the project roadmap comes after 1.0, in its rank order.
 
 ## Problem
 
