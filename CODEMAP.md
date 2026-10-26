@@ -1,51 +1,53 @@
-# nc-outliner code maps
+# nc-outliner code map
 
-These maps describe the implementation on `batch/3`, through PR #67. The feature stack is still under review; `main` currently contains the starter scaffold. Follow the source files on the branch you are changing rather than assuming every mapped module has merged.
+This map describes the Stage 2 skeleton (ticket S0, issue #84). It is written for the new layout: Vue 3 front end on Nextcloud's stack (ADR 0001), started fresh (ADR 0002). The old plain-JavaScript app is gone and nothing from it is mapped here. Check the branch you are on before assuming a module exists.
 
-| Map | Start here for |
+## Layout
+
+| Path | What it is |
 |---|---|
-| [Frontend](docs/code-maps/frontend.md) | Browser entry points, editor commands, history, autosave, import/export and appearance |
-| [Backend and storage](docs/code-maps/backend.md) | Routes, controllers, user Files access, OPML fields, locking and ETags |
-| [Tests and change guide](docs/code-maps/testing.md) | Which checks cover a change, test doubles, and verification limits |
+| `appinfo/info.xml` | App id `nc_outliner`, name "Outliner", Nextcloud 33 only, the navigation entry (route `nc_outliner.page.index`) |
+| `appinfo/routes.php` | One route: `GET /` (page#index) |
+| `lib/AppInfo/Application.php` | App bootstrap; holds `APP_ID` |
+| `lib/Controller/PageController.php` | `index()` returns the `main` template |
+| `templates/main.php` | Loads the built script `js/nc_outliner-main.mjs` and stylesheet `css/nc_outliner-style.css`; has the mount div `#nc_outliner` |
+| `src/main.js` | Creates the Vue app and mounts it on `#nc_outliner` |
+| `src/App.vue` | `NcContent` > `NcAppContent` > `h2` "Outlines" |
+| `js/` | Build output of `npm run build` (generated, not edited) |
+| `img/app.svg` | App icon |
+| `vite.config.mjs` | `@nextcloud/vite-config`; entry `src/main.js`, output `js/` (script) and `css/` (one stylesheet) |
+| `vitest.config.mjs` | jsdom environment for the JavaScript tests |
+| `eslint.config.mjs` | `@nextcloud/eslint-config` (recommended) |
+| `composer.json` | PHP autoload (`OCA\NcOutliner\` to `lib/`), phpunit and `nextcloud/ocp` for tests |
 
-## Request and edit flow
+## Request and render flow
 
 ```mermaid
 flowchart TD
-    NC[Nextcloud navigation] --> Page[PageController]
+    NC[Nextcloud navigation] --> Route[appinfo/routes.php: page#index]
+    Route --> Page[PageController::index]
     Page --> Template[templates/main.php]
-    Template --> Bootstrap[js/main.js]
-    Bootstrap --> App[js/app.js]
-    App --> Shell[js/shell.js]
-    App --> Editor[js/editor.js]
-    Editor --> Commands[Row commands and display helpers]
-    Editor --> History[js/history.js]
-    Editor -->|onChange document| Autosave[js/autosave.js]
-    Autosave -->|save callback| API[app.js createApi]
-    API --> Controller[OutlineController]
-    Controller --> Files[OutlineFiles]
-    Files --> Codec[Opml]
-    Files --> UserFiles[Signed-in user's Outlines folder]
+    Template -->|script nc_outliner-main| Bundle["js/nc_outliner-main.mjs"]
+    Template --> Mount["div#nc_outliner"]
+    Bundle --> Main[src/main.js]
+    Main --> App[src/App.vue]
+    App --> Content[NcContent, NcAppContent]
 ```
 
-## Important boundaries
+## Tests
 
-- The app is a Nextcloud 33 app with native JavaScript modules and PHP. There is no frontend build step or npm dependency tree; see [appinfo/info.xml](appinfo/info.xml) and [package.json](package.json).
-- [app.js](js/app.js) owns the open file and its autosave lifecycle. [editor.js](js/editor.js) owns the in-memory document, DOM, selection and history.
-- Document edits go through `context.change(mutator, meta)`. This is where history, focus restoration, extension hooks and the persistence callback meet. Search query and appearance are outside document history.
-- The server obtains the user from `IUserSession`, then uses Nextcloud's Files API. Client `data-uid` is not authorization, and code never writes directly to the Nextcloud data directory.
-- Unknown XML stays on the server and is carried forward from the original file by row ID. Adding a persistent field requires an explicit OPML codec mapping; preserving an arbitrary key in JavaScript alone does not save it.
-- Draft PRs and closed issue records do not establish deployment or merge status. [ROADMAP.md](ROADMAP.md) links features to their PRs; [the review record](docs/batch-two-review.md) records the batch's verification scope and overlapping implementations.
+| Check | Command | Where |
+|---|---|---|
+| Lint JS and Vue | `npm run lint` | `eslint.config.mjs` over the whole tree except `js/` |
+| JavaScript | `npm test` | `tests/js/App.test.js` mounts `src/App.vue` and finds "Outlines" |
+| Build | `npm run build` | `vite.config.mjs` writes `js/nc_outliner-main.mjs` and `css/nc_outliner-style.css` |
+| PHP lint | `npm run lint:php` | `php -l` over `appinfo/`, `lib/`, `templates/`, `tests/` (`tests/tools/php.mjs`) |
+| PHP tests | `npm run test:php` | `tests/php/PageControllerTest.php` with phpunit |
 
-## Where to start a change
+`tests/tools/php.mjs` uses a local PHP 8.4 or newer when one is on the PATH (or `PHP_BIN`). Otherwise it runs the existing `nextcloud:33.0.10-apache` image with networking off. It never pulls an image.
 
-| Change | Main touchpoints |
-|---|---|
-| New row command | Command module, `editor.js`, focused JS tests |
-| New saved row/document property | Model/feature module, `Opml::read()` and `write()`, JS and PHP round-trip tests |
-| File lifecycle or save conflict | `app.js`, `autosave.js`, `OutlineController`, `OutlineFiles` |
-| New endpoint | `appinfo/routes.php`, controller, service, PHP tests, browser API caller |
-| Visual layout | `shell.js`, `css/shell.css`, `css/outliner.css`; keep colors on `--ol-*` variables |
-| Per-user preference | `theme.js` / `ThemePreferences` pattern; keep it separate from outline content |
+## Not covered yet
 
-Update the relevant map when moving an entry point, changing a contract, or adding a module. Coding and deployment instructions remain in [CLAUDE.md](CLAUDE.md).
+- No outline data, storage or API (later tickets).
+- The page is checked by the built script containing "Outlines" and by the Nextcloud page returning 200. The rendered page in a real browser is not automated.
+- See [docs/development.md](docs/development.md) for how to run each check.
