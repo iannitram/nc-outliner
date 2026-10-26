@@ -1,38 +1,54 @@
 # Development checks
 
-For entry points, module relationships, API/storage contracts and test coverage, start with [CODEMAP.md](../CODEMAP.md).
+For entry points, module relationships and test coverage, start with [CODEMAP.md](../CODEMAP.md).
 
-The app uses native JavaScript modules and PHP. It has no build step and no npm dependencies. Node.js 22 or newer runs the JavaScript tests:
+The app is a Vue 3 front end (Nextcloud's own components and Vite config) with a PHP page controller. Requirements: Node.js 22.22 or newer (CI uses 24), npm, and PHP 8.4 for the PHP checks (or Docker; see below).
 
-```sh
-npm test
-```
-
-Run all available automated checks with:
+## First-time setup
 
 ```sh
-npm run check
+npm ci
+composer install
 ```
 
-This runs the JavaScript suite, syntax-checks PHP in `appinfo`, `lib`, `templates` and `tests`, and runs each `tests/php/**/*_test.php` file in a separate PHP process. A failed syntax check or test produces a nonzero exit code. It does not enable, install or deploy the app.
+`npm ci` uses `package-lock.json`. Do not run `npm install` in CI.
 
-PHP checks use PHP 8.4 or newer on your PATH. Set `PHP_BIN` to select a specific executable. If no suitable local PHP is available, checks use a throwaway container from the existing `nextcloud:33.0.10-apache` image. Prepare it once with:
+## Checks
+
+```sh
+npm run lint        # eslint over the sources
+npm test            # vitest: mounts src/App.vue and finds "Outlines"
+npm run build       # vite build: writes js/nc_outliner-main.mjs and css/nc_outliner-style.css
+npm run lint:php    # php -l over appinfo/, lib/, templates/, tests/
+npm run test:php    # phpunit over tests/php/
+```
+
+`npm run build` writes `js/`, which is generated, git-ignored and skipped by lint. Run it before testing the app in Nextcloud.
+
+## PHP without a local PHP
+
+`lint:php` and `test:php` use a local PHP 8.4 or newer if `php` (or `PHP_BIN`) reports one. If not, they run a throwaway container from the existing `nextcloud:33.0.10-apache` image with the checkout mounted and networking off. Prepare the image once with:
 
 ```sh
 docker pull nextcloud:33.0.10-apache
 ```
 
-The container mounts the checkout read-only and has networking disabled. The checker never pulls an image implicitly. Docker must be running and accessible to your account. On Hyperion, follow the dev gate in `CLAUDE.md` for heavy commands.
+The checker never pulls an image implicitly. Docker must be running for your account.
 
-Individual PHP tasks are also available:
+## Running the app in a test Nextcloud
+
+Use a throwaway container, never the production Nextcloud or its volumes. Mount this checkout (after `npm run build`) into `custom_apps/nc_outliner`, then:
 
 ```sh
-npm run lint:php
-npm run test:php
+occ app:enable nc_outliner
 ```
 
-JavaScript tests belong in `tests/js/*.test.mjs`. PHP tests use the `_test.php` suffix in `tests/php/` and must exit nonzero on failure. `tests/php/assert.php` supplies the existing assertion helpers. Tests should exercise behavior and boundaries; they do not require a live Nextcloud account. A passing standalone suite does not replace checking the app inside Nextcloud.
+Load `/index.php/apps/nc_outliner/` while logged in. The page should show the "Outlines" heading. On any failure, read the Nextcloud log (`occ log:tail` or `data/nextcloud.log`).
 
-# Page shell
+On Hyperion, heavy commands (builds, test runs, container runs) go through the dev gate; see `CLAUDE.md`. Deploying into a live Nextcloud needs the owner's approval each time.
 
-`mountShell(root)` in `js/shell.js` creates labeled navigation, toolbar, editor-content and live-status regions. The returned regions are ordinary DOM elements for feature modules to populate. `destroy()` removes the shell. The template loads `css/shell.css`, which follows the existing Nextcloud theme variables and gives the file browser and editor independent scroll areas. The skip link moves keyboard focus directly into the editor region. Outline text and filenames should be assigned with `textContent`, not HTML.
+## Where things go
+
+- Vue code in `src/`, unit tests in `tests/js/*.test.js`.
+- PHP in `lib/` (namespace `OCA\NcOutliner\`), tests in `tests/php/*Test.php`.
+- Page template in `templates/`, app metadata and routes in `appinfo/`.
