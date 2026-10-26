@@ -1,0 +1,4 @@
+# One line ending everywhere: the lint config requires LF, and Windows checkouts would otherwise get CRLF.
+* text=auto eol=lf
+*.png binary
+*.svg text eol=lf
