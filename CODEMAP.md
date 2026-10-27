@@ -312,8 +312,8 @@ moveTo(tree, id, parentId | null, index): Tree   // #98, for drag
 
 | | |
 |---|---|
-| File | `src/model/history.js` (stub) |
-| Tests | `tests/js/model/history.test.js` (planned) |
+| File | `src/model/history.js` (present) |
+| Tests | `tests/js/model/history.test.js` (present) |
 | Owns | The current tree, the undo and redo stacks, and telling listeners after each change. Every edit in the app is `history.execute(op, args)` (SPEC M5) |
 | Issue | #89 |
 | Called by | Editor, keyboard groups, drag, OutlineView |
