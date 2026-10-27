@@ -9,7 +9,15 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # Lint and tests on all three desktop platforms (R04); the build runs once, on Linux.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -21,6 +29,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
+          extensions: dom, xmlwriter, zip
           tools: composer
 
       - name: Install JavaScript dependencies
@@ -33,6 +42,7 @@ jobs:
         run: npm test
 
       - name: Build
+        if: matrix.os == 'ubuntu-latest'
         run: npm run build
 
       - name: Install PHP dependencies
