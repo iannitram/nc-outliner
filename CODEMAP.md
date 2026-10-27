@@ -413,6 +413,7 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | `src/components/VersionsPanel.vue` | Versions list, read-only preview, Restore, Name this version | #111 | planned |
 | `src/components/PublishButton.vue` | Publish to Doc: folder picker, then open in Nextcloud Office | #9 | planned |
 | `src/components/ThemeSetting.vue` | Auto / Light / Dark | #96 | planned |
+| `src/main.js` + `src/App.vue` (Report a bug) | `installErrorBuffer()` at startup; craft-bugreport-web's `ReportButton` in the app navigation, given `{ app, version, commit, ncVersion, dropBase, dropToken, userName }` from initial state and `getWorkingFile()` returning the open outline as `.opml`; the drop base and token come from an admin setting stored server-side (`lib/Settings/`, IConfig app value) and are never committed | #124, #125 | planned |
 
 Colours come only from Nextcloud's theme variables (`--color-main-background`, `--color-main-text`, `--color-border` and the rest), so the app follows Nextcloud's dark and light mode with no code. How the Light or Dark override forces the other set of variables inside the app is an open question for #96.
 

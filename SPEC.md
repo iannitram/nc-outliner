@@ -2,6 +2,8 @@
 
 **Approval:** 2026-10-25, in a session with the coordinator.
 
+Must M14 added 2026-10-26 by the owner: "Yes, a 1.0 Must (Recommended)" (the request: "New feature request for both apps - bug logging button with the same pathway as the launcher bug submission pathway"; details "Launcher set, browser version (Recommended)", "Same File Drop (Recommended)", "One shared module repo (Recommended)").
+
 ## 1.0 means
 
 In Nextcloud on a desktop browser, I can write a nested outline with notes, and **Publish to Doc** gives me a headed document open in Nextcloud Office; and I have used it on my production Nextcloud for a week of real school and work notes without losing anything.
@@ -25,6 +27,7 @@ Each Must has a "done looks like" line and a check someone else can repeat. Feat
 | M11 (F25) | WHEN I import an OPML file, including an OmniOutliner OPML export, THE APP SHALL open it as a new outline with its tree, notes and checkbox state. | My own OmniOutliner exports open. | Import a real OmniOutliner export and compare by hand. |
 | M12 (F71) | WHEN Nextcloud is in dark or light mode, THE APP SHALL follow it, and SHALL let me override it (Auto, Light, Dark). Published docs always come out light. | Switching Nextcloud's theme switches the app. | Toggle each setting and look. |
 | M13 (F72) | WHEN I stop typing or leave the page, THE APP SHALL **autosave** and show Saved, Saving or Can't save (retrying); and WHEN the file changed elsewhere, it SHALL never overwrite it silently, offering to reload or keep mine as a copy. | No Save button; no lost edits. | Test: edit the same outline in two tabs; the second save offers reload or copy. |
+| M14 | WHEN I choose **Report a bug**, THE APP SHALL open the shared report form (craft-bugreport-web): what happened, what I expected, the app's recent errors, an optional screenshot and, only if I tick it that time, the open outline as `.opml`; it SHALL show me every file and send the report to the bug File Drop only after I press Send. | A report sent from the app lands in the File Drop with the desktop launcher's layout, and the morning bug intake reads it unchanged. | In the test container with the drop config set: make a report, check the consent screen lists every file, press Send, see the zip in the drop. |
 
 ## Won'ts (not in 1.0)
 
