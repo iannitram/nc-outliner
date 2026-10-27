@@ -456,4 +456,6 @@ What we bring in rather than write, and where it fits. New npm packages are adde
 | PHP lint | `npm run lint:php` | `php -l` over `appinfo/`, `lib/`, `templates/`, `tests/` (`tests/tools/php.mjs`) |
 | PHP tests | `npm run test:php` | `tests/php/**` with phpunit |
 
+**Test-only stubs for server classes.** `nextcloud/ocp` ships the `OCP\` interfaces but not the `OC\` classes some of them extend (e.g. `OCP\Files\IRootFolder` extends `OC\Hooks\Emitter`), so mocking them fails. Minimal stubs for those live in `tests/stubs/OC/...`, autoloaded only in tests via `autoload-dev` `"OC\\": "tests/stubs/OC/"` in `composer.json`. Any issue whose tests mock such an interface may add a stub there; it is in scope for that issue. First added with #88.
+
 `tests/tools/php.mjs` uses a local PHP 8.4 or newer when one is on the PATH (or `PHP_BIN`). Otherwise it runs the existing `nextcloud:33.0.10-apache` image with networking off. It never pulls an image. Each Must's check in SPEC.md is the test of record; automated tests run against a throwaway Nextcloud, never production. How to run each check: [docs/development.md](docs/development.md).
