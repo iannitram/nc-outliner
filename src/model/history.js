@@ -16,12 +16,65 @@
  * @property {(listener: (tree: Tree) => void) => () => void} subscribe called after every change; returns unsubscribe
  */
 
-/* eslint-disable no-unused-vars -- stub: issue #89 replaces the body */
-
 /**
  * @param {Tree} initial
  * @return {History}
  */
 export function createHistory(initial) {
-	throw new Error('not implemented yet (#89)')
+	let tree = initial
+	const undoStack = []
+	const redoStack = []
+	const listeners = new Set()
+	let lastMergeKey
+
+	const notify = () => {
+		for (const listener of listeners) {
+			listener(tree)
+		}
+	}
+
+	return {
+		current: () => tree,
+		execute(op, args, { mergeKey } = {}) {
+			const next = op(tree, ...args)
+			if (next === tree) {
+				return false
+			}
+
+			if (mergeKey === undefined || mergeKey !== lastMergeKey) {
+				undoStack.push(tree)
+			}
+			redoStack.length = 0
+			tree = next
+			lastMergeKey = mergeKey
+			notify()
+			return true
+		},
+		undo() {
+			if (undoStack.length === 0) {
+				return false
+			}
+			redoStack.push(tree)
+			tree = undoStack.pop()
+			lastMergeKey = undefined
+			notify()
+			return true
+		},
+		redo() {
+			if (redoStack.length === 0) {
+				return false
+			}
+			undoStack.push(tree)
+			tree = redoStack.pop()
+			lastMergeKey = undefined
+			notify()
+			return true
+		},
+		canUndo: () => undoStack.length > 0,
+		canRedo: () => redoStack.length > 0,
+		subscribe(listener) {
+			listeners.add(listener)
+			return () => listeners.delete(listener)
+		},
+	}
 }
