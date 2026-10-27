@@ -10,6 +10,7 @@ use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException as OcpNotFoundException;
+use OCP\Files\NotPermittedException;
 
 /**
  * OutlineStore service: manages the user's Outlines/ folder and .opml outline files.
@@ -33,12 +34,22 @@ final class OutlineStore {
 				if ($folder instanceof Folder) {
 					return $folder;
 				}
+				throw new \RuntimeException('A file named "Outlines" is in the way; rename it so the app can create its Outlines folder');
 			} catch (OcpNotFoundException) {
 				// Recreate below if disappeared
 			}
 		}
 
-		return $userFolder->newFolder('Outlines');
+		try {
+			return $userFolder->newFolder('Outlines');
+		} catch (NotPermittedException) {
+			// Another request created it first
+			$folder = $userFolder->get('Outlines');
+			if ($folder instanceof Folder) {
+				return $folder;
+			}
+			throw new \RuntimeException('A file named "Outlines" is in the way; rename it so the app can create its Outlines folder');
+		}
 	}
 
 	/**
