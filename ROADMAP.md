@@ -29,6 +29,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 
 | Rank | ID | Feature | Complexity | Notes (dependencies) |
 |---|---|---|---|---|
+| 0 | F73 | **Updates from the admin panel** (1.0, SPEC M15): signed releases through the merged app-store feed (craft-nc-appstore), offered on the Apps page and installed by its scheduled job | Medium | #128, #129, #130; needs craft-nc-appstore 1.0 |
 | 1 | F01 | **Outline files:** create and open `.opml` outlines in the user's `Outlines/` folder (created on first use), as the signed-in user | Medium | Foundation: everything depends on it. The file format needs room for row IDs, rich text, styles and columns later (OPML attributes plus an app namespace). Old plain-JS PR #1 was merged, then its code left main in #100 under ADR 0002 (start fresh) |
 | 2 | F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Needs F01. The editing core: keyboard handling and caret movement between rows. Old plain-JS PR #2 closed as superseded 2026-10-25 (ADR 0002) |
 | 3 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02. Old plain-JS PR #5 closed as superseded 2026-10-25 (ADR 0002) |

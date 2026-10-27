@@ -4,6 +4,8 @@
 
 Must M14 added 2026-10-26 by the owner: "Yes, a 1.0 Must (Recommended)" (the request: "New feature request for both apps - bug logging button with the same pathway as the launcher bug submission pathway"; details "Launcher set, browser version (Recommended)", "Same File Drop (Recommended)", "One shared module repo (Recommended)").
 
+Must M15 added 2026-10-26 by the owner: "Private app store feed (Recommended)", "Yes, a 1.0 Must (Recommended)" (the requirement: "One feature that needs to work….once installed our plugins should update from the nextcloud admin panel, pulling updates automatically.").
+
 ## 1.0 means
 
 In Nextcloud on a desktop browser, I can write a nested outline with notes, and **Publish to Doc** gives me a headed document open in Nextcloud Office; and I have used it on my production Nextcloud for a week of real school and work notes without losing anything.
@@ -28,6 +30,7 @@ Each Must has a "done looks like" line and a check someone else can repeat. Feat
 | M12 (F71) | WHEN Nextcloud is in dark or light mode, THE APP SHALL follow it, and SHALL let me override it (Auto, Light, Dark). Published docs always come out light. | Switching Nextcloud's theme switches the app. | Toggle each setting and look. |
 | M13 (F72) | WHEN I stop typing or leave the page, THE APP SHALL **autosave** and show Saved, Saving or Can't save (retrying); and WHEN the file changed elsewhere, it SHALL never overwrite it silently, offering to reload or keep mine as a copy. | No Save button; no lost edits. | Test: edit the same outline in two tabs; the second save offers reload or copy. |
 | M14 | WHEN I choose **Report a bug**, THE APP SHALL open the shared report form (craft-bugreport-web): what happened, what I expected, the app's recent errors, an optional screenshot and, only if I tick it that time, the open outline as `.opml`; it SHALL show me every file and send the report to the bug File Drop only after I press Send. | A report sent from the app lands in the File Drop with the desktop launcher's layout, and the morning bug intake reads it unchanged. | In the test container with the drop config set: make a report, check the consent screen lists every file, press Send, see the zip in the drop. |
+| M15 | WHEN a new signed release of the app is published to our merged app-store feed (craft-nc-appstore), THE NEXTCLOUD ADMIN PANEL SHALL offer it on the Apps page and the scheduled job SHALL install it automatically. | Publishing a new version makes the Apps page offer it, and within the hour the server runs it; nothing is copied by hand, and the official apps still update. | On the test Nextcloud (nc-projects-test, never the live server) with craft-nc-appstore's merged feed: publish a test release, see it offered on the Apps page, wait for the scheduled job, and check `occ app:list` shows the new version; then the same with a second version. |
 
 ## Won'ts (not in 1.0)
 
