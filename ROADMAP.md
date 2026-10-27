@@ -23,31 +23,29 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 
 | ID | Feature | Complexity | Notes |
 |---|---|---|---|
-| F01 | **Outline files:** create and open `.opml` outlines in the user's `Outlines/` folder (created on first use), as the signed-in user | Medium | Foundation: everything depends on it. The file format needs room for row IDs, rich text, styles and columns later (OPML attributes plus an app namespace); https://github.com/iannitram/nc-outliner/pull/1 |
-| F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Needs F01. The editing core: keyboard handling and caret movement between rows; https://github.com/iannitram/nc-outliner/pull/2 |
-| F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/5 |
-| F04 | **Expand / collapse** a row (disclosure triangle, arrow keys); a bullet for rows without children | Low | Needs F02. Collapsed state saved in the file; https://github.com/iannitram/nc-outliner/pull/6 |
-| F05 | **Undo / redo** for every change | Medium | Needs F02. Build it early: every later editing feature has to go through it; https://github.com/iannitram/nc-outliner/pull/7 |
-| F06 | **Row notes:** a note under any row, shown or hidden per row | Medium | Needs F02; https://github.com/iannitram/nc-outliner/pull/58 |
-| F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/59 |
-| F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/60 |
-| F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04; https://github.com/iannitram/nc-outliner/pull/61 |
-| F14 | **Search field:** show only rows matching the text (with their parents) | Medium | Needs F04; https://github.com/iannitram/nc-outliner/pull/62 |
-| F26 | **Insert timestamp:** short or long date, time, or both | Low | Needs F02; https://github.com/iannitram/nc-outliner/pull/63 |
-| F34 | **Import plain text** (tab-indented or bulleted) and Markdown lists as a new outline | Low | Needs F01; https://github.com/iannitram/nc-outliner/pull/64 |
-| F35 | **Export plain text, OPML and Markdown** | Low | Needs F01. Markdown isn't in Omni, but it's a cheap win; https://github.com/iannitram/nc-outliner/pull/65 |
-| F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it; https://github.com/iannitram/nc-outliner/pull/66 |
-| F72 | **Autosave:** saves on its own a second or two after you stop typing, and again when you leave the page; a status shows Saved, Saving or Can't save (retrying). If the file changed somewhere else (another tab or device), it never overwrites it silently: it offers to reload, or to keep yours as a copy | Medium | Needs F01, F02. Ian's request (2026-10-22). Overwrite guard: Nextcloud's ETag with If-Match on every save. There's no Save button at all once this works; https://github.com/iannitram/nc-outliner/pull/67 |
+| | *(nothing yet)* | | |
 
 ## Unwritten
 
 | Rank | ID | Feature | Complexity | Notes (dependencies) |
 |---|---|---|---|---|
+| 1 | F01 | **Outline files:** create and open `.opml` outlines in the user's `Outlines/` folder (created on first use), as the signed-in user | Medium | Foundation: everything depends on it. The file format needs room for row IDs, rich text, styles and columns later (OPML attributes plus an app namespace). Old plain-JS PR #1 was merged, then its code left main in #100 under ADR 0002 (start fresh) |
+| 2 | F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Needs F01. The editing core: keyboard handling and caret movement between rows. Old plain-JS PR #2 closed as superseded 2026-10-25 (ADR 0002) |
+| 3 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02. Old plain-JS PR #5 closed as superseded 2026-10-25 (ADR 0002) |
 | 4 | F24 | **Versioning:** a version list with times, preview any version read-only, restore one (the current state is kept as a version first), and name a version you care about ("Before rewrite") so it never gets cleaned up | Medium | Needs F01, F72. Ian's request (2026-10-22). Built on Nextcloud's own file versions and version labels, the web stand-in for Time Machine. Autosave creates many versions: Nextcloud thins old ones automatically, and named versions are kept. Check Hyperion's version-retention setting first |
+| 5 | F04 | **Expand / collapse** a row (disclosure triangle, arrow keys); a bullet for rows without children | Low | Needs F02. Collapsed state saved in the file. Old plain-JS PR #6 closed as superseded 2026-10-25 (ADR 0002) |
+| 6 | F05 | **Undo / redo** for every change | Medium | Needs F02. Build it early: every later editing feature has to go through it. Old plain-JS PR #7 closed as superseded 2026-10-25 (ADR 0002) |
+| 7 | F06 | **Row notes:** a note under any row, shown or hidden per row | Medium | Needs F02. Old plain-JS PR #58 closed as superseded 2026-10-25 (ADR 0002) |
+| 8 | F10 | **Status checkboxes:** turn any outline into a checklist, with a show/hide toggle | Low | Needs F02. Old plain-JS PR #59 closed as superseded 2026-10-25 (ADR 0002) |
 | 9 | F07 | **Publish to Doc:** ask where to save (Nextcloud folder picker), write an `.odt` (top level → Heading 1, a second-level row with children → Heading 2, deeper → nested bullets, notes → paragraphs), open it in Nextcloud Office, remember the spot and offer it on re-publish (overwrites) | High | Needs F01, F03, F06. Not an Omni feature: it's this app's reason to exist. Show Ian a sample doc before locking the heading rules |
+| 10 | F08 | **Delete rows,** and move a row up or down with the keyboard | Low | Needs F02. Old plain-JS PR #60 closed as superseded 2026-10-25 (ADR 0002) |
+| 11 | F13 | **Expand all / collapse all,** and expand or collapse a row completely | Low | Needs F04. Old plain-JS PR #61 closed as superseded 2026-10-25 (ADR 0002) |
 | 12 | F09 | **Drag and drop** rows by their handle to reorder or nest | Medium | Needs F03, F04 |
+| 13 | F14 | **Search field:** show only rows matching the text (with their parents) | Medium | Needs F04. Old plain-JS PR #62 closed as superseded 2026-10-25 (ADR 0002) |
 | 14 | F11 | **Select several rows** (Shift/Ctrl+click, Shift+arrow) and act on them together | Medium | Needs F02. Needed by F12, F21, F22 |
 | 15 | F12 | **Cut, copy, paste rows** with their structure, between outlines too; pasting tab-indented or bulleted text becomes rows | Medium | Needs F11 |
+| 16 | F26 | **Insert timestamp:** short or long date, time, or both | Low | Needs F02. Old plain-JS PR #63 closed as superseded 2026-10-25 (ADR 0002) |
+| 17 | F34 | **Import plain text** (tab-indented or bulleted) and Markdown lists as a new outline | Low | Needs F01. Old plain-JS PR #64 closed as superseded 2026-10-25 (ADR 0002) |
 | 18 | F15 | **Bold, italic, underline, strikethrough** in row text and notes | Medium | Needs F02. Needs the rich-text storage from F01 |
 | 19 | F16 | **Links in text:** paste or add a URL and it's clickable | Low | Needs F15 |
 | 20 | F17 | **Calculated checkboxes:** a parent shows checked, unchecked or mixed from its children; checking a parent checks them all | Medium | Needs F10 |
@@ -58,6 +56,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 25 | F22 | **Duplicate selection** in place | Low | Needs F11, F12 |
 | 26 | F23 | **Find with Next / Previous** and highlighted matches, including inside collapsed rows and notes | Medium | Needs F14. A regex option comes later |
 | 27 | F25 | **Import OPML,** including OmniOutliner's own OPML exports (notes, checkbox state) | Low | Needs F01. Test against real OmniOutliner exports |
+| 28 | F35 | **Export plain text, OPML and Markdown** | Low | Needs F01. Markdown isn't in Omni, but it's a cheap win. Old plain-JS PR #65 closed as superseded 2026-10-25 (ADR 0002) |
 | 29 | F27 | **Print and Save as PDF:** expand all, include notes, selected rows only, flatten indentation, checked or unchecked rows only | Medium | Needs F06, F13. A print stylesheet plus a print-options dialog |
 | 30 | F28 | **Export to Word (.docx),** indented and outline styles | Medium | Shares F07's publisher, with a second output format |
 | 31 | F29 | **Sort rows** permanently: topic A–Z or Z–A, by status, by note | Low | Needs F11 for "selected rows" |
@@ -65,6 +64,8 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 33 | F32 | **Level styles:** font, size and colour per outline level, for the whole document | Medium | Needs F15. The base of the style system |
 | 34 | F31 | **Themes:** built-in looks that follow Nextcloud's light and dark mode | Medium | Needs F32, F71. Adds whole looks on top of the light/dark switch |
 | 35 | F33 | **Text formatting controls:** font, size, colour, highlight, alignment, line height, row padding, space above and below children | Medium | Needs F32 |
+| 36 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it. Old plain-JS PR #66 closed as superseded 2026-10-25 (ADR 0002) |
+| 37 | F72 | **Autosave:** saves on its own a second or two after you stop typing, and again when you leave the page; a status shows Saved, Saving or Can't save (retrying). If the file changed somewhere else (another tab or device), it never overwrites it silently: it offers to reload, or to keep yours as a copy | Medium | Needs F01, F02. Ian's request (2026-10-22). Overwrite guard: Nextcloud's ETag with If-Match on every save. There's no Save button at all once this works. Old plain-JS PR #67 closed as superseded 2026-10-25 (ADR 0002) |
 | 38 | F36 | **Links to a row:** copy a link to one row, and open the outline scrolled to it (Omni Links) | Medium | Needs F01 (stable row IDs). Links only work for people who can open the file |
 | 39 | F37 | **Templates:** save an outline as a template, and start a new one from a template | Medium | Needs F01; worth more after F31 and F32 |
 | 40 | F38 | **Attachments:** link a Nextcloud file to a row (picker), shown as a chip that opens it | Medium | Needs F02. Links to Files instead of embedding copies |
