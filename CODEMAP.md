@@ -120,8 +120,8 @@ All PHP lives under `lib/` in namespace `OCA\NcOutliner\`. Pure classes (codec, 
 
 | | |
 |---|---|
-| Files | `lib/Opml/Row.php` (present), `lib/Opml/Outline.php` (present), `lib/Opml/OpmlParseException.php` (present), `lib/Opml/OpmlCodec.php` (stub) |
-| Tests | `tests/php/Opml/OpmlCodecTest.php` (planned) |
+| Files | `lib/Opml/Row.php` (present), `lib/Opml/Outline.php` (present), `lib/Opml/OpmlParseException.php` (present), `lib/Opml/OpmlCodec.php` (present) |
+| Tests | `tests/php/Opml/OpmlCodecTest.php` (present) |
 | Owns | OPML text to `Outline` and back. Pure |
 | Issues | #85 `parse`, #103 `write` |
 | Called by | Outline store, Import |
