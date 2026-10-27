@@ -6,4 +6,4 @@ Date: 2026-10-25. Decided in the spec interview.
 
 **Why.** The front end moves to Vue (ADR 0001), and the earlier code was written before there was an approved spec.
 
-**Consequence.** The open PRs of the stack are closed as superseded once the spec is approved; their branches are kept for reference. Nothing is deleted.
+**Consequence.** The open PRs of the stack are closed as superseded once the spec is approved; the stack's branches are kept for reference; the old code leaves main and git history keeps it.
