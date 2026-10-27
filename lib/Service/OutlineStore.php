@@ -15,7 +15,7 @@ use OCP\Files\NotFoundException as OcpNotFoundException;
  * OutlineStore service: manages the user's Outlines/ folder and .opml outline files.
  * Accesses files solely through Nextcloud's file API as the signed-in user.
  */
-final class OutlineStore {
+final class OutlineStore implements IOutlineStore {
 	public function __construct(
 		private readonly IRootFolder $rootFolder,
 		private readonly OpmlCodec $codec,

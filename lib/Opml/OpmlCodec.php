@@ -16,6 +16,10 @@ final class OpmlCodec {
 	 * @throws OpmlParseException on invalid XML or a missing <body>
 	 */
 	public function parse(string $xml): Outline {
+		if (trim($xml) === '') {
+			throw new OpmlParseException('Empty OPML file');
+		}
+
 		$previousUseInternalErrors = libxml_use_internal_errors(true);
 
 		try {

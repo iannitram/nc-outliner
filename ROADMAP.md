@@ -1,6 +1,6 @@
 # Roadmap: OmniOutliner feature parity
 
-Goal: feature parity with OmniOutliner 6 Pro, adapted to a Nextcloud web app (Ian, 2026-10-22).
+Goal: feature parity with OmniOutliner 6 Pro, adapted to a Nextcloud web app (the owner, 2026-10-22).
 
 **How this file works**
 - Every feature has a fixed **ID** (F01, F02, …). IDs never change, so the Notes column can name dependencies even after rows move.
@@ -35,7 +35,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 1 | F01 | **Outline files:** create and open `.opml` outlines in the user's `Outlines/` folder (created on first use), as the signed-in user | Medium | Foundation: everything depends on it. The file format needs room for row IDs, rich text, styles and columns later (OPML attributes plus an app namespace). Old plain-JS PR #1 was merged, then its code left main in #100 under ADR 0002 (start fresh) **On main:** OPML codec (#85, #103) and `OutlineStore` (#88); the API routes (#108) and the list view (#90) are open. |
 | 2 | F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Needs F01. The editing core: keyboard handling and caret movement between rows. Old plain-JS PR #2 closed as superseded 2026-10-25 (ADR 0002) **On main:** the model's `insertAfter`, `remove`, `updateRow` (#86, #105); the editor (#91) and keys (#107) are open. |
 | 3 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02. Old plain-JS PR #5 closed as superseded 2026-10-25 (ADR 0002) **On main:** the model's `indent` and `outdent` (#104); the keys (#92) are open. |
-| 4 | F24 | **Versioning:** a version list with times, preview any version read-only, restore one (the current state is kept as a version first), and name a version you care about ("Before rewrite") so it never gets cleaned up | Medium | Needs F01, F72. Ian's request (2026-10-22). Built on Nextcloud's own file versions and version labels, the web stand-in for Time Machine. Autosave creates many versions: Nextcloud thins old ones automatically, and named versions are kept. Check Hyperion's version-retention setting first |
+| 4 | F24 | **Versioning:** a version list with times, preview any version read-only, restore one (the current state is kept as a version first), and name a version you care about ("Before rewrite") so it never gets cleaned up | Medium | Needs F01, F72. The owner's request (2026-10-22). Built on Nextcloud's own file versions and version labels, the web stand-in for Time Machine. Autosave creates many versions: Nextcloud thins old ones automatically, and named versions are kept. Check the build machine's version-retention setting first |
 | 5 | F04 | **Expand / collapse** a row (disclosure triangle, arrow keys); a bullet for rows without children | Low | Needs F02. Collapsed state saved in the file. Old plain-JS PR #6 closed as superseded 2026-10-25 (ADR 0002) **On main:** the model's `updateRow` collapsed flag (#105) and the file's `nco:collapsed` (#85, #103); the triangle and keys (#93) are open. |
 | 6 | F05 | **Undo / redo** for every change | Medium | Needs F02. Build it early: every later editing feature has to go through it. Old plain-JS PR #7 closed as superseded 2026-10-25 (ADR 0002) **On main:** History, undo and redo over the model (#89); the Ctrl/Cmd+Z keys (#107) are open. |
 | 7 | F06 | **Row notes:** a note under any row, shown or hidden per row | Medium | Needs F02. Old plain-JS PR #58 closed as superseded 2026-10-25 (ADR 0002) **On main:** notes in the codec and `updateRow` (#103, #105); the note UI (#94) is open. |
@@ -67,7 +67,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 33 | F32 | **Level styles:** font, size and colour per outline level, for the whole document | Medium | Needs F15. The base of the style system |
 | 34 | F31 | **Themes:** built-in looks that follow Nextcloud's light and dark mode | Medium | Needs F32, F71. Adds whole looks on top of the light/dark switch |
 | 35 | F33 | **Text formatting controls:** font, size, colour, highlight, alignment, line height, row padding, space above and below children | Medium | Needs F32 |
-| 36 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. Ian's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it. Old plain-JS PR #66 closed as superseded 2026-10-25 (ADR 0002) |
+| 36 | F71 | **Dark and light mode:** follows Nextcloud's own light/dark setting automatically, with a per-user override (Auto, Light, Dark) in the app | Low | Needs F02. The owner's request (2026-10-22). Build every colour on Nextcloud's theme variables from day one, so it costs almost nothing now and a lot to retrofit. Published docs (F07) always come out light. F31 builds on it. Old plain-JS PR #66 closed as superseded 2026-10-25 (ADR 0002) |
 | 37 | F72 | **Autosave:** saves on its own a second or two after you stop typing, and again when you leave the page; a status shows Saved, Saving or Can't save (retrying). If the file changed somewhere else (another tab or device), it never overwrites it silently: it offers to reload, or to keep yours as a copy | Medium | Needs F01, F02. The owner's request (2026-10-22). Overwrite guard: Nextcloud's ETag with If-Match on every save. There's no Save button at all once this works. Old plain-JS PR #67 closed as superseded 2026-10-25 (ADR 0002) **On main:** the browser API client with the `If-Match` save (#106) and the store's etag guard (#88); the saver (#97) and conflict dialog (#110) are open. |
 | 38 | F36 | **Links to a row:** copy a link to one row, and open the outline scrolled to it (Omni Links) | Medium | Needs F01 (stable row IDs). Links only work for people who can open the file |
 | 39 | F37 | **Templates:** save an outline as a template, and start a new one from a template | Medium | Needs F01; worth more after F31 and F32 |
@@ -76,7 +76,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 42 | F40 | **Notes display options:** inline or in a bottom pane; show or hide all notes | Low | Needs F06 |
 | 43 | F41 | **Text folding:** show only a row's first line until you edit it | Low | Needs F02 |
 | 44 | F42 | **Sections sidebar:** top-level rows as a list; click to jump, drag to reorder, select to focus | Medium | Needs F09, F18 |
-| 45 | F43 | **Columns:** add, remove, rename and resize columns; column headers show automatically once there are two | High | Needs F01 (storage designed in from day one). Deferred by Ian until after the outline core |
+| 45 | F43 | **Columns:** add, remove, rename and resize columns; column headers show automatically once there are two | High | Needs F01 (storage designed in from day one). Deferred by the owner until after the outline core |
 | 46 | F44 | **Column types:** checkbox, number (decimal, percent, currency), date, duration, pop-up list, rich text | High | Needs F43 |
 | 47 | F45 | **Column summaries** on parent rows: total, min, max, average of leaves, checkbox state (Omni's "smart columns") | Medium | Needs F44 |
 | 48 | F46 | **Sort by column** and **hide or show columns** | Low | Needs F43, F29 |
@@ -95,7 +95,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 61 | F59 | **Import RTF / RTFD** | Medium | Needs F15 |
 | 62 | F60 | **Custom keyboard shortcuts** and shareable shortcut sets | Medium | Needs F19 |
 | 63 | F61 | **Customizable toolbar,** globally or per document | Medium | None |
-| 64 | F62 | **Mobile / phone layout** | Medium | Deferred by Ian until after v1 (desktop first) |
+| 64 | F62 | **Mobile / phone layout** | Medium | Deferred by the owner until after v1 (desktop first) |
 | 65 | F63 | **Audio recording** into a row | Medium | Needs F38 (saved as an attachment) |
 | 66 | F64 | **Read aloud** the current row | Low | Uses the browser's speech API |
 | 67 | F65 | **Right-to-left** writing direction | Low | Needs F33 |

@@ -78,6 +78,17 @@ final class OpmlCodecTest extends TestCase {
 		}
 	}
 
+	public function testThrowsForEmptyOrBlankInput(): void {
+		foreach (['', '   '] as $xml) {
+			try {
+				(new OpmlCodec())->parse($xml);
+				$this->fail('Expected empty input to throw');
+			} catch (OpmlParseException) {
+				$this->addToAssertionCount(1);
+			}
+		}
+	}
+
 	private function parse(string $contents): \OCA\NcOutliner\Opml\Outline {
 		return (new OpmlCodec())->parse(
 			'<opml version="2.0" xmlns:nco="' . OpmlCodec::NS . '">' . $contents . '</opml>',

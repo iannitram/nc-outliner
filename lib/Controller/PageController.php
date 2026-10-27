@@ -6,6 +6,8 @@ namespace OCA\NcOutliner\Controller;
 
 use OCA\NcOutliner\AppInfo\Application;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
+use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\IRequest;
 
@@ -14,12 +16,8 @@ class PageController extends Controller {
 		parent::__construct(Application::APP_ID, $request);
 	}
 
-	/**
-	 * Renders the app page: the mount point and the built Vue script.
-	 *
-	 * @NoAdminRequired
-	 * @NoCSRFRequired
-	 */
+	#[NoAdminRequired]
+	#[NoCSRFRequired]
 	public function index(): TemplateResponse {
 		return new TemplateResponse(Application::APP_ID, 'main');
 	}

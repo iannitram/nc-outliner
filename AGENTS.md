@@ -1,6 +1,6 @@
 # Rules for agents in this repo
 
-Everything you need to work here is in this repo. The full pipeline and rules live in potn-dev (https://github.com/iannitram/potn-dev: `PIPELINE.md`, `RULES.md`, `RUBRIC.md`, `roles/`); this is the short copy.
+Everything you need to work here is in this repo. The full pipeline and rules live in the pipeline repo (private: `PIPELINE.md`, `RULES.md`, `RUBRIC.md`, `roles/`); this is the short copy.
 
 1. **Find the stage** in `PIPELINE.md`. The spec is `SPEC.md`, the plan `ROADMAP.md` (all features) with the 1.0 tickets in `docs/plan/1.0-work.md`, the code map `CODEMAP.md` (check its branch scope before treating a module as merged). How to build and test: `docs/development.md`.
 2. **Work from an issue.** Take one that is not `in-progress` and not blocked; add `in-progress` before you start. Its body is your brief; an Easy issue has a "Qwen brief" section with the expected results and the code map snippet.
