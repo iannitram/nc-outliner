@@ -123,7 +123,7 @@ All PHP lives under `lib/` in namespace `OCA\NcOutliner\`. Pure classes (codec, 
 | Files | `lib/Opml/Row.php` (present), `lib/Opml/Outline.php` (present), `lib/Opml/OpmlParseException.php` (present), `lib/Opml/OpmlCodec.php` (present) |
 | Tests | `tests/php/Opml/OpmlCodecTest.php` (present) |
 | Owns | OPML text to `Outline` and back. Pure |
-| Issues | #85 `parse`, #103 `write` |
+| Issues | #85 `parse`, #103 `write` (both merged) |
 | Called by | Outline store, Import |
 
 ```php
@@ -144,10 +144,10 @@ Parse with `DOMDocument::loadXML($xml, LIBXML_NONET)` and never `LIBXML_NOENT`: 
 
 | | |
 |---|---|
-| File | `lib/Odt/ContentWriter.php` (stub) |
-| Tests | `tests/php/Odt/ContentWriterTest.php` (planned) |
+| File | `lib/Odt/ContentWriter.php` (present) |
+| Tests | `tests/php/Odt/ContentWriterTest.php` (present) |
 | Owns | Root rows to the `content.xml` of an `.odt`, by the heading rule (ADR 0003). Pure |
-| Issue | #87 |
+| Issue | #87 (merged) |
 | Called by | Publish |
 
 ```php
@@ -161,10 +161,10 @@ Heading rule: top-level rows are `text:h text:outline-level="1"`; a second-level
 
 | | |
 |---|---|
-| File | `lib/Odt/OdtPackage.php` (planned) |
-| Tests | `tests/php/Odt/OdtPackageTest.php` (planned) |
+| File | `lib/Odt/OdtPackage.php` (present) |
+| Tests | `tests/php/Odt/OdtPackageTest.php` (present) |
 | Owns | Zips a `content.xml` with `mimetype`, `META-INF/manifest.xml` and a fixed light `styles.xml` into `.odt` bytes. Pure apart from a temp file |
-| Issue | #112 |
+| Issue | #112 (merged); #120 checks a generated `.odt` opens in LibreOffice and Nextcloud Office |
 | Called by | Publish |
 
 ```php
@@ -181,7 +181,7 @@ final class OdtPackage { public function build(string $contentXml): string; }
 | File | `lib/Service/OutlineStore.php`, `lib/Service/ConflictException.php`, `lib/Service/NotFoundException.php` (present) |
 | Tests | `tests/php/Service/OutlineStoreTest.php` (present; mocks `IRootFolder`) |
 | Owns | The user's `Outlines/` folder and the `.opml` files in it, through Nextcloud's file API (`OCP\Files\IRootFolder::getUserFolder($uid)`), never direct disk writes. The etag check on save |
-| Issue | #88 |
+| Issue | #88 (merged) |
 | Called by | API, Publish, Versions, Import |
 
 ```php
@@ -289,10 +289,10 @@ All browser code lives under `src/` (ES modules, Vue 3 `<script setup>`, Nextclo
 
 | | |
 |---|---|
-| File | `src/model/outline.js` (stub; `newRow` and `newId` present) |
-| Tests | `tests/js/model/outline.test.js` (planned) |
+| File | `src/model/outline.js` (present; every function below except `moveTo`, which is planned for #98) |
+| Tests | `tests/js/model/outline.test.js` (present) |
 | Owns | The tree and every change to it, as pure functions. Each returns a new tree, leaves its input unchanged, and moves a row's children with it. An operation that cannot apply (indent the first row, move the last row down) returns the input tree itself (`===`), which History reads as "no change" |
-| Issues | #86 `insertAfter`, `remove`, `moveUp`, `moveDown` · #104 `indent`, `outdent` · #105 `updateRow` · #98 adds `moveTo` |
+| Issues | #86 `insertAfter`, `remove`, `moveUp`, `moveDown` · #104 `indent`, `outdent` · #105 `updateRow` (all merged) · #98 adds `moveTo` |
 | Called by | History, keyboard groups, drag |
 
 ```js
@@ -315,7 +315,7 @@ moveTo(tree, id, parentId | null, index): Tree   // #98, for drag
 | File | `src/model/history.js` (present) |
 | Tests | `tests/js/model/history.test.js` (present) |
 | Owns | The current tree, the undo and redo stacks, and telling listeners after each change. Every edit in the app is `history.execute(op, args)` (SPEC M5) |
-| Issue | #89 |
+| Issue | #89 (merged) |
 | Called by | Editor, keyboard groups, drag, OutlineView |
 
 ```js
@@ -333,10 +333,10 @@ Trees are immutable, so an entry is the tree before the change. Typing uses `mer
 
 | | |
 |---|---|
-| File | `src/api/outlines.js` (stub) |
-| Tests | `tests/js/api/outlines.test.js` (planned; mocks axios) |
+| File | `src/api/outlines.js` (present) |
+| Tests | `tests/js/api/outlines.test.js` (present; mocks axios) |
 | Owns | The HTTP calls to [the API](#api), with `@nextcloud/axios` (adds the request token) and `@nextcloud/router` `generateUrl('/apps/nc_outliner/api/...')` |
-| Issue | #106 (outline calls). #109, #4, #27 and #113's browser side add their own calls here |
+| Issue | #106 (outline calls; merged). #109, #4, #27 and #113's browser side add their own calls here |
 | Called by | OutlineList, OutlineView, Saver |
 
 ```js

@@ -2,6 +2,7 @@
 
 Newest first. One line per change of stage, release or decision that the next session needs.
 
+- 2026-10-26 End-of-night sweep: code map, roadmap and plan match main after 11 merged tickets (#85-#89, #101, #103-#106, #112); #125 resized to Medium (needs the private craft-bugreport-web package).
 - 2026-10-26 Must M15 added on the owner's word: updates from the Nextcloud admin panel through the merged private app-store feed (craft-nc-appstore); issues #128-#130.
 - 2026-10-26 Must M14 added on the owner's word: Report a bug, through the shared craft-bugreport-web module and the bug File Drop.
 - 2026-10-26 Roadmap done, now Dev Loop: CODEMAP.md maps every 1.0 module, stubs for the pure modules, CI on Mac, PC and Linux; 1.0 issues rewritten in the v2 format, the big ones split (#103-#113 new); undo is snapshot History instead of per-command inverses.
