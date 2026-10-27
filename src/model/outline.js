@@ -39,24 +39,90 @@ export function newId() {
 
 /* eslint-disable no-unused-vars -- stubs: each issue below replaces its body */
 
+/** Find a row and its sibling array, returning the index path from the root. */
+function findPath(rows, id, path = []) {
+	for (let i = 0; i < rows.length; i++) {
+		const next = [...path, i]
+		if (rows[i].id === id) {
+			return next
+		}
+		const childPath = findPath(rows[i].children, id, next)
+		if (childPath) {
+			return childPath
+		}
+	}
+	return null
+}
+
+/** Replace the sibling array identified by a path, copying arrays along the path. */
+function changeSiblings(tree, path, change) {
+	const [index, ...rest] = path
+	if (rest.length === 0) {
+		return change(tree, index)
+	}
+	const row = tree[index]
+	const children = changeSiblings(row.children, rest, change)
+	if (children === row.children) {
+		return tree
+	}
+	const copy = tree.slice()
+	copy[index] = { ...row, children }
+	return copy
+}
+
 /** Issue #86. @param {Tree} tree @param {string} id @param {Row} row @return {Tree} */
 export function insertAfter(tree, id, row) {
-	throw new Error('not implemented yet (#86)')
+	const path = findPath(tree, id)
+	if (!path) {
+		return tree
+	}
+	return changeSiblings(tree, path, (siblings, index) => {
+		const copy = siblings.slice()
+		copy.splice(index + 1, 0, row)
+		return copy
+	})
 }
 
 /** Issue #86. @param {Tree} tree @param {string} id @return {Tree} */
 export function remove(tree, id) {
-	throw new Error('not implemented yet (#86)')
+	const path = findPath(tree, id)
+	if (!path) {
+		return tree
+	}
+	return changeSiblings(tree, path, (siblings, index) => {
+		const copy = siblings.slice()
+		copy.splice(index, 1)
+		return copy
+	})
 }
 
 /** Issue #86. @param {Tree} tree @param {string} id @return {Tree} */
 export function moveUp(tree, id) {
-	throw new Error('not implemented yet (#86)')
+	const path = findPath(tree, id)
+	if (!path || path[path.length - 1] === 0) {
+		return tree
+	}
+	return changeSiblings(tree, path, (siblings, index) => {
+		const copy = siblings.slice()
+		;[copy[index - 1], copy[index]] = [copy[index], copy[index - 1]]
+		return copy
+	})
 }
 
 /** Issue #86. @param {Tree} tree @param {string} id @return {Tree} */
 export function moveDown(tree, id) {
-	throw new Error('not implemented yet (#86)')
+	const path = findPath(tree, id)
+	if (!path) {
+		return tree
+	}
+	return changeSiblings(tree, path, (siblings, index) => {
+		if (index === siblings.length - 1) {
+			return siblings
+		}
+		const copy = siblings.slice()
+		;[copy[index], copy[index + 1]] = [copy[index + 1], copy[index]]
+		return copy
+	})
 }
 
 /** Issue #104. @param {Tree} tree @param {string} id @return {Tree} */
