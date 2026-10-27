@@ -406,8 +406,8 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | `src/App.vue` | Shell: the list, or one outline when the URL hash is `#/outline/<fileId>` (no router library); the theme class | #90, #96 | present (skeleton) |
 | `src/views/OutlineList.vue` | My outlines, New outline, open one, Import | #90, #27 | planned |
 | `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, versions and publish | #90, #97 | planned |
-| `src/components/OutlineEditor.vue` | Renders the tree from History, caret and focus by row id, keydown to the keymap | #91 | planned |
-| `src/components/OutlineRow.vue` | One row: handle, disclosure triangle or bullet, a plain text input (no rich text in 1.0), the note under it | #91, #93, #94, #98 | planned |
+| `src/components/OutlineEditor.vue` | Renders the tree from History, caret and focus by row id, keydown to the keymap | #91 | present |
+| `src/components/OutlineRow.vue` | One row: handle, disclosure triangle or bullet, a plain text input (no rich text in 1.0), the note under it | #91, #93, #94, #98 | present |
 | `src/components/SaveStatus.vue` | Saved / Saving / Can't save (retrying) | #97 | planned |
 | `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | planned |
 | `src/components/VersionsPanel.vue` | Versions list, read-only preview, Restore, Name this version | #111 | planned |
