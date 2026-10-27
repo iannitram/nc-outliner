@@ -11,11 +11,13 @@ namespace OCA\NcOutliner\Opml;
 final class Outline {
 	/**
 	 * @param list<Row> $rows
+	 * @param list<string> $headExtra XML strings of head children the app does not model
 	 */
 	public function __construct(
 		public string $title = '',
 		public array $rows = [],
 		public ?string $publishPath = null,
+		public array $headExtra = [],
 	) {
 	}
 }
