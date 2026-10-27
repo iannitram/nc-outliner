@@ -37,8 +37,6 @@ export function newId() {
 	return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-/* eslint-disable no-unused-vars -- stubs: each issue below replaces its body */
-
 /** Find a row and its sibling array, returning the index path from the root. */
 function findPath(rows, id, path = []) {
 	for (let i = 0; i < rows.length; i++) {
@@ -169,5 +167,23 @@ export function outdent(tree, id) {
  * @return {Tree}
  */
 export function updateRow(tree, id, patch) {
-	throw new Error('not implemented yet (#105)')
+	const path = findPath(tree, id)
+	if (!path) {
+		return tree
+	}
+	const row = path.slice(0, -1).reduce((siblings, index) => siblings[index].children, tree)[path[path.length - 1]]
+	const updates = {}
+	for (const key of ['text', 'note', 'collapsed']) {
+		if (Object.hasOwn(patch, key) && patch[key] !== row[key]) {
+			updates[key] = patch[key]
+		}
+	}
+	if (Object.keys(updates).length === 0) {
+		return tree
+	}
+	return changeSiblings(tree, path, (siblings, index) => {
+		const copy = siblings.slice()
+		copy[index] = { ...row, ...updates }
+		return copy
+	})
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { indent, insertAfter, moveDown, moveUp, outdent, remove } from '../../../src/model/outline.js'
+import { indent, insertAfter, moveDown, moveUp, outdent, remove, updateRow } from '../../../src/model/outline.js'
 
 function startTree() {
 	return [
@@ -193,5 +193,39 @@ describe('outline model operations', () => {
 			operation(tree)
 			expect(tree).toEqual(before)
 		}
+	})
+
+	it('updates text while preserving unchanged branch references', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = updateRow(tree, 'A1', { text: 'x' })
+		expect(result[0].children[0].text).toBe('x')
+		expect(result[0].children[1]).toBe(tree[0].children[1])
+		expect(result[1]).toBe(tree[1])
+		expect(result[2]).toBe(tree[2])
+		expect(tree).toEqual(before)
+	})
+
+	it('updates note and collapsed together', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = updateRow(tree, 'B', { note: 'n', collapsed: true })
+		expect(result[1]).toMatchObject({ note: 'n', collapsed: true })
+		expect(tree).toEqual(before)
+	})
+
+	it('ignores unknown keys and returns the input tree when nothing changes', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		expect(updateRow(tree, 'A', { children: [] })).toBe(tree)
+		expect(updateRow(tree, 'A1', { text: 'A1' })).toBe(tree)
+		expect(tree).toEqual(before)
+	})
+
+	it('returns the input tree when the row is not found', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		expect(updateRow(tree, 'nope', { text: 'x' })).toBe(tree)
+		expect(tree).toEqual(before)
 	})
 })
