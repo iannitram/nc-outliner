@@ -104,7 +104,7 @@ final class OpmlCodec {
 		
 		if ($outline->publishPath !== null) {
 			$publishPath = $document->createElement('nco:publishPath');
-			$publishPath->nodeValue = $outline->publishPath;
+			$publishPath->textContent =$outline->publishPath;
 			$head->appendChild($publishPath);
 		}
 		

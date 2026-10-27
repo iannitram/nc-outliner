@@ -126,6 +126,20 @@ final class OpmlCodecTest extends TestCase {
 			$this->assertEquals($original, $parsed);
 		}
 		
+		public function testRoundTripWithSpecialCharacters(): void {
+			$special = "a & b < c > d \" e\nf";
+			$original = new Outline($special, [
+				new Row('r1', $special, $special, true, [new Row('r2', $special . '2', $special, false)]),
+			], '/Docs/P & Q.odt');
+
+			$codec = new OpmlCodec();
+			$parsed = $codec->parse($codec->write($original));
+
+			$this->assertSame($original->title, $parsed->title);
+			$this->assertSame('/Docs/P & Q.odt', $parsed->publishPath);
+			$this->assertEquals($original, $parsed);
+		}
+
 		public function testWritesPublishPath(): void {
 			$outline = new Outline('T', [], '/Docs/P.odt');
 			
