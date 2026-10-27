@@ -127,12 +127,37 @@ export function moveDown(tree, id) {
 
 /** Issue #104. @param {Tree} tree @param {string} id @return {Tree} */
 export function indent(tree, id) {
-	throw new Error('not implemented yet (#104)')
+	const path = findPath(tree, id)
+	if (!path || path[path.length - 1] === 0) {
+		return tree
+	}
+	return changeSiblings(tree, path, (siblings, index) => {
+		const prev = siblings[index - 1]
+		const row = siblings[index]
+		const newPrev = { ...prev, children: [...prev.children, row] }
+		const copy = siblings.slice()
+		copy.splice(index - 1, 2, newPrev)
+		return copy
+	})
 }
 
 /** Issue #104. @param {Tree} tree @param {string} id @return {Tree} */
 export function outdent(tree, id) {
-	throw new Error('not implemented yet (#104)')
+	const path = findPath(tree, id)
+	if (!path || path.length < 2) {
+		return tree
+	}
+	const childIndex = path[path.length - 1]
+	return changeSiblings(tree, path.slice(0, -1), (siblings, parentIndex) => {
+		const parent = siblings[parentIndex]
+		const row = parent.children[childIndex]
+		const children = parent.children.slice()
+		children.splice(childIndex, 1)
+		const newParent = { ...parent, children }
+		const copy = siblings.slice()
+		copy.splice(parentIndex, 1, newParent, row)
+		return copy
+	})
 }
 
 /**

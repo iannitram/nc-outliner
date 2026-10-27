@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { insertAfter, moveDown, moveUp, remove } from '../../../src/model/outline.js'
+import { indent, insertAfter, moveDown, moveUp, outdent, remove } from '../../../src/model/outline.js'
 
 function startTree() {
 	return [
@@ -80,6 +80,112 @@ describe('outline model operations', () => {
 			(tree) => moveDown(tree, 'C'),
 			(tree) => moveUp(tree, 'A1'),
 			(tree) => remove(tree, 'nope'),
+		]
+		for (const operation of operations) {
+			const tree = startTree()
+			const before = structuredClone(tree)
+			operation(tree)
+			expect(tree).toEqual(before)
+		}
+	})
+
+	it('indents a root row into the previous root row as its last child', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = indent(tree, 'B')
+		expect(rowIds(result)).toEqual([['A', [['A1', []], ['A2', []], ['B', []]]], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('returns the input tree itself when indenting the first row at its level', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		expect(indent(tree, 'A')).toBe(tree)
+		expect(tree).toEqual(before)
+	})
+
+	it('indents a nested row into its previous sibling', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = indent(tree, 'A2')
+		expect(rowIds(result)).toEqual([['A', [['A1', [['A2', []]]]]], ['B', []], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('outdents the last child of a row to become the next sibling of its parent', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = outdent(tree, 'A2')
+		expect(rowIds(result)).toEqual([['A', [['A1', []]]], ['A2', []], ['B', []], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('outdents an earlier child while leaving later siblings with the parent', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = outdent(tree, 'A1')
+		expect(rowIds(result)).toEqual([['A', [['A2', []]]], ['A1', []], ['B', []], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('returns the input tree itself when outdenting a root row', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		expect(outdent(tree, 'B')).toBe(tree)
+		expect(tree).toEqual(before)
+	})
+
+	it('indents a row with its own children moving with it', () => {
+		const tree = [
+			{ id: 'A', text: 'A', note: '', collapsed: false, children: [] },
+			{ id: 'B', text: 'B', note: '', collapsed: false, children: [
+				{ id: 'B1', text: 'B1', note: '', collapsed: false, children: [] },
+			] },
+		]
+		const before = structuredClone(tree)
+		const result = indent(tree, 'B')
+		expect(rowIds(result)).toEqual([['A', [['B', [['B1', []]]]]]])
+		expect(tree).toEqual(before)
+	})
+
+	it('outdents a row with its own children moving with it', () => {
+		const tree = [
+			{ id: 'A', text: 'A', note: '', collapsed: false, children: [
+				{ id: 'A1', text: 'A1', note: '', collapsed: false, children: [
+					{ id: 'A1_1', text: 'A1_1', note: '', collapsed: false, children: [] },
+				] },
+				{ id: 'A2', text: 'A2', note: '', collapsed: false, children: [] },
+			] },
+		]
+		const before = structuredClone(tree)
+		const result = outdent(tree, 'A1')
+		expect(rowIds(result)).toEqual([['A', [['A2', []]]], ['A1', [['A1_1', []]]]])
+		expect(tree).toEqual(before)
+	})
+
+	it('returns the original tree when indent or outdent cannot apply', () => {
+		const tree = startTree()
+		expect(indent(tree, 'A')).toBe(tree)
+		expect(indent(tree, 'A1')).toBe(tree)
+		expect(indent(tree, 'nope')).toBe(tree)
+		expect(outdent(tree, 'A')).toBe(tree)
+		expect(outdent(tree, 'B')).toBe(tree)
+		expect(outdent(tree, 'C')).toBe(tree)
+		expect(outdent(tree, 'nope')).toBe(tree)
+	})
+
+	it('leaves the starting tree unchanged after every indent and outdent call', () => {
+		const operations = [
+			(tree) => indent(tree, 'B'),
+			(tree) => indent(tree, 'A'),
+			(tree) => indent(tree, 'A2'),
+			(tree) => indent(tree, 'A1'),
+			(tree) => indent(tree, 'nope'),
+			(tree) => outdent(tree, 'A2'),
+			(tree) => outdent(tree, 'A1'),
+			(tree) => outdent(tree, 'B'),
+			(tree) => outdent(tree, 'A'),
+			(tree) => outdent(tree, 'nope'),
 		]
 		for (const operation of operations) {
 			const tree = startTree()
