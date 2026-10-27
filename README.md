@@ -20,18 +20,18 @@ Stage and status: [PIPELINE.md](PIPELINE.md); history: [CHANGELOG.md](CHANGELOG.
 
 | Date | Decision | By |
 |---|---|---|
-| 2026-10-22 | v1 is the nested outline only. Columns (checkboxes, dates, numbers) come later, and the file layout must leave room for them | Ian |
-| 2026-10-22 | Main use is planning, school and work notes, so publishing uses the headings + bullets layout | Ian |
+| 2026-10-22 | v1 is the nested outline only. Columns (checkboxes, dates, numbers) come later, and the file layout must leave room for them | The owner |
+| 2026-10-22 | Main use is planning, school and work notes, so publishing uses the headings + bullets layout | The owner |
 | 2026-10-22 | Nothing suitable in the Nextcloud app store to fork (551 apps checked; nearest are MeeTree, a tree of note pages, and files_mindmap) | Kaylee |
-| 2026-10-22 | Private repo; dev tree on Hyperion at `B:\dev\nc-outliner` | Ian |
-| 2026-10-22 | Per-user app; one fixed `Outlines/` folder in each user's Files | Ian |
-| 2026-10-22 | Publish copies: the outline stays the source, and re-publishing overwrites the doc (Nextcloud keeps the old versions) | Ian |
-| 2026-10-22 | Desktop browser only for v1; phone comes later | Ian |
-| 2026-10-22 | Publish asks where to save (folder picker); re-publish offers the last spot | Ian |
-| 2026-10-22 | Goal is feature parity with OmniOutliner; see `ROADMAP.md` | Ian |
+| 2026-10-22 | Private repo | The owner |
+| 2026-10-22 | Per-user app; one fixed `Outlines/` folder in each user's Files | The owner |
+| 2026-10-22 | Publish copies: the outline stays the source, and re-publishing overwrites the doc (Nextcloud keeps the old versions) | The owner |
+| 2026-10-22 | Desktop browser only for v1; phone comes later | The owner |
+| 2026-10-22 | Publish asks where to save (folder picker); re-publish offers the last spot | The owner |
+| 2026-10-22 | Goal is feature parity with OmniOutliner; see `ROADMAP.md` | The owner |
 
 ## Layout
 
 Vue 3 on Nextcloud's own stack (decided 2026-10-25, [ADR 0001](docs/adr/0001-vue-front-end.md)). Where each module goes: [CODEMAP.md](CODEMAP.md).
 
-The app deploys as a folder copy into the Nextcloud container's `custom_apps/`. A deploy to the live server needs Ian's yes.
+The app deploys as a folder copy into the Nextcloud container's `custom_apps/`. A deploy to the live server needs the owner's yes.
