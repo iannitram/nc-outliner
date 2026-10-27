@@ -13,8 +13,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+        # Self-hosted runners (the pipeline repo's R29). macOS is left out until the
+        # Mac mini runner exists: GitHub-hosted runners are stopped for private repos.
+        include:
+          - os: linux
+            runner: [self-hosted, linux]
+          - os: windows
+            runner: [self-hosted, windows]
+    runs-on: ${{ matrix.runner }}
     defaults:
       run:
         shell: bash
@@ -27,6 +33,7 @@ jobs:
           cache: npm
 
       - uses: shivammathur/setup-php@v2
+        if: runner.os != 'Windows' || runner.environment == 'github-hosted'
         with:
           php-version: '8.4'
           extensions: dom, xmlwriter, zip
@@ -42,7 +49,7 @@ jobs:
         run: npm test
 
       - name: Build
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.os == 'linux'
         run: npm run build
 
       - name: Install PHP dependencies
