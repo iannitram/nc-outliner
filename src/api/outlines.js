@@ -8,21 +8,27 @@
  * @typedef {{title: string, rows: Tree, publishPath: string|null}} OutlineDoc
  */
 
-/* eslint-disable no-unused-vars -- stubs: issue #106 replaces the bodies */
+import axios from '@nextcloud/axios'
+import { generateUrl } from '@nextcloud/router'
+
+const outlinesUrl = generateUrl('/apps/nc_outliner/api/outlines')
 
 /** @return {Promise<OutlineEntry[]>} */
 export async function listOutlines() {
-	throw new Error('not implemented yet (#106)')
+	const response = await axios.get(outlinesUrl)
+	return response.data
 }
 
 /** @param {string} name @return {Promise<{fileId: number, name: string, etag: string}>} */
 export async function createOutline(name) {
-	throw new Error('not implemented yet (#106)')
+	const response = await axios.post(outlinesUrl, { name })
+	return response.data
 }
 
 /** @param {number} fileId @return {Promise<{fileId: number, name: string, etag: string, outline: OutlineDoc}>} */
 export async function readOutline(fileId) {
-	throw new Error('not implemented yet (#106)')
+	const response = await axios.get(`${outlinesUrl}/${fileId}`)
+	return response.data
 }
 
 /**
@@ -32,10 +38,21 @@ export async function readOutline(fileId) {
  * @return {Promise<{ok: true, etag: string}|{conflict: true, etag: string}>}
  */
 export async function saveOutline(fileId, outline, etag) {
-	throw new Error('not implemented yet (#106)')
+	try {
+		const response = await axios.put(`${outlinesUrl}/${fileId}`, { outline }, {
+			headers: { 'If-Match': etag },
+		})
+		return { ok: true, etag: response.data.etag }
+	} catch (error) {
+		if (error.response?.status === 412) {
+			return { conflict: true, etag: error.response.data.etag }
+		}
+		throw error
+	}
 }
 
 /** @param {number} fileId @param {OutlineDoc} outline @return {Promise<{fileId: number, name: string, etag: string}>} */
 export async function saveCopy(fileId, outline) {
-	throw new Error('not implemented yet (#106)')
+	const response = await axios.post(`${outlinesUrl}/${fileId}/copy`, { outline })
+	return response.data
 }
