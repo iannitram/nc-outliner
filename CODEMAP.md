@@ -212,8 +212,8 @@ final class NotFoundException extends \RuntimeException {}
 
 | | |
 |---|---|
-| Files | `lib/Controller/OutlineController.php` (planned), routes in `appinfo/routes.php` |
-| Tests | `tests/php/Controller/OutlineControllerTest.php` (planned) |
+| Files | `lib/Controller/OutlineController.php` (present), routes in `appinfo/routes.php` |
+| Tests | `tests/php/Controller/OutlineControllerTest.php` (present) |
 | Owns | The JSON routes for outlines; the signed-in user from `IUserSession` |
 | Issue | #108 (outline routes). Other routes come with their own issues, listed below |
 | Called by | Browser API client |
