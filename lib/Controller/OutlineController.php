@@ -12,6 +12,7 @@ use OCA\NcOutliner\Service\NotFoundException;
 use OCA\NcOutliner\Service\IOutlineStore;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http;
 use OCP\IRequest;
 use OCP\IUserSession;
@@ -25,17 +26,17 @@ final class OutlineController extends Controller {
 		parent::__construct(Application::APP_ID, $request);
 	}
 
-	/** @NoAdminRequired */
+	#[NoAdminRequired]
 	public function index(): JSONResponse {
 		return new JSONResponse($this->store->list($this->uid()));
 	}
 
-	/** @NoAdminRequired */
+	#[NoAdminRequired]
 	public function create(string $name = ''): JSONResponse {
 		return new JSONResponse($this->store->create($this->uid(), $name), Http::STATUS_CREATED);
 	}
 
-	/** @NoAdminRequired */
+	#[NoAdminRequired]
 	public function show(int $fileId): JSONResponse {
 		try {
 			$result = $this->store->read($this->uid(), $fileId);
@@ -46,7 +47,7 @@ final class OutlineController extends Controller {
 		}
 	}
 
-	/** @NoAdminRequired */
+	#[NoAdminRequired]
 	public function update(int $fileId): JSONResponse {
 		$params = $this->request->getParams();
 		$outline = (array)($params['outline'] ?? []);
@@ -65,7 +66,7 @@ final class OutlineController extends Controller {
 		}
 	}
 
-	/** @NoAdminRequired */
+	#[NoAdminRequired]
 	public function copy(int $fileId): JSONResponse {
 		$params = $this->request->getParams();
 		$outline = (array)($params['outline'] ?? []);

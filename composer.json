@@ -19,8 +19,7 @@
 		"psr-4": {
 			"OCA\\NcOutliner\\Tests\\": "tests/php/",
 			"OCP\\": "vendor/nextcloud/ocp/OCP/",
-			"OC\\": "tests/stubs/OC/",
-			"": "tests/stubs/"
+			"OC\\": "tests/stubs/OC/"
 		}
 	}
 }

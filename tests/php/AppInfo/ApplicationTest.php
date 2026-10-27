@@ -10,22 +10,7 @@ use OCA\NcOutliner\Service\OutlineStore;
 use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../../stubs/OC.php';
-\OC::$server = new class {
-	public function get(string $service): object {
-		return new class {
-			public function getSystemValueBool(string $name): bool {
-				return false;
-			}
-		};
-	}
-
-	public function getRegisteredAppContainer(string $appId): object {
-		return new class {
-		};
-	}
-};
-
+// No need to construct App, which accesses the global server.
 final class ApplicationTest extends TestCase {
 	public function testRegisterAliasesOutlineStoreInterface(): void {
 		$context = $this->createMock(IRegistrationContext::class);
@@ -33,7 +18,7 @@ final class ApplicationTest extends TestCase {
 			->method('registerServiceAlias')
 			->with(IOutlineStore::class, OutlineStore::class);
 
-		$app = new Application();
+		$app = (new \ReflectionClass(Application::class))->newInstanceWithoutConstructor();
 		$app->register($context);
 	}
 }
