@@ -6,6 +6,8 @@ namespace OCA\NcOutliner\Tests\Opml;
 
 use OCA\NcOutliner\Opml\OpmlCodec;
 use OCA\NcOutliner\Opml\OpmlParseException;
+use OCA\NcOutliner\Opml\Outline;
+use OCA\NcOutliner\Opml\Row;
 use PHPUnit\Framework\TestCase;
 
 final class OpmlCodecTest extends TestCase {
@@ -76,9 +78,72 @@ final class OpmlCodecTest extends TestCase {
 		}
 	}
 
-	private function parse(string $contents): \OCA\NcOutliner\Opml\Outline {
-		return (new OpmlCodec())->parse(
-			'<opml version="2.0" xmlns:nco="' . OpmlCodec::NS . '">' . $contents . '</opml>',
-		);
+		private function parse(string $contents): \OCA\NcOutliner\Opml\Outline {
+			return (new OpmlCodec())->parse(
+				'<opml version="2.0" xmlns:nco="' . OpmlCodec::NS . '">' . $contents . '</opml>',
+			);
+		}
+		
+		public function testWritesNoteAttribute(): void {
+			$outline = new Outline('T', [new Row('r1', 'A', 'n')]);
+			
+			$xml = (new OpmlCodec())->write($outline);
+			$this->assertStringContainsString('_note="n"', $xml);
+			$this->assertStringNotContainsString('nco:note', $xml);
+		}
+		
+		public function testWritesCollapsedAttribute(): void {
+			$outline = new Outline('T', [new Row('r1', 'A', '', true)]);
+			
+			$xml = (new OpmlCodec())->write($outline);
+			$this->assertStringContainsString('nco:collapsed="true"', $xml);
+		}
+		
+		public function testWritesNoCollapsedAttributeWhenFalse(): void {
+			$outline = new Outline('T', [new Row('r1', 'A', '', false)]);
+			
+			$xml = (new OpmlCodec())->write($outline);
+			$this->assertStringNotContainsString('nco:collapsed="true"', $xml);
+		}
+		
+		public function testWritesEscapedText(): void {
+			$outline = new Outline('T', [new Row('r1', 'a & b < c "d"', '')]);
+			
+			$xml = (new OpmlCodec())->write($outline);
+			$this->assertStringContainsString('a &amp; b &lt; c &quot;d&quot;', $xml);
+		}
+		
+		public function testRoundTrip(): void {
+			$original = new Outline('Plan', [
+				new Row('r1', 'A', 'a note', true, [new Row('r2', 'A1', '', false)]),
+				new Row('r3', 'D', '', false)
+			], '/Docs/P.odt');
+			
+			$codec = new OpmlCodec();
+			$xml = $codec->write($original);
+			$parsed = $codec->parse($xml);
+			
+			$this->assertEquals($original, $parsed);
+		}
+		
+		public function testWritesPublishPath(): void {
+			$outline = new Outline('T', [], '/Docs/P.odt');
+			
+			$xml = (new OpmlCodec())->write($outline);
+			$this->assertStringContainsString('<nco:publishPath>/Docs/P.odt</nco:publishPath>', $xml);
+		}
+		
+		public function testWritesNoPublishPathWhenNull(): void {
+			$outline = new Outline('T', [], null);
+			
+			$xml = (new OpmlCodec())->write($outline);
+			$this->assertStringNotContainsString('<nco:publishPath>', $xml);
+		}
+		
+		public function testWritesEmptyBody(): void {
+			$outline = new Outline('T', []);
+			
+			$xml = (new OpmlCodec())->write($outline);
+			$this->assertStringContainsString('<body/>', $xml);
+		}
 	}
-}

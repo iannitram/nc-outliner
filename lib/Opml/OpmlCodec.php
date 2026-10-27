@@ -89,6 +89,52 @@ final class OpmlCodec {
 	}
 
 	public function write(Outline $outline): string {
-		throw new \LogicException('not implemented yet (#103)');
+		$document = new \DOMDocument('1.0', 'UTF-8');
+		$document->formatOutput = true;
+		
+		$opml = $document->createElement('opml');
+		$opml->setAttribute('version', '2.0');
+		$opml->setAttribute('xmlns:nco', self::NS);
+		$document->appendChild($opml);
+		
+		$head = $document->createElement('head');
+		$title = $document->createElement('title');
+		$title->textContent = $outline->title;
+		$head->appendChild($title);
+		
+		if ($outline->publishPath !== null) {
+			$publishPath = $document->createElement('nco:publishPath');
+			$publishPath->nodeValue = $outline->publishPath;
+			$head->appendChild($publishPath);
+		}
+		
+		$opml->appendChild($head);
+		
+		$body = $document->createElement('body');
+		foreach ($outline->rows as $row) {
+			$this->writeRow($document, $body, $row);
+		}
+		$opml->appendChild($body);
+		
+		return $document->saveXML();
+	}
+
+	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row): void {
+		$outline = $document->createElement('outline');
+		// Let DOM handle escaping properly
+		$outline->setAttribute('text', $row->text);
+		if ($row->note !== '') {
+			$outline->setAttribute('_note', $row->note);
+		}
+		$outline->setAttributeNS(self::NS, 'nco:id', $row->id);
+		if ($row->collapsed) {
+			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
+		}
+		
+		foreach ($row->children as $child) {
+			$this->writeRow($document, $outline, $child);
+		}
+		
+		$parent->appendChild($outline);
 	}
 }
