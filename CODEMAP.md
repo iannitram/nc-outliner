@@ -178,8 +178,8 @@ final class OdtPackage { public function build(string $contentXml): string; }
 
 | | |
 |---|---|
-| File | `lib/Service/OutlineStore.php`, `lib/Service/ConflictException.php`, `lib/Service/NotFoundException.php` (planned) |
-| Tests | `tests/php/Service/OutlineStoreTest.php` (planned; mocks `IRootFolder`) |
+| File | `lib/Service/OutlineStore.php`, `lib/Service/ConflictException.php`, `lib/Service/NotFoundException.php` (present) |
+| Tests | `tests/php/Service/OutlineStoreTest.php` (present; mocks `IRootFolder`) |
 | Owns | The user's `Outlines/` folder and the `.opml` files in it, through Nextcloud's file API (`OCP\Files\IRootFolder::getUserFolder($uid)`), never direct disk writes. The etag check on save |
 | Issue | #88 |
 | Called by | API, Publish, Versions, Import |
