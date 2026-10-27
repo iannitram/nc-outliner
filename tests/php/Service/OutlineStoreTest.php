@@ -13,6 +13,7 @@ use OCA\NcOutliner\Service\OutlineStore;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
+use OCP\Lock\ILockingProvider;
 use PHPUnit\Framework\TestCase;
 
 final class OutlineStoreTest extends TestCase {
@@ -280,14 +281,19 @@ final class OutlineStoreTest extends TestCase {
 
 		$file->method('getId')->willReturn(42);
 		$file->method('getName')->willReturn('Plan.opml');
-		$file->method('getEtag')->willReturnOnConsecutiveCalls('etag-current', 'etag-current', 'etag-new');
+		$written = false;
+		$file->method('getEtag')->willReturnCallback(static function () use (&$written): string {
+			return $written ? 'etag-new' : 'etag-current';
+		});
 
 		// Writes nothing on stale etag conflict
-		$file->expects($this->once())->method('putContent')->with($this->isType('string'));
+		$file->expects($this->once())->method('putContent')->with($this->isType('string'))
+			->willReturnCallback(static function () use (&$written): void { $written = true; });
 
 		$outlinesFolder->method('getById')->with(42)->willReturn([$file]);
 
-		$store = new OutlineStore($rootFolder, $codec);
+		$lockingProvider = $this->createMock(ILockingProvider::class);
+		$store = new OutlineStore($rootFolder, $codec, $lockingProvider);
 		$outline = new Outline('Plan', [new Row('r1', 'Row 1', '')]);
 
 		// 1. Stale etag throws ConflictException and writes nothing

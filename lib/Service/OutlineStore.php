@@ -10,6 +10,8 @@ use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException as OcpNotFoundException;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 
 /**
  * OutlineStore service: manages the user's Outlines/ folder and .opml outline files.
@@ -19,6 +21,7 @@ final class OutlineStore {
 	public function __construct(
 		private readonly IRootFolder $rootFolder,
 		private readonly OpmlCodec $codec,
+		private ?ILockingProvider $lockingProvider = null,
 	) {
 	}
 
@@ -128,16 +131,28 @@ final class OutlineStore {
 	 */
 	public function save(string $uid, int $fileId, Outline $outline, string $ifMatch): string {
 		$file = $this->getOutlineFile($uid, $fileId);
-		$currentEtag = $file->getEtag();
-
-		if ($currentEtag !== $ifMatch) {
-			throw new ConflictException($currentEtag);
+		$key = 'nc_outliner/save/' . $fileId;
+		$lockingProvider = $this->lockingProvider ??= \OCP\Server::get(ILockingProvider::class);
+		try {
+			$lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+		} catch (LockedException) {
+			throw new ConflictException($file->getEtag());
 		}
 
-		$xml = $this->codec->write($outline);
-		$file->putContent($xml);
+		try {
+			$currentEtag = $file->getEtag();
 
-		return $file->getEtag();
+			if ($currentEtag !== $ifMatch) {
+				throw new ConflictException($currentEtag);
+			}
+
+			$xml = $this->codec->write($outline);
+			$file->putContent($xml);
+
+			return $file->getEtag();
+		} finally {
+			$lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+		}
 	}
 
 	/**
