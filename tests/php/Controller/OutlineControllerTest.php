@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OCA\NcOutliner\Tests\Controller;
 
 use OCA\NcOutliner\Controller\OutlineController;
+use OCA\NcOutliner\Opml\OpmlParseException;
 use OCA\NcOutliner\Opml\Outline;
 use OCA\NcOutliner\Opml\Row;
 use OCA\NcOutliner\Service\ConflictException;
@@ -14,6 +15,7 @@ use OCP\AppFramework\Http;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserSession;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class OutlineControllerTest extends TestCase {
@@ -92,6 +94,65 @@ final class OutlineControllerTest extends TestCase {
 		$conflict = $this->controller->update(7);
 		$this->assertSame(Http::STATUS_PRECONDITION_FAILED, $conflict->getStatus());
 		$this->assertSame(['etag' => 'current'], $conflict->getData());
+	}
+
+	/** @return array<string, array{array<string, mixed>}> */
+	public static function badOutlineParams(): array {
+		return [
+			'no params' => [[]],
+			'outline is a string' => [['outline' => 'x']],
+			'outline without rows' => [['outline' => ['title' => 'T']]],
+			'rows is not an array' => [['outline' => ['title' => 'T', 'rows' => 'x']]],
+		];
+	}
+
+	/** @param array<string, mixed> $params */
+	#[DataProvider('badOutlineParams')]
+	public function testUpdateRejectsMissingOutlineBody(array $params): void {
+		$this->request->method('getHeader')->with('If-Match')->willReturn('e1');
+		$this->request->method('getParams')->willReturn($params);
+		$this->store->expects($this->never())->method('save');
+
+		$response = $this->controller->update(7);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame(['message' => 'outline with a rows array is required'], $response->getData());
+	}
+
+	/** @param array<string, mixed> $params */
+	#[DataProvider('badOutlineParams')]
+	public function testCopyRejectsMissingOutlineBody(array $params): void {
+		$this->request->method('getParams')->willReturn($params);
+		$this->store->expects($this->never())->method('saveCopy');
+
+		$response = $this->controller->copy(7);
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame(['message' => 'outline with a rows array is required'], $response->getData());
+	}
+
+	public function testUpdateAndCopyAcceptAnOutlineWithNoRows(): void {
+		$this->request->method('getHeader')->with('If-Match')->willReturn('e1');
+		$this->request->method('getParams')->willReturn(['outline' => ['title' => 'T', 'rows' => []]]);
+		$this->store->expects($this->once())->method('save')->willReturn('e2');
+		$this->store->expects($this->once())->method('saveCopy')->willReturn(['fileId' => 8, 'name' => 'T.opml', 'etag' => 'e8']);
+
+		$this->assertSame(Http::STATUS_OK, $this->controller->update(7)->getStatus());
+		$this->assertSame(Http::STATUS_CREATED, $this->controller->copy(7)->getStatus());
+	}
+
+	public function testShowAnswers422ForUnreadableOutline(): void {
+		$this->store->method('read')->willThrowException(new OpmlParseException('Empty OPML file'));
+
+		$response = $this->controller->show(7);
+		$this->assertSame(Http::STATUS_UNPROCESSABLE_ENTITY, $response->getStatus());
+		$this->assertArrayHasKey('message', $response->getData());
+	}
+
+	public function testCreateAnswers400ForForbiddenName(): void {
+		$this->store->method('create')->willThrowException(new \InvalidArgumentException('bad name'));
+
+		$response = $this->controller->create('x');
+		$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+		$this->assertSame(['message' => 'bad name'], $response->getData());
 	}
 
 	public function testSaveCopyReturnsCreatedOrNotFound(): void {
