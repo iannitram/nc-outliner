@@ -166,5 +166,6 @@ final class OpmlCodecTest extends TestCase {
 
 		$xml = (new OpmlCodec())->write($outline);
 		$this->assertStringContainsString('<body/>', $xml);
+		$this->assertSame([], (new OpmlCodec())->parse($xml)->rows);
 	}
 }
