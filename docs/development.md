@@ -45,7 +45,7 @@ occ app:enable nc_outliner
 
 Load `/index.php/apps/nc_outliner/` while logged in. The page should show the "Outlines" heading. On any failure, read the Nextcloud log (`occ log:tail` or `data/nextcloud.log`).
 
-On Hyperion, heavy commands (builds, test runs, container runs) go through the dev gate; see `CLAUDE.md`. Deploying into a live Nextcloud needs the owner's approval each time.
+Deploying into a live Nextcloud needs the owner's approval each time.
 
 ## Where things go
 

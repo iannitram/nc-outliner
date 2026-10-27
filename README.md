@@ -2,7 +2,7 @@
 
 A Nextcloud app for outlining, modeled on OmniOutliner. Write a nested outline in the browser. When it's ready, **Publish to Doc** turns it into a document in your Nextcloud files and opens it in Nextcloud Office (Collabora).
 
-Status: **design.** No code yet. Project notes and status live in the vault at `Workspaces/Outliner/PROJECT.md`; the tracker is project `cc-kaylee-nc-outliner-2026` on `queue-kaylee`.
+Stage and status: [PIPELINE.md](PIPELINE.md); history: [CHANGELOG.md](CHANGELOG.md). The spec is [SPEC.md](SPEC.md).
 
 ## What v1 does
 
@@ -30,15 +30,8 @@ Status: **design.** No code yet. Project notes and status live in the vault at `
 | 2026-10-22 | Publish asks where to save (folder picker); re-publish offers the last spot | Ian |
 | 2026-10-22 | Goal is feature parity with OmniOutliner; see `ROADMAP.md` | Ian |
 
-## Open questions
+## Layout
 
-1. Front end: plain JS with no build step (the Quote Database app's approach) or Vue (the usual Nextcloud app stack)? Kaylee leans toward plain JS for v1.
+Vue 3 on Nextcloud's own stack (decided 2026-10-25, [ADR 0001](docs/adr/0001-vue-front-end.md)). Where each module goes: [CODEMAP.md](CODEMAP.md).
 
-## Layout (planned)
-
-- `appinfo/` holds `info.xml` and routes.
-- `lib/` holds the PHP controllers and the OPML → ODT publisher.
-- `js/` and `css/` hold the editor.
-- `templates/` holds the page shell.
-
-The app deploys as a folder copy into the Nextcloud container's `custom_apps/` on Hyperion. A deploy needs Ian's yes.
+The app deploys as a folder copy into the Nextcloud container's `custom_apps/`. A deploy to the live server needs Ian's yes.
