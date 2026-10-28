@@ -462,4 +462,39 @@ describe('OutlineEditor', () => {
 		expect(treeContainer.exists()).toBe(true)
 		expect(wrapper.element.contains(sortBar.element)).toBe(true)
 	})
+
+	describe('empty outline', () => {
+		const placeholderSelector = 'input[placeholder="Type your first heading"]'
+
+		it('shows one focused placeholder row and no real rows', async () => {
+			wrapper = mount(OutlineEditor, { props: { history: createHistory([]) }, attachTo: document.body })
+			await wrapper.vm.$nextTick()
+
+			expect(wrapper.findAll(placeholderSelector)).toHaveLength(1)
+			expect(wrapper.findAll('[data-row-id]')).toHaveLength(0)
+			expect(document.activeElement).toBe(wrapper.get(placeholderSelector).element)
+		})
+
+		it('creates a real row on the first keystroke, focuses its input, and one undo removes it', async () => {
+			const history = createHistory([])
+			wrapper = mount(OutlineEditor, { props: { history }, attachTo: document.body })
+			await wrapper.vm.$nextTick()
+
+			await wrapper.get(placeholderSelector).setValue('H')
+			await wrapper.vm.$nextTick()
+
+			const rows = history.current()
+			expect(rows).toHaveLength(1)
+			expect(rows[0].text).toBe('H')
+			expect(wrapper.find(placeholderSelector).exists()).toBe(false)
+			const input = wrapper.get(`input[data-row-id="${rows[0].id}"]`)
+			expect(document.activeElement).toBe(input.element)
+
+			history.undo()
+			await wrapper.vm.$nextTick()
+			expect(history.current()).toEqual([])
+			expect(wrapper.find(placeholderSelector).exists()).toBe(true)
+			expect(document.activeElement).toBe(wrapper.get(placeholderSelector).element)
+		})
+	})
 })

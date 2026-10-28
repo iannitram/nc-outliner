@@ -139,10 +139,15 @@ describe('OutlineView autosave conflict flow', () => {
 		})
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })
 		await flushPromises()
-		await buttonLabelled(wrapper, 'Add first row').trigger('click')
+		expect(wrapper.text()).not.toContain('Add first row')
+		expect(buttonLabelled(wrapper, 'Add first row')).toBeUndefined()
+		// The editor (stubbed here) gets the empty History and owns the placeholder row.
+		const history = wrapper.findComponent({ name: 'OutlineEditor' }).props('history')
+		expect(history.current()).toEqual([])
+		history.execute((rows) => [...rows, { id: 'n1', text: 'H', note: '', collapsed: false, children: [] }], [])
 		await vi.advanceTimersByTimeAsync(1500)
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
-			rows: [expect.objectContaining({ text: '', children: [] })],
+			rows: [expect.objectContaining({ text: 'H', children: [] })],
 		}), 'etag-1')
 	})
 

@@ -1,8 +1,9 @@
 <script setup>
-import { nextTick, onUnmounted, provide, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 'vue'
+import KeyboardHints from './KeyboardHints.vue'
 import OutlineRow from './OutlineRow.vue'
 import * as keymap from '../editor/keymap.js'
-import { moveTo, remove, sortRows, updateRow } from '../model/outline.js'
+import { moveTo, newRow, remove, sortRows, updateRow } from '../model/outline.js'
 
 const props = defineProps({
 	history: {
@@ -15,11 +16,58 @@ const rootRef = ref(null)
 const tree = ref(props.history.current())
 const activeRowId = ref(null)
 const caretPos = ref(0)
-const sortBy = ref('text')
-const sortDirection = ref('asc')
 const dragSourceId = ref(null)
 const dropTarget = ref(null)
 const inputRefs = new Map()
+const placeholderRef = ref(null)
+const sortBy = ref('text')
+const sortDirection = ref('asc')
+
+/**
+ * @param {import('../model/outline.js').Tree} rows the rows to count
+ * @return {number} how many rows there are, at every level
+ */
+function countRows(rows) {
+	return rows.reduce((total, row) => total + 1 + countRows(row.children ?? []), 0)
+}
+
+const rowCount = computed(() => countRows(tree.value))
+const isEmpty = computed(() => tree.value.length === 0)
+
+/** Put the caret in the placeholder row, once it is on the page. */
+function focusPlaceholder() {
+	nextTick(() => placeholderRef.value?.focus())
+}
+
+onMounted(() => {
+	if (isEmpty.value) {
+		focusPlaceholder()
+	}
+})
+
+// An undo that removes the only row brings the placeholder back with the caret in it.
+watch(isEmpty, (empty) => {
+	if (empty) {
+		placeholderRef.value?.focus()
+	}
+}, { flush: 'post' })
+
+/**
+ * The first keystroke in the placeholder creates a real row through History,
+ * so one undo removes it again. The new row's editor takes the focus.
+ *
+ * @param {InputEvent} event the input event
+ */
+function handlePlaceholderInput(event) {
+	const text = event.target.value
+	if (text === '') {
+		return
+	}
+	event.target.value = ''
+	const row = newRow(text)
+	props.history.execute((rows) => [...rows, row], [])
+	focus(row.id, 'end')
+}
 
 let unsubscribe = null
 
@@ -367,7 +415,24 @@ defineExpose({
 					<slot :name="name" v-bind="slotProps" />
 				</template>
 			</OutlineRow>
+			<div
+				v-if="isEmpty"
+				class="outline-row level-1 outline-placeholder"
+				role="treeitem">
+				<div class="outline-row__line">
+					<span class="outline-placeholder__gutter" aria-hidden="true" />
+					<span class="outline-row__bullet" aria-hidden="true">•</span>
+					<input
+						ref="placeholderRef"
+						type="text"
+						class="outline-placeholder__input"
+						placeholder="Type your first heading"
+						aria-label="Type your first heading"
+						@input="handlePlaceholderInput">
+				</div>
+			</div>
 		</div>
+		<KeyboardHints :rowCount="rowCount" />
 	</div>
 </template>
 
@@ -420,5 +485,45 @@ body[data-theme-dark] .outline-editor,
 	display: flex;
 	align-items: center;
 	gap: 0.35rem;
+}
+
+.outline-placeholder {
+	margin-top: 14px;
+}
+
+.outline-placeholder .outline-row__line {
+	background-color: var(--band-1);
+	padding: 5px 4px 5px 0;
+	min-height: 30px;
+}
+
+.outline-placeholder__gutter {
+	width: 16px;
+	min-width: 16px;
+}
+
+.outline-placeholder__input {
+	flex: 1;
+	min-width: 0;
+	background: transparent;
+	color: var(--color-main-text);
+	border: 1px solid transparent;
+	border-radius: var(--border-radius-element, 3px);
+	padding: 4px 8px;
+	font: inherit;
+	font-size: 19px;
+	font-weight: 650;
+	letter-spacing: -0.005em;
+	line-height: 1.5;
+	outline: none;
+}
+
+.outline-placeholder__input::placeholder {
+	color: var(--color-text-maxcontrast);
+	font-weight: 400;
+}
+
+.outline-placeholder__input:focus {
+	border-color: var(--color-primary-element, var(--color-border));
 }
 </style>

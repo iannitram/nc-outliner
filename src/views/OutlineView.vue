@@ -9,7 +9,6 @@ import VersionsPanel from '../components/VersionsPanel.vue'
 import { readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
 import { createHistory } from '../model/history.js'
-import { newRow } from '../model/outline.js'
 
 const props = defineProps({ fileId: { type: Number, required: true } })
 const loading = ref(true)
@@ -194,11 +193,6 @@ function onPublished(newPath) {
 	}
 }
 
-/** Create the first root row for a valid empty outline. */
-function addFirstRow() {
-	history.value?.execute((rows) => [...rows, newRow()], [])
-}
-
 defineExpose({ beforeLeave })
 
 onMounted(() => {
@@ -235,9 +229,6 @@ watch(() => props.fileId, load)
 				:beforePublish="flushPendingSave"
 				@published="onPublished"
 				@openVersions="versionsOpen = true" />
-			<button v-if="history.current().length === 0" type="button" @click="addFirstRow">
-				Add first row
-			</button>
 			<OutlineEditor v-if="history" :history="history" class="outline-editor" />
 			<ConflictDialog
 				:open="conflictOpen"
