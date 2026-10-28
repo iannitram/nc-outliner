@@ -28,6 +28,7 @@ const versions = ref([])
 const loading = ref(false)
 const busy = ref(false)
 const error = ref('')
+const notice = ref('')
 const renaming = ref(null)
 const offer = ref(null)
 const liveTime = ref(null)
@@ -138,6 +139,7 @@ watch(() => props.open, async (isOpen) => {
 		return
 	}
 	error.value = ''
+	notice.value = ''
 	renaming.value = null
 	unreadable.value = new Set()
 	loading.value = true
@@ -153,6 +155,7 @@ watch(() => props.open, async (isOpen) => {
  */
 async function select(version) {
 	error.value = ''
+	notice.value = ''
 	if (isCurrent(version)) {
 		emit('preview', null)
 		return
@@ -177,6 +180,7 @@ async function select(version) {
  */
 async function restore(id) {
 	error.value = ''
+	notice.value = ''
 	offer.value = null
 	let beforeId = null
 	busy.value = true
@@ -202,7 +206,7 @@ async function restore(id) {
 	if (kept) {
 		offer.value = { id: kept.id, label: `Before restore ${formatTime(kept.time)}`, time: formatTime(kept.time) }
 	} else {
-		error.value = 'Restored. The state from before the restore could not be found in the list, so it cannot be named.'
+		notice.value = 'Restored. The state from before the restore could not be found in the list, so it cannot be named.'
 	}
 }
 
@@ -229,6 +233,7 @@ async function liveFileId() {
  */
 async function saveName(id, label) {
 	error.value = ''
+	notice.value = ''
 	busy.value = true
 	try {
 		await nameVersion(props.fileId, id, label.trim())
@@ -287,6 +292,9 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onEscape))
 			<p v-if="loading" role="status">
 				Loading versions…
 			</p>
+			<NcNoteCard v-if="notice" type="info">
+				{{ notice }}
+			</NcNoteCard>
 			<p v-if="error" role="alert" class="version-error">
 				{{ error }}
 			</p>
