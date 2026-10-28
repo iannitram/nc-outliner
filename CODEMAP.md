@@ -16,6 +16,7 @@ Describes commit: 0b8d9e4 (2026-10-28)
 - [Mac, PC and Linux](#mac-pc-and-linux)
 - [Open-source pieces](#open-source-pieces)
 - [Tests](#tests)
+- Design pass (approved 2026-10-28, #174): [brief](docs/design/2026-10-28-design-pass/brief.md) · [mockups, sections A to H](docs/design/2026-10-28-design-pass/mockups.html) · [implementation notes](docs/design/2026-10-28-design-pass/implementation-notes.md). UI work follows these.
 
 ## Skeleton (present)
 
