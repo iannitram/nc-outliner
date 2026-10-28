@@ -340,8 +340,22 @@ defineExpose({
 				class="outline-row__note-toggle"
 				:class="{ 'outline-row__note-toggle--always': noteToggleAlwaysShown }"
 				:aria-expanded="noteShown"
+				:aria-label="noteToggleLabel"
+				:title="noteToggleLabel"
 				@click="toggleNote">
-				{{ noteToggleLabel }}
+				<svg
+					viewBox="0 0 24 24"
+					width="16"
+					height="16"
+					aria-hidden="true">
+					<path
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M5 4.5h14v11l-4.5 4.5H5z M14.5 20v-4.5H19 M8.5 9h7 M8.5 12.5h4" />
+				</svg>
 			</button>
 		</div>
 		<slot name="note" :row="row" />
@@ -352,6 +366,7 @@ defineExpose({
 				class="outline-row__note"
 				:data-note-id="row.id"
 				:value="row.note"
+				rows="1"
 				aria-label="Row note"
 				@input="handleNoteInput" />
 		</div>
@@ -536,21 +551,26 @@ defineExpose({
 .outline-row__note-area {
 	display: flex;
 	flex-direction: column;
-	align-items: flex-start;
-	gap: 4px;
-	padding-left: 28px;
+	align-items: stretch;
+	/* Handle 16 + gap 4 + gutter 24 + gap 4: the note's text lines up with the row text. */
+	padding-left: 48px;
+	padding-right: 12px;
 }
 
 .outline-row__note-toggle {
 	flex: none;
 	margin-left: auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
 	background: transparent;
 	border: none;
+	border-radius: var(--border-radius-element, 3px);
 	color: var(--color-text-maxcontrast, var(--color-main-text));
 	cursor: pointer;
-	font: inherit;
-	font-size: 0.85em;
-	padding: 2px 4px;
 	/* Shown on hover or focus inside the row, or always while a note is hidden. Still focusable when hidden. */
 	opacity: 0;
 	pointer-events: none;
@@ -559,6 +579,7 @@ defineExpose({
 
 .outline-row__line:hover .outline-row__note-toggle,
 .outline-row__line:focus-within .outline-row__note-toggle,
+.outline-row__note-toggle:focus-visible,
 .outline-row__note-toggle--always {
 	opacity: 1;
 	pointer-events: auto;
@@ -566,24 +587,33 @@ defineExpose({
 
 .outline-row__note-toggle:hover {
 	color: var(--color-main-text);
-	text-decoration: underline;
 }
 
+/* A note is muted text under its row; it only gets a border while it has focus. */
 .outline-row__note {
 	box-sizing: border-box;
 	width: 100%;
 	background: transparent;
-	color: var(--color-main-text);
+	color: var(--color-text-maxcontrast, var(--color-main-text));
 	border: 1px solid transparent;
 	border-radius: var(--border-radius-element, 3px);
-	padding: 6px 8px;
+	padding: 0 8px 6px;
 	font: inherit;
+	font-size: 13.5px;
 	line-height: 1.5;
-	resize: vertical;
+	resize: none;
+	overflow: hidden;
 	outline: none;
+}
+
+@supports (field-sizing: content) {
+	.outline-row__note {
+		field-sizing: content;
+	}
 }
 
 .outline-row__note:focus {
 	border-color: var(--color-primary-element, var(--color-border));
+	color: var(--color-main-text);
 }
 </style>

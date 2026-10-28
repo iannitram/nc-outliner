@@ -101,7 +101,10 @@ describe('OutlineRow', () => {
 		})
 
 		expect(wrapper.get('textarea[data-note-id="r1"]').element.value).toBe('Note text')
-		expect(wrapper.get('.outline-row__note-toggle').text()).toBe('Hide note')
+		expect(wrapper.get('.outline-row__note-toggle').attributes('aria-label')).toBe('Hide note')
+		expect(wrapper.get('.outline-row__note-toggle').text()).toBe('')
+		expect(wrapper.find('.outline-row__note-toggle svg').exists()).toBe(true)
+		expect(wrapper.get('.outline-row__note-toggle').classes()).not.toContain('outline-row__note-toggle--always')
 		wrapper.unmount()
 
 		wrapper = mount(OutlineRow, {
@@ -109,7 +112,8 @@ describe('OutlineRow', () => {
 		})
 
 		expect(wrapper.find('textarea[data-note-id="r1"]').exists()).toBe(false)
-		expect(wrapper.get('.outline-row__note-toggle').text()).toBe('Show note')
+		expect(wrapper.get('.outline-row__note-toggle').attributes('aria-label')).toBe('Show note')
+		expect(wrapper.get('.outline-row__note-toggle').classes()).toContain('outline-row__note-toggle--always')
 	})
 
 	it('writes a note through History with mergeKey "note:<id>"', async () => {
@@ -138,6 +142,28 @@ describe('OutlineRow', () => {
 			{ mergeKey: 'note:r1' },
 		)
 		expect(history.current()[0].note).toBe('A note')
+	})
+
+	it('keeps noteHidden through History when the note icon is clicked', async () => {
+		const row = { id: 'r1', text: 'Sample', note: 'Note text', collapsed: false, noteHidden: false, children: [] }
+		const history = createHistory([row])
+		wrapper = mount(OutlineRow, {
+			props: { row },
+			global: {
+				provide: {
+					outlineEditor: { history, registerInput() {}, unregisterInput() {} },
+				},
+			},
+		})
+
+		await wrapper.get('.outline-row__note-toggle').trigger('click')
+		expect(history.current()[0].noteHidden).toBe(true)
+		expect(history.current()[0].note).toBe('Note text')
+
+		await wrapper.setProps({ row: history.current()[0] })
+		expect(wrapper.find('textarea[data-note-id="r1"]').exists()).toBe(false)
+		await wrapper.get('.outline-row__note-toggle').trigger('click')
+		expect(history.current()[0].noteHidden).toBe(false)
 	})
 
 	it('renders a disclosure control for rows with children and a bullet for leaves', () => {
