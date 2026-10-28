@@ -2,7 +2,7 @@ import { showSuccess } from '@nextcloud/dialogs'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OutlineView from '../../../src/views/OutlineView.vue'
-import { readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
+import { listOutlines, readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
 import { listVersions, restoreVersion } from '../../../src/api/versions.js'
 
 vi.mock('@nextcloud/dialogs', () => ({
@@ -11,6 +11,7 @@ vi.mock('@nextcloud/dialogs', () => ({
 }))
 
 vi.mock('../../../src/api/outlines.js', () => ({
+	listOutlines: vi.fn(),
 	readOutline: vi.fn(),
 	saveCopy: vi.fn(),
 	saveOutline: vi.fn(),
@@ -180,6 +181,7 @@ describe('OutlineView autosave conflict flow', () => {
 			{ id: '300', time: Date.parse('2026-10-28T17:51:38Z'), label: '', size: 3 },
 			{ id: '100', time: Date.parse('2026-10-28T17:51:02Z'), label: '', size: 3 },
 		])
+		listOutlines.mockResolvedValue([{ fileId: 3, name: 'Untitled', mtime: Date.parse('2026-10-28T17:51:38Z') / 1000 }])
 		restoreVersion.mockResolvedValue()
 		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-4' })
 		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })

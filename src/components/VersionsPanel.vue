@@ -1,6 +1,7 @@
 <script setup>
 import { NcButton, NcDialog, NcTextField } from '@nextcloud/vue'
 import { ref, watch } from 'vue'
+import { listOutlines } from '../api/outlines.js'
 import { listVersions, nameVersion, readVersion, restoreVersion } from '../api/versions.js'
 
 /**
@@ -23,6 +24,44 @@ const error = ref('')
 const preview = ref(null)
 const renaming = ref(null)
 const offer = ref(null)
+const liveTime = ref(null)
+const unreadable = ref(new Set())
+const UNREADABLE = "This version can't be opened"
+
+/**
+ * Whether an entry is the live file: its time is the file's own modified time (whole seconds).
+ *
+ * @param {{time: number}} version the entry
+ * @return {boolean} true for the live file
+ */
+function isCurrent(version) {
+	return liveTime.value !== null && Math.floor(version.time / 1000) === liveTime.value
+}
+
+/**
+ * The OPML text as a flat list of row texts with their depth, or null if it is not OPML.
+ *
+ * @param {string} text the version's file text
+ * @return {{depth: number, text: string}[]|null} the rows
+ */
+function parseRows(text) {
+	const doc = new DOMParser().parseFromString(text, 'application/xml')
+	const body = doc.querySelector('body')
+	if (doc.querySelector('parsererror') || !body) {
+		return null
+	}
+	const out = []
+	const walk = (node, depth) => {
+		for (const child of node.children) {
+			if (child.tagName === 'outline') {
+				out.push({ depth, text: child.getAttribute('text') ?? '' })
+				walk(child, depth + 1)
+			}
+		}
+	}
+	walk(body, 0)
+	return out
+}
 
 /**
  * Format a version time for people to read.
@@ -42,6 +81,13 @@ async function loadList() {
 		versions.value = await listVersions(props.fileId)
 	} catch {
 		error.value = 'Could not load versions.'
+		return
+	}
+	try {
+		const entry = (await listOutlines()).find((item) => item.fileId === props.fileId)
+		liveTime.value = entry ? entry.mtime : null
+	} catch {
+		liveTime.value = null // unknown: no entry is marked Current
 	}
 }
 
@@ -52,6 +98,7 @@ watch(() => props.open, async (isOpen) => {
 	error.value = ''
 	preview.value = null
 	renaming.value = null
+	unreadable.value = new Set()
 	loading.value = true
 	await loadList()
 	loading.value = false
@@ -65,9 +112,11 @@ watch(() => props.open, async (isOpen) => {
 async function showPreview(id) {
 	error.value = ''
 	try {
-		preview.value = { id, text: await readVersion(props.fileId, id) }
+		const text = await readVersion(props.fileId, id)
+		preview.value = { id, text, rows: parseRows(text) }
 	} catch {
-		error.value = 'Could not preview this version.'
+		preview.value = null
+		unreadable.value = new Set([...unreadable.value, id])
 	}
 }
 
@@ -159,23 +208,26 @@ function startRename(version) {
 			</NcButton>
 		</div>
 		<ol v-if="versions.length" class="version-list">
-			<li v-for="(version, index) in versions" :key="version.id" class="version-row">
+			<li v-for="version in versions" :key="version.id" class="version-row">
 				<div class="version-info">
 					<time :datetime="new Date(version.time).toISOString()">{{ formatTime(version.time) }}</time>
-					<strong v-if="index === 0">Current</strong>
+					<strong v-if="isCurrent(version)">Current</strong>
 					<span v-if="version.label" class="version-name">{{ version.label }}</span>
 				</div>
-				<div v-if="index > 0" class="version-actions">
+				<div v-if="!isCurrent(version)" class="version-actions">
 					<NcButton :disabled="busy" @click="showPreview(version.id)">
 						Preview
 					</NcButton>
-					<NcButton :disabled="busy" @click="restore(version.id)">
+					<NcButton :disabled="busy || unreadable.has(version.id)" :title="unreadable.has(version.id) ? UNREADABLE : undefined" @click="restore(version.id)">
 						Restore
 					</NcButton>
 					<NcButton :disabled="busy" @click="startRename(version)">
 						Name
 					</NcButton>
 				</div>
+				<p v-if="unreadable.has(version.id)" class="version-unreadable" role="status">
+					{{ UNREADABLE }}
+				</p>
 				<div v-if="renaming?.id === version.id" class="version-rename">
 					<NcTextField v-model="renaming.label" label="Version name" />
 					<NcButton variant="primary" :disabled="busy" @click="saveName(version.id, renaming.label)">
@@ -188,7 +240,12 @@ function startRename(version) {
 			</li>
 		</ol>
 		<section v-if="preview" class="version-preview" aria-label="Preview of an older version">
-			<pre tabindex="0">{{ preview.text }}</pre>
+			<ul v-if="preview.rows" class="version-rows">
+				<li v-for="(item, i) in preview.rows" :key="i" :style="{ paddingInlineStart: `${item.depth * 20}px` }">
+					{{ item.text }}
+				</li>
+			</ul>
+			<pre v-else tabindex="0">{{ preview.text }}</pre>
 			<NcButton @click="preview = null">
 				Close preview
 			</NcButton>
@@ -210,6 +267,8 @@ function startRename(version) {
 	flex-wrap: wrap;
 	gap: 8px;
 }
+.version-rows { list-style: none; padding: 0; margin: 0 0 8px; }
+.version-unreadable { color: var(--color-error-text); margin: 4px 0 0; }
 .version-name { font-style: italic; }
 .version-preview pre {
 	max-height: 40vh;

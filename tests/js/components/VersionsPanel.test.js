@@ -1,7 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import VersionsPanel from '../../../src/components/VersionsPanel.vue'
+import { listOutlines } from '../../../src/api/outlines.js'
 import { listVersions, nameVersion, readVersion, restoreVersion } from '../../../src/api/versions.js'
+
+vi.mock('../../../src/api/outlines.js', () => ({
+	listOutlines: vi.fn(),
+}))
 
 vi.mock('../../../src/api/versions.js', () => ({
 	listVersions: vi.fn(),
@@ -62,6 +67,8 @@ beforeEach(() => {
 		calls.push('list')
 		return [current, named, older]
 	})
+	// The live file's mtime (seconds), as the outline list reports it.
+	listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: current.time / 1000 }])
 	readVersion.mockResolvedValue('old text of the outline')
 	restoreVersion.mockImplementation(async () => {
 		calls.push('restore')
@@ -229,5 +236,52 @@ describe('VersionsPanel.vue', () => {
 		await click(button('Close'))
 
 		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+
+	it('after a restore, labels Current by the file mtime, not the newest entry, and keeps its buttons', async () => {
+		// The restored-from version (100) is now the live file; the pre-restore state is newest and readable.
+		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: older.time / 1000 }])
+		listVersions.mockImplementation(async () => [preRestore, named, older])
+		await open()
+
+		expect(row(0).textContent).not.toContain('Current')
+		expect(button('Preview', row(0))).toBeTruthy()
+		expect(button('Restore', row(0))).toBeTruthy()
+		expect(row(2).textContent).toContain('Current')
+	})
+
+	it('puts Current on the entry that matches the file mtime, and on none if nothing matches', async () => {
+		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: named.time / 1000 }])
+		await open()
+
+		expect(rows().map((el) => el.textContent.includes('Current'))).toEqual([false, true, false])
+		wrapper.unmount()
+		document.body.innerHTML = ''
+
+		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: 12345 }])
+		await open()
+		expect(rows().map((el) => el.textContent.includes('Current'))).toEqual([false, false, false])
+	})
+
+	it('says a version cannot be opened when its read fails, and disables its Restore', async () => {
+		readVersion.mockRejectedValue(Object.assign(new Error('Request failed with status code 500'), { response: { status: 500 } }))
+		await open()
+
+		await click(button('Preview', row(1)))
+
+		expect(document.body.textContent).toContain("This version can't be opened")
+		expect(button('Restore', row(1)).disabled).toBe(true)
+		expect(button('Restore', row(2)).disabled).toBe(false)
+		expect(restoreVersion).not.toHaveBeenCalled()
+	})
+
+	it('shows an outline preview as a list of row texts', async () => {
+		readVersion.mockResolvedValue('<opml><body><outline text="alpha"><outline text="child"/></outline><outline text="beta"/></body></opml>')
+		await open()
+
+		await click(button('Preview', row(2)))
+
+		const items = Array.from(document.body.querySelectorAll('.version-preview li')).map((el) => el.textContent.trim())
+		expect(items).toEqual(['alpha', 'child', 'beta'])
 	})
 })
