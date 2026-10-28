@@ -16,24 +16,31 @@ const DAV = 'DAV:'
 const NC = 'http://nextcloud.org/ns'
 
 /**
+ * The signed-in user's versions root (the user id is one encoded path segment).
  *
+ * @return {string}
  */
 function root() {
 	return `${generateRemoteUrl('dav')}/versions/${encodeURIComponent(getCurrentUser().uid)}`
 }
 
 /**
+ * Escape text for use as XML element content.
  *
- * @param text
+ * @param {string} text the raw text
+ * @return {string}
  */
 function escapeXml(text) {
 	return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /**
- * @param {Element} response @param {string} ns @param {string} name
- * @param ns
- * @param name
+ * A property's text from the response's 200 propstat, or null when it is missing there.
+ *
+ * @param {Element} response one d:response element
+ * @param {string} ns the property's namespace
+ * @param {string} name the property's local name
+ * @return {string|null}
  */
 function okProp(response, ns, name) {
 	for (const propstat of response.getElementsByTagNameNS(DAV, 'propstat')) {
@@ -51,7 +58,7 @@ function okProp(response, ns, name) {
 /**
  * The versions of one outline, newest first.
  *
- * @param {number} fileId
+ * @param {number} fileId the outline's Nextcloud file id
  * @return {Promise<Version[]>}
  */
 export async function listVersions(fileId) {
@@ -71,7 +78,7 @@ export async function listVersions(fileId) {
 		}
 		const href = entry.getElementsByTagNameNS(DAV, 'href')[0].textContent
 		versions.push({
-			id: href.replace(/\/$/, '').split('/').pop(),
+			id: decodeURIComponent(href.replace(/\/$/, '').split('/').pop()),
 			time: Date.parse(modified),
 			label: okProp(entry, NC, 'version-label') ?? '',
 			size: Number(okProp(entry, DAV, 'getcontentlength') ?? 0),
@@ -83,8 +90,8 @@ export async function listVersions(fileId) {
 /**
  * One older version's text, read-only (a GET never changes anything).
  *
- * @param {number} fileId
- * @param {string} id
+ * @param {number} fileId the outline's Nextcloud file id
+ * @param {string} id the version id, as listVersions gives it
  * @return {Promise<string>}
  */
 export async function readVersion(fileId, id) {
@@ -99,8 +106,8 @@ export async function readVersion(fileId, id) {
  * Make an older version the file again. Nextcloud first keeps the state the file was in as a
  * version, so the restore can be undone.
  *
- * @param {number} fileId
- * @param {string} id
+ * @param {number} fileId the outline's Nextcloud file id
+ * @param {string} id the version id, as listVersions gives it
  * @return {Promise<void>}
  */
 export async function restoreVersion(fileId, id) {
@@ -114,9 +121,9 @@ export async function restoreVersion(fileId, id) {
 /**
  * Name a version; a named version is never cleaned up. An empty label un-names it.
  *
- * @param {number} fileId
- * @param {string} id
- * @param {string} label
+ * @param {number} fileId the outline's Nextcloud file id
+ * @param {string} id the version id, as listVersions gives it
+ * @param {string} label the new name; empty to un-name
  * @return {Promise<void>}
  */
 export async function nameVersion(fileId, id, label) {

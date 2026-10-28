@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { axios } = vi.hoisted(() => ({
+const { axios, user } = vi.hoisted(() => ({
 	axios: { request: vi.fn(), get: vi.fn() },
+	user: { uid: 'ann' },
 }))
 
 vi.mock('@nextcloud/axios', () => ({ default: axios }))
-vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: 'ann' }) }))
+vi.mock('@nextcloud/auth', () => ({ getCurrentUser: () => ({ uid: user.uid }) }))
 vi.mock('@nextcloud/router', () => ({
 	generateRemoteUrl: (service) => `https://cloud.example/remote.php/${service}`,
 }))
@@ -30,6 +31,7 @@ ${entries.map(([id, time, label, size]) => `<d:response><d:href>/remote.php/dav/
 describe('versions client', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		user.uid = 'ann'
 	})
 
 	it('lists versions newest first with time and label', async () => {
@@ -73,11 +75,35 @@ describe('versions client', () => {
 	it('names a version with a PROPPATCH of the label', async () => {
 		axios.request.mockResolvedValue({ status: 207 })
 
-		await nameVersion(7, '100', 'Before the rewrite <1>')
+		await nameVersion(7, '100', 'Tom & Jerry <1>')
 
 		const call = axios.request.mock.calls[0][0]
 		expect(call.method).toBe('PROPPATCH')
 		expect(call.url).toBe(`${base}/versions/7/100`)
-		expect(call.data).toContain('<nc:version-label>Before the rewrite &lt;1&gt;</nc:version-label>')
+		expect(call.data).toContain('<nc:version-label>Tom &amp; Jerry &lt;1&gt;</nc:version-label>')
+	})
+
+	it.each([
+		["ann.o'neil@example.com", "ann.o'neil%40example.com"],
+		['ann smith', 'ann%20smith'],
+	])('encodes user id %s and version id in every URL', async (uid, encodedUid) => {
+		user.uid = uid
+		const root = `https://cloud.example/remote.php/dav/versions/${encodedUid}`
+		const version = `${root}/versions/7/v%201%232%2F3`
+		axios.request.mockResolvedValue({ data: multistatus([['v%201%232%2F3', 'Wed, 28 Oct 2026 17:51:34 GMT', '', 3]]), status: 207 })
+		axios.get.mockResolvedValue({ data: '' })
+
+		const [listed] = await listVersions(7)
+		expect(listed.id).toBe('v 1#2/3')
+		await readVersion(7, 'v 1#2/3')
+		await restoreVersion(7, 'v 1#2/3')
+		await nameVersion(7, 'v 1#2/3', 'x')
+
+		const [list, restore, name] = axios.request.mock.calls.map(([call]) => call)
+		expect(list.url).toBe(`${root}/versions/7`)
+		expect(axios.get.mock.calls[0][0]).toBe(version)
+		expect(restore.url).toBe(version)
+		expect(restore.headers).toEqual({ Destination: `${root}/restore/target` })
+		expect(name.url).toBe(version)
 	})
 })
