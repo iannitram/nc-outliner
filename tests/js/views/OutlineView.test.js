@@ -182,6 +182,20 @@ describe('OutlineView autosave conflict flow', () => {
 		expect(history.canUndo()).toBe(false)
 	})
 
+	it('closes Sort rows when the open outline changes and keeps it closed after loading', async () => {
+		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
+		await flushPromises()
+		wrapper.findComponent({ name: 'OutlineTopBar' }).vm.$emit('openSort')
+		await flushPromises()
+		expect(document.body.querySelector('input[name="sort-by"]')).not.toBeNull()
+		readOutline.mockResolvedValueOnce({ fileId: 4, name: 'Other.opml', etag: 'etag-4', outline: { ...initialOutline, title: 'Other' } })
+		await wrapper.setProps({ fileId: 4 })
+		await flushPromises()
+		expect(readOutline).toHaveBeenLastCalledWith(4)
+		expect(wrapper.findComponent({ name: 'SortDialog' }).props('open')).toBe(false)
+		expect(document.body.querySelector('input[name="sort-by"]')).toBeNull()
+	})
+
 	it('shows a success toast after keepCopy succeeds', async () => {
 		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
 		await flushPromises()

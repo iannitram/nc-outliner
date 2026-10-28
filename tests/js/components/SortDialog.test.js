@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 import SortDialog from '../../../src/components/SortDialog.vue'
 import { createHistory } from '../../../src/model/history.js'
@@ -49,6 +49,18 @@ describe('SortDialog', () => {
 		wrapper = mount(SortDialog, { props: { open: true }, attachTo: document.body })
 		button('Cancel').click()
 		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+
+	it('closes on Escape with focus inside a radio', async () => {
+		wrapper = mount(SortDialog, { props: { open: true }, attachTo: document.body })
+		await flushPromises()
+		const radio = document.body.querySelector('input[name="sort-by"][value="note"]')
+		radio.focus()
+		expect(document.activeElement).toBe(radio)
+		radio.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+		await flushPromises()
+		expect(wrapper.emitted('close')).toHaveLength(1)
+		expect(wrapper.emitted('sort')).toBeUndefined()
 	})
 
 	it('its choice sorts through History in one undoable step', () => {

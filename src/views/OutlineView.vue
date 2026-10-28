@@ -226,7 +226,10 @@ onUnmounted(() => {
 	unsubscribe?.()
 	void saver?.flush().finally(() => saver?.destroy())
 })
-watch(() => props.fileId, load)
+watch(() => props.fileId, () => {
+	sortOpen.value = false
+	load()
+})
 </script>
 
 <template>

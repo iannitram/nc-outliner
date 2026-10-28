@@ -25,15 +25,6 @@ const orderOptions = [
 	{ value: 'desc', label: 'Z → A' },
 ]
 
-/**
- * @param {boolean} isOpen whether the dialog wants to be open
- */
-function onUpdateOpen(isOpen) {
-	if (!isOpen) {
-		emit('close')
-	}
-}
-
 /** Hand the choice to the view, which sorts through History. */
 function apply() {
 	emit('sort', { by: by.value, direction: direction.value })
@@ -47,46 +38,48 @@ function apply() {
 		container="#nc-outliner-dialogs"
 		name="Sort rows"
 		size="small"
-		@update:open="onUpdateOpen">
-		<fieldset class="sort-dialog__group">
-			<legend class="sort-dialog__label">
-				Sort by
-			</legend>
-			<label
-				v-for="option in sortByOptions"
-				:key="option.value"
-				class="sort-dialog__radio">
-				<input
-					v-model="by"
-					type="radio"
-					name="sort-by"
-					:value="option.value">
-				<span>{{ option.label }}</span>
-			</label>
-		</fieldset>
-		<fieldset class="sort-dialog__order">
-			<legend class="sort-dialog__label">
-				Order
-			</legend>
-			<span class="sort-dialog__seg">
+		@closing="emit('close')">
+		<div @keydown.esc.stop.prevent="emit('close')">
+			<fieldset class="sort-dialog__group">
+				<legend class="sort-dialog__label">
+					Sort by
+				</legend>
 				<label
-					v-for="option in orderOptions"
+					v-for="option in sortByOptions"
 					:key="option.value"
-					class="sort-dialog__seg-option"
-					:class="{ 'sort-dialog__seg-option--on': direction === option.value }">
+					class="sort-dialog__radio">
 					<input
-						v-model="direction"
+						v-model="by"
 						type="radio"
-						name="sort-order"
-						class="sort-dialog__seg-input"
+						name="sort-by"
 						:value="option.value">
 					<span>{{ option.label }}</span>
 				</label>
-			</span>
-		</fieldset>
-		<p class="sort-dialog__note">
-			Sorts the rows under every heading, at every level. Undo with Ctrl+Z.
-		</p>
+			</fieldset>
+			<fieldset class="sort-dialog__order">
+				<legend class="sort-dialog__label">
+					Order
+				</legend>
+				<span class="sort-dialog__seg">
+					<label
+						v-for="option in orderOptions"
+						:key="option.value"
+						class="sort-dialog__seg-option"
+						:class="{ 'sort-dialog__seg-option--on': direction === option.value }">
+						<input
+							v-model="direction"
+							type="radio"
+							name="sort-order"
+							class="sort-dialog__seg-input"
+							:value="option.value">
+						<span>{{ option.label }}</span>
+					</label>
+				</span>
+			</fieldset>
+			<p class="sort-dialog__note">
+				Sorts the rows under every heading, at every level. Undo with Ctrl+Z.
+			</p>
+		</div>
 		<template #actions>
 			<NcButton variant="tertiary" @click="emit('close')">
 				Cancel
