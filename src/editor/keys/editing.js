@@ -51,7 +51,8 @@ export const commands = {
 	},
 	deleteEmptyRow(ctx) {
 		const tree = ctx.history.current()
-		if (!locate(tree, ctx.rowId)) {
+		const location = locate(tree, ctx.rowId)
+		if (!location) {
 			return
 		}
 		if (tree.length === 1 && tree[0].id === ctx.rowId) {
@@ -59,7 +60,9 @@ export const commands = {
 		}
 		const previous = previousVisibleRow(tree, ctx.rowId)
 		const focusId = previous || nextRootAfterRemoval(tree, ctx.rowId)
-		ctx.history.execute(remove, [ctx.rowId])
+		const targetRow = location.siblings[location.index]
+		const op = targetRow.children.length > 0 ? removeKeepChildren : remove
+		ctx.history.execute(op, [ctx.rowId])
 		if (focusId) {
 			ctx.focus(focusId, 'end')
 		}
@@ -138,4 +141,31 @@ function nextRootAfterRemoval(tree, removedId) {
 		return null
 	}
 	return first(tree)
+}
+
+/**
+ * Issue #107. Delete a row and promote its children into its place.
+ *
+ * @param {import('../../model/outline.js').Tree} tree the outline rows
+ * @param {string} id the target row id
+ * @return {import('../../model/outline.js').Tree}
+ */
+export function removeKeepChildren(tree, id) {
+	let changed = false
+	const next = []
+	for (const row of tree) {
+		if (row.id === id) {
+			changed = true
+			next.push(...row.children)
+		} else {
+			const children = removeKeepChildren(row.children, id)
+			if (children !== row.children) {
+				changed = true
+				next.push({ ...row, children })
+			} else {
+				next.push(row)
+			}
+		}
+	}
+	return changed ? next : tree
 }
