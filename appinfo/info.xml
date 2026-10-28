@@ -10,6 +10,7 @@
     <namespace>NcOutliner</namespace>
     <category>office</category>
     <dependencies>
+        <php min-version="8.2"/>
         <nextcloud min-version="33" max-version="33"/>
     </dependencies>
     <navigations>
