@@ -66,9 +66,11 @@ const props = defineProps({
 	},
 })
 
-const emit = defineEmits(['publish', 'published', 'update:publishPath'])
+const emit = defineEmits(['published'])
 
 const publishing = ref(false)
+/** Link to the last published doc; the user clicks it (no popup block). */
+const openUrl = ref('')
 
 const startFolder = computed(() => getStartFolder(props.publishPath))
 const defaultName = computed(() => getDefaultDocName(props.publishPath, props.title, props.name))
@@ -87,6 +89,13 @@ async function onPublishClick() {
 			.setMultiSelect(false)
 			.allowDirectories(true)
 			.setMimeTypeFilter(['httpd/unix-directory'])
+			// With allowDirectories the picker hands the current folder to the
+			// callback when no row is selected, and pick() resolves its path.
+			.addButton({
+				label: 'Publish here',
+				variant: 'primary',
+				callback: () => {},
+			})
 			.startAt(startFolder.value)
 			.build()
 		chosenFolder = await picker.pick()
@@ -99,15 +108,12 @@ async function onPublishClick() {
 	}
 
 	publishing.value = true
+	openUrl.value = ''
 	try {
 		const result = await publish(props.fileId, chosenFolder, defaultName.value)
 		showSuccess(`Published to ${result.path}`)
-		emit('publish', result.path)
+		openUrl.value = result.openUrl || ''
 		emit('published', result.path)
-		emit('update:publishPath', result.path)
-		if (result.openUrl) {
-			window.open(result.openUrl, '_blank')
-		}
 	} catch (error) {
 		showError(error.message || 'Could not publish document')
 	} finally {
@@ -117,7 +123,15 @@ async function onPublishClick() {
 </script>
 
 <template>
-	<NcButton :disabled="publishing" @click="onPublishClick">
-		Publish to Doc
-	</NcButton>
+	<span class="publish-button">
+		<NcButton :disabled="publishing" @click="onPublishClick">
+			Publish to Doc
+		</NcButton>
+		<a
+			v-if="openUrl"
+			class="publish-open-link"
+			:href="openUrl"
+			target="_blank"
+			rel="noopener">Open document</a>
+	</span>
 </template>

@@ -15,6 +15,23 @@ vi.mock('../../../src/api/outlines.js', () => ({
 	saveOutline: vi.fn(),
 }))
 
+const scheduleSpy = vi.fn()
+vi.mock('../../../src/editor/saver.js', async (importOriginal) => {
+	const actual = await importOriginal()
+	return {
+		...actual,
+		createSaver: (...args) => {
+			const saver = actual.createSaver(...args)
+			const schedule = saver.schedule.bind(saver)
+			saver.schedule = (doc) => {
+				scheduleSpy(doc)
+				return schedule(doc)
+			}
+			return saver
+		},
+	}
+})
+
 vi.mock('../../../src/components/OutlineEditor.vue', () => ({
 	default: {
 		props: ['history'],
@@ -31,7 +48,7 @@ vi.mock('../../../src/components/PublishButton.vue', () => ({
 	default: {
 		name: 'PublishButton',
 		props: ['fileId', 'publishPath', 'name', 'title'],
-		emits: ['publish', 'published'],
+		emits: ['published'],
 		template: '<div class="publish-button-stub" />',
 	},
 }))
@@ -151,5 +168,17 @@ describe('OutlineView autosave conflict flow', () => {
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
 			publishPath: '/Documents/Plan.odt',
 		}), 'etag-1')
+	})
+
+	it('schedules exactly one save per publish', async () => {
+		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-2' })
+		wrapper = mount(OutlineView, { props: { fileId: 3 } })
+		await flushPromises()
+		scheduleSpy.mockClear()
+		const publishBtn = wrapper.findComponent({ name: 'PublishButton' })
+		publishBtn.vm.$emit('published', '/Documents/Plan.odt')
+		await flushPromises()
+		expect(scheduleSpy).toHaveBeenCalledTimes(1)
+		expect(scheduleSpy).toHaveBeenCalledWith(expect.objectContaining({ publishPath: '/Documents/Plan.odt' }))
 	})
 })

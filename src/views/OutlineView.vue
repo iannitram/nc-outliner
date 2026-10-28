@@ -207,7 +207,6 @@ watch(() => props.fileId, load)
 					:publishPath="document?.publishPath ?? null"
 					:name="name"
 					:title="title"
-					@publish="onPublished"
 					@published="onPublished" />
 			</div>
 			<button v-if="history.current().length === 0" type="button" @click="addFirstRow">
