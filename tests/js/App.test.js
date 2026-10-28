@@ -46,6 +46,26 @@ describe('App', () => {
 		wrapper.unmount()
 	})
 
+	it('mounts the dialog host in a body-level theme provider, outside the app', async () => {
+		// Drop the setup host so only the one App renders is found.
+		document.getElementById('nc-outliner-dialogs')?.remove()
+		const mountPoint = document.createElement('div')
+		mountPoint.id = 'content'
+		document.body.append(mountPoint)
+		getSettings.mockResolvedValueOnce({ theme: 'dark' })
+		const wrapper = mount(App, { attachTo: mountPoint })
+		await flushPromises()
+
+		const host = document.body.querySelector('#nc-outliner-dialogs')
+		const provider = host.parentElement
+		expect(provider.parentElement).toBe(document.body)
+		expect(provider.hasAttribute('data-theme-dark')).toBe(true)
+		expect(mountPoint.contains(host)).toBe(false)
+		expect(host.closest('#content')).toBeNull()
+		wrapper.unmount()
+		mountPoint.remove()
+	})
+
 	it('follows Nextcloud for Auto by setting neither dark nor light theme attribute', async () => {
 		getSettings.mockResolvedValueOnce({ theme: 'auto' })
 		const wrapper = mount(App)
