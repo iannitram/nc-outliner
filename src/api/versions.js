@@ -4,7 +4,7 @@
  * as the signed-in user: nobody else's versions can be reached. There is no server code of ours.
  *
  * @typedef {{id: string, time: number, label: string, size: number}} Version
- *   `time` is milliseconds since 1970. The newest entry is the file as it is now: it
+ *   `time` is milliseconds since 1970. The entry whose time equals the file's own modified time is the live file; it
  *   lists and restores like the others, but reading it by id answers 404 (read the file itself).
  */
 

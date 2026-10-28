@@ -1,10 +1,12 @@
 <script setup>
 import { showSuccess } from '@nextcloud/dialogs'
+import { NcButton } from '@nextcloud/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConflictDialog from '../components/ConflictDialog.vue'
 import OutlineEditor from '../components/OutlineEditor.vue'
 import PublishButton from '../components/PublishButton.vue'
 import SaveStatus from '../components/SaveStatus.vue'
+import VersionsPanel from '../components/VersionsPanel.vue'
 import { readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
 import { createHistory } from '../model/history.js'
@@ -20,6 +22,7 @@ const history = ref(null)
 const title = computed(() => document.value?.title || name.value)
 const saveStatus = ref('saved')
 const conflictOpen = ref(false)
+const versionsOpen = ref(false)
 let saver = null
 let unsubscribe = null
 let currentDocument = null
@@ -137,6 +140,23 @@ async function keepCopy() {
 }
 
 /**
+ * Save pending edits before a version is restored over the file.
+ *
+ * @return {Promise<boolean>} true when nothing unsaved is left
+ */
+async function flushBeforeRestore() {
+	await saver?.flush()
+	return !saver?.isDirty()
+}
+
+/**
+ * Reload the outline and its etag after a restore, through the normal load path.
+ */
+async function reloadAfterRestore() {
+	await load()
+}
+
+/**
  *
  */
 function onVisibilityChange() {
@@ -218,6 +238,9 @@ watch(() => props.fileId, load)
 					:title="title"
 					:beforePublish="flushPendingSave"
 					@published="onPublished" />
+				<NcButton @click="versionsOpen = true">
+					Versions
+				</NcButton>
 			</div>
 			<button v-if="history.current().length === 0" type="button" @click="addFirstRow">
 				Add first row
@@ -229,6 +252,12 @@ watch(() => props.fileId, load)
 			:name="name"
 			@reload="reloadAfterConflict"
 			@keepCopy="keepCopy" />
+		<VersionsPanel
+			:fileId="props.fileId"
+			:open="versionsOpen"
+			:flush="flushBeforeRestore"
+			:reload="reloadAfterRestore"
+			@close="versionsOpen = false" />
 	</section>
 </template>
 

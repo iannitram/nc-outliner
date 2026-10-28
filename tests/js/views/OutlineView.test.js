@@ -2,7 +2,8 @@ import { showSuccess } from '@nextcloud/dialogs'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OutlineView from '../../../src/views/OutlineView.vue'
-import { readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
+import { listOutlines, readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
+import { listVersions, restoreVersion } from '../../../src/api/versions.js'
 
 vi.mock('@nextcloud/dialogs', () => ({
 	showSuccess: vi.fn(),
@@ -10,10 +11,27 @@ vi.mock('@nextcloud/dialogs', () => ({
 }))
 
 vi.mock('../../../src/api/outlines.js', () => ({
+	listOutlines: vi.fn(),
 	readOutline: vi.fn(),
 	saveCopy: vi.fn(),
 	saveOutline: vi.fn(),
 }))
+
+vi.mock('../../../src/api/versions.js', () => ({
+	listVersions: vi.fn(),
+	readVersion: vi.fn(),
+	restoreVersion: vi.fn(),
+	nameVersion: vi.fn(),
+}))
+
+/**
+ * @param {import('@vue/test-utils').VueWrapper} wrapper mounted view
+ * @param {string} text the button's text
+ * @return {import('@vue/test-utils').DOMWrapper} the button
+ */
+function buttonLabelled(wrapper, text) {
+	return wrapper.findAll('button').find((button) => button.text() === text)
+}
 
 const scheduleSpy = vi.fn()
 vi.mock('../../../src/editor/saver.js', async (importOriginal) => {
@@ -81,7 +99,7 @@ describe('OutlineView autosave conflict flow', () => {
 	it('keeps the captured outline id for the copy and releases the dirty navigation barrier', async () => {
 		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
 		await flushPromises()
-		await wrapper.get('button').trigger('click')
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
 		await vi.advanceTimersByTimeAsync(1500)
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({ rows: [expect.objectContaining({ text: 'Edited' })] }), 'etag-1')
 		expect(wrapper.text()).toContain('Changed elsewhere')
@@ -97,7 +115,7 @@ describe('OutlineView autosave conflict flow', () => {
 		saveOutline.mockRejectedValue(Error('offline'))
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })
 		await flushPromises()
-		await wrapper.get('button').trigger('click')
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
 		await vi.advanceTimersByTimeAsync(1500)
 		await expect(wrapper.vm.beforeLeave()).resolves.toBe(false)
 		await expect(readOutline).toHaveBeenCalledTimes(1)
@@ -112,7 +130,7 @@ describe('OutlineView autosave conflict flow', () => {
 		})
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })
 		await flushPromises()
-		await wrapper.get('button').trigger('click')
+		await buttonLabelled(wrapper, 'Add first row').trigger('click')
 		await vi.advanceTimersByTimeAsync(1500)
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
 			rows: [expect.objectContaining({ text: '', children: [] })],
@@ -122,7 +140,7 @@ describe('OutlineView autosave conflict flow', () => {
 	it('shows a success toast after keepCopy succeeds', async () => {
 		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
 		await flushPromises()
-		await wrapper.get('button').trigger('click')
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
 		await vi.advanceTimersByTimeAsync(1500)
 		const copyButton = Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent.includes('Keep mine as a copy'))
 		copyButton.click()
@@ -135,7 +153,7 @@ describe('OutlineView autosave conflict flow', () => {
 		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-2' })
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })
 		await flushPromises()
-		await wrapper.get('button').trigger('click')
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
 		expect(saveOutline).not.toHaveBeenCalled()
 		window.dispatchEvent(new Event('pagehide'))
 		await flushPromises()
@@ -148,7 +166,7 @@ describe('OutlineView autosave conflict flow', () => {
 		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-2' })
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })
 		await flushPromises()
-		await wrapper.get('button').trigger('click')
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
 		expect(saveOutline).not.toHaveBeenCalled()
 		Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
 		document.dispatchEvent(new Event('visibilitychange'))
@@ -156,6 +174,31 @@ describe('OutlineView autosave conflict flow', () => {
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
 			rows: [expect.objectContaining({ text: 'Edited' })],
 		}), 'etag-1')
+	})
+
+	it('restores a version through the view: the outline reloads with its new etag, and that etag is used for the next save', async () => {
+		listVersions.mockResolvedValue([
+			{ id: '300', time: Date.parse('2026-10-28T17:51:38Z'), label: '', size: 3 },
+			{ id: '100', time: Date.parse('2026-10-28T17:51:02Z'), label: '', size: 3 },
+		])
+		listOutlines.mockResolvedValue([{ fileId: 3, name: 'Untitled', mtime: Date.parse('2026-10-28T17:51:38Z') / 1000 }])
+		restoreVersion.mockResolvedValue()
+		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-4' })
+		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
+		await flushPromises()
+		readOutline.mockResolvedValueOnce({ fileId: 3, name: 'Plan.opml', etag: 'etag-3', outline: initialOutline })
+
+		await buttonLabelled(wrapper, 'Versions').trigger('click')
+		await flushPromises()
+		const restore = Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Restore')
+		restore.click()
+		await flushPromises()
+
+		expect(restoreVersion).toHaveBeenCalledWith(3, '100')
+		expect(readOutline).toHaveBeenCalledTimes(2)
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(saveOutline).toHaveBeenCalledWith(3, expect.anything(), 'etag-3')
 	})
 
 	it('saves outline when PublishButton emits a new publishPath', async () => {
