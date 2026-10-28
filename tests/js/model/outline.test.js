@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { indent, insertAfter, moveDown, moveUp, outdent, remove, sortRows, updateRow } from '../../../src/model/outline.js'
+import { indent, insertAfter, moveDown, moveTo, moveUp, outdent, remove, sortRows, updateRow } from '../../../src/model/outline.js'
 
 function startTree() {
 	return [
@@ -274,5 +274,57 @@ describe('outline model operations', () => {
 		expect(sortRows(tree, 'text')).toBe(tree)
 		expect(sortRows(tree, 'unknown')).toBe(tree)
 		expect(sortRows(tree, 'text', 'sideways')).toBe(tree)
+	})
+})
+
+describe('moveTo', () => {
+	it('reorders a row among its siblings', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = moveTo(tree, 'C', null, 0)
+		expect(rowIds(result)).toEqual([['C', []], ['A', [['A1', []], ['A2', []]]], ['B', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('nests a row under a new parent with its children', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = moveTo(tree, 'B', 'A', 2)
+		expect(rowIds(result)).toEqual([['A', [['A1', []], ['A2', []], ['B', []]]], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('moves a nested row to the top level', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = moveTo(tree, 'A1', null, 1)
+		expect(rowIds(result)).toEqual([['A', [['A2', []]]], ['A1', []], ['B', []], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('carries a row and all its children to a new place', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = moveTo(tree, 'A', 'B', 0)
+		expect(rowIds(result)).toEqual([['B', [['A', [['A1', []], ['A2', []]]]]], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('returns the input tree when the parent is the row or inside its subtree', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		expect(moveTo(tree, 'A', 'A', 0)).toBe(tree)
+		expect(moveTo(tree, 'A', 'A1', 0)).toBe(tree)
+		expect(tree).toEqual(before)
+	})
+
+	it('returns the input tree for a missing row, a missing parent or an unchanged move', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		expect(moveTo(tree, 'nope', null, 0)).toBe(tree)
+		expect(moveTo(tree, 'B', 'nope', 0)).toBe(tree)
+		expect(moveTo(tree, 'B', null, 1)).toBe(tree)
+		expect(moveTo(tree, 'A1', 'A', 0)).toBe(tree)
+		expect(tree).toEqual(before)
 	})
 })
