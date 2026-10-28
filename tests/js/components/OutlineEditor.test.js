@@ -428,4 +428,24 @@ describe('OutlineEditor', () => {
 		expect(execute).not.toHaveBeenCalled()
 		expect(history.current()).toBe(initialTree)
 	})
+
+	it('adds a note through the row UI, then hides and shows it through History', async () => {
+		const history = createHistory([
+			{ id: 'r1', text: 'Row', note: '', collapsed: false, noteHidden: false, children: [] },
+		])
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		await wrapper.get('.outline-row__note-toggle').trigger('click')
+		await wrapper.get('textarea[data-note-id="r1"]').setValue('My note')
+		expect(history.current()[0].note).toBe('My note')
+
+		await wrapper.get('.outline-row__note-toggle').trigger('click')
+		expect(history.current()[0].noteHidden).toBe(true)
+		expect(history.current()[0].note).toBe('My note')
+		expect(wrapper.find('textarea[data-note-id="r1"]').exists()).toBe(false)
+
+		await wrapper.get('.outline-row__note-toggle').trigger('click')
+		expect(history.current()[0].noteHidden).toBe(false)
+		expect(wrapper.get('textarea[data-note-id="r1"]').element.value).toBe('My note')
+	})
 })

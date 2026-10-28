@@ -95,7 +95,7 @@ final class OpmlCodec {
 		$extra = [];
 		foreach ($element->attributes as $attribute) {
 			$uri = $attribute->namespaceURI;
-			if (($uri === null && in_array($attribute->nodeName, ['text', '_note'], true)) || ($uri === self::NS && in_array($attribute->localName, ['id', 'collapsed'], true)) || str_starts_with($attribute->nodeName, 'xmlns')) {
+			if (($uri === null && in_array($attribute->nodeName, ['text', '_note'], true)) || ($uri === self::NS && in_array($attribute->localName, ['id', 'collapsed', 'noteHidden'], true)) || str_starts_with($attribute->nodeName, 'xmlns')) {
 				continue;
 			}
 			if ($uri !== null && $attribute->prefix !== 'xml') {
@@ -111,6 +111,7 @@ final class OpmlCodec {
 			$element->getAttributeNS(self::NS, 'collapsed') === 'true',
 			$children,
 			$extra,
+			$element->getAttributeNS(self::NS, 'noteHidden') === 'true',
 		);
 	}
 
@@ -172,6 +173,9 @@ final class OpmlCodec {
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
 		}
+		if ($row->noteHidden) {
+			$outline->setAttributeNS(self::NS, 'nco:noteHidden', 'true');
+		}
 		// Namespace declarations belong to each row: siblings can bind the same
 		// prefix to different URIs without changing the imported attribute names.
 		foreach ($row->extra as $name => $value) {
@@ -186,7 +190,7 @@ final class OpmlCodec {
 			if (str_contains($name, ':')) {
 				[$prefix, $localName] = explode(':', $name, 2);
 				$uri = $prefix === 'xml' ? 'http://www.w3.org/XML/1998/namespace' : ($prefix === 'nco' ? self::NS : ($row->extra['xmlns:' . $prefix] ?? null));
-				if ($uri === self::NS && in_array($localName, ['id', 'collapsed'], true)) {
+				if ($uri === self::NS && in_array($localName, ['id', 'collapsed', 'noteHidden'], true)) {
 					continue;
 				}
 				if ($uri !== null) {
