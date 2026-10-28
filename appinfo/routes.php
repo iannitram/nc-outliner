@@ -9,5 +9,6 @@ return [
 		['name' => 'outline#show', 'url' => '/api/outlines/{fileId}', 'verb' => 'GET'],
 		['name' => 'outline#update', 'url' => '/api/outlines/{fileId}', 'verb' => 'PUT'],
 		['name' => 'outline#copy', 'url' => '/api/outlines/{fileId}/copy', 'verb' => 'POST'],
+		['name' => 'publish#publish', 'url' => '/api/outlines/{fileId}/publish', 'verb' => 'POST'],
 	],
 ];
