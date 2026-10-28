@@ -4,6 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OutlineView from '../../../src/views/OutlineView.vue'
 import { publish, readOutline, saveOutline } from '../../../src/api/outlines.js'
 
+if (typeof globalThis.ResizeObserver === 'undefined') {
+	globalThis.ResizeObserver = class {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	}
+}
+
 const pickMock = vi.fn()
 const builderMock = {
 	setMultiSelect: vi.fn().mockReturnThis(),
@@ -90,7 +98,7 @@ describe('OutlineView Publish flushes the pending autosave first (#170)', () => 
 		await flushPromises()
 		await buttonWithText(wrapper, 'Edit outline').trigger('click')
 		// Publish within the 1.5 s autosave debounce window: no save has started yet.
-		await buttonWithText(wrapper, 'Publish to Doc').trigger('click')
+		await buttonWithText(wrapper, 'Publish').trigger('click')
 		await vi.waitFor(() => expect(publish).toHaveBeenCalledTimes(1))
 
 		expect(calls).toEqual(['save', 'saved', 'publish'])
@@ -107,7 +115,7 @@ describe('OutlineView Publish flushes the pending autosave first (#170)', () => 
 		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
 		await flushPromises()
 		await buttonWithText(wrapper, 'Edit outline').trigger('click')
-		await buttonWithText(wrapper, 'Publish to Doc').trigger('click')
+		await buttonWithText(wrapper, 'Publish').trigger('click')
 		await vi.waitFor(() => expect(showError).toHaveBeenCalledWith(SAVE_FAILED_MESSAGE))
 
 		expect(saveOutline).toHaveBeenCalledTimes(1)

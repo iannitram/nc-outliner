@@ -12,18 +12,16 @@ describe('ThemeSetting.vue', () => {
 		vi.clearAllMocks()
 	})
 
-	it('shows Auto, Light, and Dark options and displays current value', () => {
+	it('shows Follow Nextcloud, Light, and Dark radios and displays current value', () => {
 		const wrapper = mount(ThemeSetting, {
 			props: { modelValue: 'auto' },
 		})
 
-		const select = wrapper.get('select[aria-label="Theme"]')
-		expect(select.element.value).toBe('auto')
-
-		const options = wrapper.findAll('option')
+		const options = wrapper.findAll('input[type="radio"]')
 		expect(options).toHaveLength(3)
-		expect(options.map((opt) => opt.text())).toEqual(['Auto', 'Light', 'Dark'])
+		expect(wrapper.findAll('label').map((label) => label.text())).toEqual(['Follow Nextcloud', 'Light', 'Dark'])
 		expect(options.map((opt) => opt.element.value)).toEqual(['auto', 'light', 'dark'])
+		expect(wrapper.get('input[value="auto"]').element.checked).toBe(true)
 	})
 
 	it('saves the choice and emits update:modelValue when Dark is selected', async () => {
@@ -32,7 +30,7 @@ describe('ThemeSetting.vue', () => {
 			props: { modelValue: 'auto' },
 		})
 
-		await wrapper.get('select[aria-label="Theme"]').setValue('dark')
+		await wrapper.get('input[value="dark"]').setValue()
 		await flushPromises()
 
 		expect(setSettings).toHaveBeenCalledWith('dark')
@@ -46,31 +44,32 @@ describe('ThemeSetting.vue', () => {
 			props: { modelValue: 'auto' },
 		})
 
-		await wrapper.get('select[aria-label="Theme"]').setValue('light')
+		await wrapper.get('input[value="light"]').setValue()
 		await flushPromises()
 
 		expect(setSettings).toHaveBeenCalledWith('light')
 		expect(wrapper.emitted('update:modelValue')).toEqual([['light']])
 	})
 
-	it('reverts the select and displays an error message when saving fails', async () => {
+	it('reverts the radios and displays an error message when saving fails', async () => {
 		setSettings.mockRejectedValueOnce(new Error('Network error'))
 		const wrapper = mount(ThemeSetting, {
 			props: { modelValue: 'auto' },
 		})
 
-		await wrapper.get('select[aria-label="Theme"]').setValue('dark')
+		await wrapper.get('input[value="dark"]').setValue()
 		await flushPromises()
 
 		expect(setSettings).toHaveBeenCalledWith('dark')
 		expect(wrapper.emitted('update:modelValue')).toBeUndefined()
-		expect(wrapper.get('select[aria-label="Theme"]').element.value).toBe('auto')
+		expect(wrapper.get('input[value="auto"]').element.checked).toBe(true)
+		expect(wrapper.get('input[value="dark"]').element.checked).toBe(false)
 		const alert = wrapper.get('[role="alert"]')
 		expect(alert.text()).toContain('Could not save the theme setting.')
 		expect(wrapper.emitted('error')).toHaveLength(1)
 	})
 
-	it('disables the select when disabled prop is true or while saving is pending', async () => {
+	it('disables the radios when disabled prop is true or while saving is pending', async () => {
 		let finishSave
 		setSettings.mockReturnValueOnce(new Promise((resolve) => {
 			finishSave = resolve
@@ -80,17 +79,17 @@ describe('ThemeSetting.vue', () => {
 			props: { modelValue: 'auto', disabled: false },
 		})
 
-		expect(wrapper.get('select').element.disabled).toBe(false)
+		expect(wrapper.get('input[value="dark"]').element.disabled).toBe(false)
 
-		await wrapper.get('select').setValue('dark')
-		expect(wrapper.get('select').element.disabled).toBe(true)
+		await wrapper.get('input[value="dark"]').setValue()
+		expect(wrapper.get('input[value="dark"]').element.disabled).toBe(true)
 
 		finishSave({ theme: 'dark' })
 		await flushPromises()
 
-		expect(wrapper.get('select').element.disabled).toBe(false)
+		expect(wrapper.get('input[value="dark"]').element.disabled).toBe(false)
 
 		await wrapper.setProps({ disabled: true })
-		expect(wrapper.get('select').element.disabled).toBe(true)
+		expect(wrapper.get('input[value="dark"]').element.disabled).toBe(true)
 	})
 })

@@ -1,16 +1,16 @@
 <script setup>
 import { showSuccess } from '@nextcloud/dialogs'
-import { NcButton } from '@nextcloud/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConflictDialog from '../components/ConflictDialog.vue'
 import OutlineEditor from '../components/OutlineEditor.vue'
-import PublishButton from '../components/PublishButton.vue'
-import SaveStatus from '../components/SaveStatus.vue'
+import OutlineTopBar from '../components/OutlineTopBar.vue'
+import SortDialog from '../components/SortDialog.vue'
+import StatusLine from '../components/StatusLine.vue'
 import VersionsPanel from '../components/VersionsPanel.vue'
 import { exportOpml, readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
 import { createHistory } from '../model/history.js'
-import { newRow } from '../model/outline.js'
+import { sortRows } from '../model/outline.js'
 
 const props = defineProps({ fileId: { type: Number, required: true } })
 const loading = ref(true)
@@ -23,6 +23,8 @@ const title = computed(() => document.value?.title || name.value)
 const saveStatus = ref('saved')
 const conflictOpen = ref(false)
 const versionsOpen = ref(false)
+const sortOpen = ref(false)
+const publishedOpenUrl = ref('')
 let saver = null
 let unsubscribe = null
 let currentDocument = null
@@ -53,6 +55,7 @@ async function load({ discardLocal = false, fileId = props.fileId } = {}) {
 			return
 		}
 		conflictOpen.value = false
+		publishedOpenUrl.value = ''
 		name.value = result.name
 		etag.value = result.etag
 		saveStatus.value = 'saved'
@@ -186,18 +189,25 @@ async function beforeLeave() {
  * Update the publish path and trigger autosave.
  *
  * @param {string} newPath published document path
+ * @param {string} openUrl URL to open the published document
  */
-function onPublished(newPath) {
+function onPublished(newPath, openUrl = '') {
 	if (currentDocument) {
+		publishedOpenUrl.value = openUrl
 		currentDocument = { ...currentDocument, publishPath: newPath }
 		document.value = currentDocument
 		saver?.schedule(currentDocument)
 	}
 }
 
-/** Create the first root row for a valid empty outline. */
-function addFirstRow() {
-	history.value?.execute((rows) => [...rows, newRow()], [])
+/**
+ * Sort every level through History, so one undo reverses it.
+ *
+ * @param {{by: 'text'|'status'|'note', direction: 'asc'|'desc'}} choice the dialog's choice
+ */
+function applySort({ by, direction }) {
+	history.value?.execute(sortRows, [by, direction])
+	sortOpen.value = false
 }
 
 /** @return {Promise<object|null>} OPML including the current unsaved edits */
@@ -224,7 +234,10 @@ onUnmounted(() => {
 	unsubscribe?.()
 	void saver?.flush().finally(() => saver?.destroy())
 })
-watch(() => props.fileId, load)
+watch(() => props.fileId, () => {
+	sortOpen.value = false
+	load()
+})
 </script>
 
 <template>
@@ -236,44 +249,63 @@ watch(() => props.fileId, load)
 			{{ error }}
 		</p>
 		<template v-if="!loading && history">
-			<div class="outline-header">
-				<h2>{{ title }}</h2>
-				<SaveStatus :status="saveStatus" />
-				<PublishButton
-					:fileId="props.fileId"
-					:publishPath="document?.publishPath ?? null"
-					:name="name"
-					:title="title"
-					:beforePublish="flushPendingSave"
-					@published="onPublished" />
-				<NcButton @click="versionsOpen = true">
-					Versions
-				</NcButton>
-			</div>
-			<button v-if="history.current().length === 0" type="button" @click="addFirstRow">
-				Add first row
-			</button>
-			<OutlineEditor v-if="history" :history="history" />
+			<OutlineTopBar
+				:title="title"
+				:fileId="props.fileId"
+				:publishPath="document?.publishPath ?? null"
+				:name="name"
+				:beforePublish="flushPendingSave"
+				@published="onPublished"
+				@openVersions="versionsOpen = true"
+				@openSort="sortOpen = true" />
+			<OutlineEditor v-if="history" :history="history" class="outline-editor" />
+			<SortDialog
+				:open="sortOpen"
+				@close="sortOpen = false"
+				@sort="applySort" />
+			<ConflictDialog
+				:open="conflictOpen"
+				:name="name"
+				@reload="reloadAfterConflict"
+				@keepCopy="keepCopy" />
+			<VersionsPanel
+				:fileId="props.fileId"
+				:open="versionsOpen"
+				:flush="flushBeforeRestore"
+				:reload="reloadAfterRestore"
+				@close="versionsOpen = false" />
+			<StatusLine
+				:status="saveStatus"
+				:openUrl="publishedOpenUrl"
+				:rows="document?.rows ?? []"
+				:publishPath="document?.publishPath ?? null" />
 		</template>
-		<ConflictDialog
-			:open="conflictOpen"
-			:name="name"
-			@reload="reloadAfterConflict"
-			@keepCopy="keepCopy" />
-		<VersionsPanel
-			:fileId="props.fileId"
-			:open="versionsOpen"
-			:flush="flushBeforeRestore"
-			:reload="reloadAfterRestore"
-			@close="versionsOpen = false" />
 	</section>
 </template>
 
 <style scoped>
-.outline-view { width: 100%; }
-.outline-header {
+.outline-view {
+	width: 100%;
+	height: 100%;
 	display: flex;
-	align-items: center;
-	gap: 12px;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.outline-top-bar,
+:deep(.outline-top-bar) {
+	flex: none;
+}
+
+.outline-editor,
+:deep(.outline-editor) {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+}
+
+.status-line,
+:deep(.status-line) {
+	flex: none;
 }
 </style>

@@ -27,6 +27,21 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 |---|---|---|---|
 | | *(nothing yet)* | | |
 
+### Approved O1 design polish
+
+These refinements of existing features are in [PR #199](https://github.com/iannitram/nc-outliner/pull/199); they do not change the broader feature stages below.
+
+| Issue | Refinement | Stage |
+|---|---|---|
+| #182 | Inline notes and note icon | PR |
+| #188 | Empty-outline placeholder and keyboard card | PR |
+| #189 | Sort rows dialog, Escape and outline-change dismissal | PR |
+| #184 | Publish picker, feedback and status-line document link | PR |
+| #187 | Theme radios in Outliner settings | PR |
+| #190 | Container width, wrapped rows and touch controls | PR |
+
+---
+
 ## Unwritten
 
 | Rank | ID | Feature | Complexity | Notes (dependencies) |
