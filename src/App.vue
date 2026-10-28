@@ -88,6 +88,11 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 				<OutlineList v-else @open="openOutline" />
 			</NcAppContent>
 		</NcContent>
+		<Teleport to="body">
+			<NcThemeProvider :dark="theme === 'dark'" :light="theme === 'light'">
+				<div id="nc-outliner-dialogs" />
+			</NcThemeProvider>
+		</Teleport>
 	</NcThemeProvider>
 </template>
 
