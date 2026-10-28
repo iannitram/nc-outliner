@@ -304,7 +304,7 @@ All browser code lives under `src/` (ES modules, Vue 3 `<script setup>`, Nextclo
 
 | | |
 |---|---|
-| File | `src/model/outline.js` (present; every function below except `moveTo`, which is planned for #98) |
+| File | `src/model/outline.js` (present) |
 | Tests | `tests/js/model/outline.test.js` (present) |
 | Owns | The tree and every change to it, as pure functions. Each returns a new tree, leaves its input unchanged, and moves a row's children with it. An operation that cannot apply (indent the first row, move the last row down) returns the input tree itself (`===`), which History reads as "no change" |
 | Issues | #86 `insertAfter`, `remove`, `moveUp`, `moveDown` · #104 `indent`, `outdent` · #105 `updateRow` (all merged) · #98 adds `moveTo` |

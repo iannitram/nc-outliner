@@ -3,7 +3,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OutlineEditor from '../../../src/components/OutlineEditor.vue'
 import * as keymap from '../../../src/editor/keymap.js'
 import { createHistory } from '../../../src/model/history.js'
-import { updateRow } from '../../../src/model/outline.js'
+import { moveTo, updateRow } from '../../../src/model/outline.js'
+
+function stubRowHeight(element, height = 30) {
+	vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
+		top: 0,
+		bottom: height,
+		height,
+		left: 0,
+		right: 100,
+		width: 100,
+		x: 0,
+		y: 0,
+		toJSON: () => ({}),
+	})
+}
+
+async function dragAndDrop(wrapper, sourceId, targetId, fraction) {
+	const handle = wrapper.find(`[data-row-id="${sourceId}"] .outline-row__handle`)
+	const line = wrapper.find(`[data-row-id="${targetId}"] .outline-row__line`)
+	stubRowHeight(line.element)
+	const dataTransfer = {
+		effectAllowed: 'none',
+		dropEffect: 'none',
+		setData: vi.fn(),
+		getData: vi.fn(),
+	}
+	const clientY = 30 * fraction
+	await handle.trigger('dragstart', { dataTransfer })
+	await line.trigger('dragover', { clientY, dataTransfer })
+	await line.trigger('drop', { clientY, dataTransfer })
+	await wrapper.vm.$nextTick()
+}
 
 describe('OutlineEditor', () => {
 	let wrapper
@@ -317,6 +348,85 @@ describe('OutlineEditor', () => {
 		await wrapper.get('select').setValue('note')
 		await wrapper.findAll('button')[0].trigger('click')
 		expect(wrapper.findAll('button')[0].text()).toContain('Descending')
+	})
+
+	it('drops a row before another row as one undoable move', async () => {
+		const history = createHistory([
+			{ id: 'r1', text: 'One', note: '', collapsed: false, children: [] },
+			{ id: 'r2', text: 'Two', note: '', collapsed: false, children: [] },
+			{ id: 'r3', text: 'Three', note: '', collapsed: false, children: [] },
+		])
+		const execute = vi.spyOn(history, 'execute')
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		await dragAndDrop(wrapper, 'r3', 'r1', 0.1)
+
+		expect(execute).toHaveBeenCalledWith(moveTo, ['r3', null, 0])
+		expect(history.current().map((row) => row.id)).toEqual(['r3', 'r1', 'r2'])
+		history.undo()
+		expect(history.current().map((row) => row.id)).toEqual(['r1', 'r2', 'r3'])
+	})
+
+	it('drops a row after another row as one undoable move', async () => {
+		const history = createHistory([
+			{ id: 'r1', text: 'One', note: '', collapsed: false, children: [] },
+			{ id: 'r2', text: 'Two', note: '', collapsed: false, children: [] },
+			{ id: 'r3', text: 'Three', note: '', collapsed: false, children: [] },
+		])
+		const execute = vi.spyOn(history, 'execute')
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		await dragAndDrop(wrapper, 'r1', 'r2', 0.9)
+
+		expect(execute).toHaveBeenCalledWith(moveTo, ['r1', null, 1])
+		expect(history.current().map((row) => row.id)).toEqual(['r2', 'r1', 'r3'])
+		history.undo()
+		expect(history.current().map((row) => row.id)).toEqual(['r1', 'r2', 'r3'])
+	})
+
+	it('drops a row into the middle of another row to nest it and leaves that row collapsed', async () => {
+		const history = createHistory([
+			{
+				id: 'r1',
+				text: 'Parent',
+				note: '',
+				collapsed: true,
+				children: [{ id: 'r2', text: 'Child', note: '', collapsed: false, children: [] }],
+			},
+			{ id: 'r3', text: 'Other', note: '', collapsed: false, children: [] },
+		])
+		const execute = vi.spyOn(history, 'execute')
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		await dragAndDrop(wrapper, 'r3', 'r1', 0.5)
+
+		expect(execute).toHaveBeenCalledWith(moveTo, ['r3', 'r1', 1])
+		expect(history.current()[0].collapsed).toBe(true)
+		expect(history.current()[0].children.map((row) => row.id)).toEqual(['r2', 'r3'])
+		expect(history.current().map((row) => row.id)).toEqual(['r1'])
+		history.undo()
+		expect(history.current().map((row) => row.id)).toEqual(['r1', 'r3'])
+	})
+
+	it('ignores a drop onto the dragged row or its own subtree', async () => {
+		const initialTree = [
+			{
+				id: 'r1',
+				text: 'Parent',
+				note: '',
+				collapsed: false,
+				children: [{ id: 'r2', text: 'Child', note: '', collapsed: false, children: [] }],
+			},
+			{ id: 'r3', text: 'Other', note: '', collapsed: false, children: [] },
+		]
+		const history = createHistory(initialTree)
+		const execute = vi.spyOn(history, 'execute')
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		await dragAndDrop(wrapper, 'r1', 'r2', 0.5)
+
+		expect(execute).not.toHaveBeenCalled()
+		expect(history.current()).toBe(initialTree)
 	})
 
 	it('adds a note through the row UI, then hides and shows it through History', async () => {
