@@ -12,6 +12,7 @@ import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 
 const outlinesUrl = generateUrl('/apps/nc_outliner/api/outlines')
+const settingsUrl = generateUrl('/apps/nc_outliner/api/settings')
 
 /** @return {Promise<OutlineEntry[]>} */
 export async function listOutlines() {
@@ -54,5 +55,22 @@ export async function saveOutline(fileId, outline, etag) {
 /** @param {number} fileId @param {OutlineDoc} outline @return {Promise<{fileId: number, name: string, etag: string}>} */
 export async function saveCopy(fileId, outline) {
 	const response = await axios.post(`${outlinesUrl}/${fileId}/copy`, { outline })
+	return response.data
+}
+
+/**
+ * @return {Promise<{theme: 'auto'|'light'|'dark'}>}
+ */
+export async function getSettings() {
+	const response = await axios.get(settingsUrl)
+	return response.data
+}
+
+/**
+ * @param {'auto'|'light'|'dark'} theme user theme preference
+ * @return {Promise<{theme: 'auto'|'light'|'dark'}>}
+ */
+export async function setSettings(theme) {
+	const response = await axios.put(settingsUrl, { theme })
 	return response.data
 }

@@ -229,6 +229,19 @@ describe('outline model operations', () => {
 		expect(tree).toEqual(before)
 	})
 
+	it('updates noteHidden and returns the input tree when it is unchanged', () => {
+		const tree = [
+			{ id: 'n', text: 'N', note: 'A note', collapsed: false, noteHidden: false, children: [] },
+		]
+		const before = structuredClone(tree)
+
+		const hidden = updateRow(tree, 'n', { noteHidden: true })
+		expect(hidden[0].noteHidden).toBe(true)
+		expect(hidden[0].note).toBe('A note')
+		expect(tree).toEqual(before)
+		expect(updateRow(tree, 'n', { noteHidden: false })).toBe(tree)
+	})
+
 	it('sorts siblings by topic without separating their children or changing the input', () => {
 		const tree = [
 			{ id: 'b', text: 'beta', note: '', collapsed: false, children: [

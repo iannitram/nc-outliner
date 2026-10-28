@@ -1,10 +1,11 @@
+import { NcThemeProvider } from '@nextcloud/vue'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 import ConflictDialog from '../../../src/components/ConflictDialog.vue'
 
 let wrapper
 
-// NcDialog teleports its content to document.body, so look there, not in wrapper.html().
+// Query the attached DOM so the checks also cover teleported content.
 function show(props) {
 	wrapper = mount(ConflictDialog, { props, attachTo: document.body })
 	return wrapper
@@ -21,6 +22,23 @@ afterEach(() => {
 })
 
 describe('ConflictDialog', () => {
+	it.each(['dark', 'light'])('keeps the open dialog inside the forced %s theme', async (theme) => {
+		wrapper = mount({
+			components: { NcThemeProvider, ConflictDialog },
+			props: ['theme', 'open'],
+			template: `<NcThemeProvider :dark="theme === 'dark'" :light="theme === 'light'">
+				<ConflictDialog :open="open" name="Trip plan" />
+			</NcThemeProvider>`,
+		}, { props: { theme, open: false }, attachTo: document.body })
+
+		await wrapper.setProps({ open: true })
+
+		const provider = wrapper.get(`[data-theme-${theme}]`).element
+		const dialog = document.body.querySelector('[role="dialog"]')
+		expect(dialog).not.toBeNull()
+		expect(dialog.closest(`[data-theme-${theme}]`)).toBe(provider)
+	})
+
 	it('1. with open true, shows the outline name and both buttons', () => {
 		show({ open: true, name: 'Trip plan' })
 

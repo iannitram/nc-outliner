@@ -47,12 +47,13 @@ describe('OutlineView autosave conflict flow', () => {
 	afterEach(() => {
 		wrapper?.unmount()
 		wrapper = undefined
+		document.body.innerHTML = ''
 		vi.useRealTimers()
 		Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
 	})
 
 	it('keeps the captured outline id for the copy and releases the dirty navigation barrier', async () => {
-		wrapper = mount(OutlineView, { props: { fileId: 3 } })
+		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
 		await flushPromises()
 		await wrapper.get('button').trigger('click')
 		await vi.advanceTimersByTimeAsync(1500)
@@ -93,7 +94,7 @@ describe('OutlineView autosave conflict flow', () => {
 	})
 
 	it('shows a success toast after keepCopy succeeds', async () => {
-		wrapper = mount(OutlineView, { props: { fileId: 3 } })
+		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
 		await flushPromises()
 		await wrapper.get('button').trigger('click')
 		await vi.advanceTimersByTimeAsync(1500)

@@ -24,7 +24,7 @@ final class OutlineStoreFolderEdgeTest extends TestCase {
 	private function store(Folder $home): OutlineStore {
 		$root = $this->createMock(IRootFolder::class);
 		$root->method('getUserFolder')->with('alice')->willReturn($home);
-		return new OutlineStore($root, new OpmlCodec());
+		return new OutlineStore($root, new OpmlCodec(), $this->createMock(\OCP\Lock\ILockingProvider::class));
 	}
 
 	public function testAlreadyExistsRaceReturnsWinningFolder(): void {
