@@ -215,4 +215,21 @@ describe('OutlineEditor', () => {
 		expect(wrapper.find('.slot-bullet').text()).toBe('dot')
 		expect(wrapper.find('.slot-note').text()).toBe('my note')
 	})
+
+	it('sorts rows through shared history so the change can be undone', async () => {
+		const history = createHistory([
+			{ id: 'b', text: 'Beta', note: '', collapsed: false, children: [] },
+			{ id: 'a', text: 'Alpha', note: '', collapsed: false, children: [] },
+		])
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		await wrapper.get('button:last-child').trigger('click')
+		expect(history.current().map((row) => row.id)).toEqual(['a', 'b'])
+		history.undo()
+		expect(history.current().map((row) => row.id)).toEqual(['b', 'a'])
+
+		await wrapper.get('select').setValue('note')
+		await wrapper.findAll('button')[0].trigger('click')
+		expect(wrapper.findAll('button')[0].text()).toContain('Descending')
+	})
 })
