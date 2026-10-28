@@ -325,8 +325,8 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 	text-overflow: ellipsis;
 }
 
+/* #197: the open entry sits on Nextcloud's primary highlight; use its text colour for contrast */
 :deep(.active) .outline-entry-date {
-	color: inherit;
-	opacity: 0.8;
+	color: var(--color-primary-element-text);
 }
 </style>
