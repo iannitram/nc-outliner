@@ -60,6 +60,7 @@ flowchart LR
         View --> Status[SaveStatus.vue]
         View --> Conflict[ConflictDialog.vue]
         View --> Versions[VersionsPanel.vue]
+        Versions --> VClient[api/versions.js]
         View --> Publish[PublishButton.vue]
         App --> Theme[ThemeSetting.vue]
         List --> Client
@@ -73,14 +74,12 @@ flowchart LR
         PS --> Store
         PS --> Writer[Odt/ContentWriter]
         PS --> Pkg[Odt/OdtPackage]
-        VC[VersionController] --> VS[Service/VersionService]
-        VS --> FV[(Files Versions app)]
         SC[SettingsController] --> Cfg[(user config)]
     end
     Client -->|JSON over /apps/nc_outliner/api| OC
     Publish --> PC
-    Versions --> VC
     Theme --> SC
+    VClient -->|WebDAV, remote.php/dav/versions| FV[(Files Versions app)]
 ```
 
 ## Data shapes
@@ -237,10 +236,7 @@ All routes are under `/apps/nc_outliner/api`, take and return JSON, and are `#[N
 | `POST /outlines/{fileId}/copy` | `{outline}` | `201 {fileId, name, etag}` · `404` · `400 {message}` as for `PUT` | #108 |
 | `POST /outlines/import` | multipart `file` | `201 {fileId, name, etag}` · `422 {message}` | #27 |
 | `GET /settings` · `PUT /settings` | `{theme}` (`PUT` only) | `200 {theme}` · `400 {message}` for a value other than `auto`, `light` or `dark` | #109 (merged in #151) |
-| `GET /outlines/{fileId}/versions` | | `200 [{versionId, mtime, size, label}]` | #4 |
-| `GET /outlines/{fileId}/versions/{versionId}` | | `200 {outline}` (read-only) | #4 |
-| `POST /outlines/{fileId}/versions/{versionId}/restore` | | `200 {etag}` | #4 |
-| `PUT /outlines/{fileId}/versions/{versionId}/label` | `{label}` | `200 {label}` | #4 |
+| Versions | | No routes: the browser uses WebDAV, see [Versions](#versions) and ADR 0004 | #4 |
 | `POST /outlines/{fileId}/publish` | `{folder, name}` | `200 {fileId, path, openUrl}` | #113 |
 
 ### Theme setting
@@ -262,11 +258,19 @@ Overlay audit: `src/` has no other `NcDialog`, `NcModal`, `NcPopover`, `NcAction
 
 | | |
 |---|---|
-| Files | `lib/Service/VersionService.php`, `lib/Controller/VersionController.php` (planned) |
-| Owns | An outline's versions: list with times, read one, restore one, label one so it is kept. Built on Nextcloud's own file versions (the Files Versions app), never a copy of our own |
-| Issue | #4 (server), #111 (panel) |
+| Files | `src/api/versions.js` (present), `tests/js/api/versions.test.js` (present). No PHP: no `VersionService`, no `VersionController`, no route |
+| Owns | An outline's versions: list with times, read one, restore one, name one so it is kept. Built on Nextcloud's own file versions (the Files Versions app), never a copy of our own |
+| Issue | #4 (client and ADR), #111 (panel) |
+| Decision | [ADR 0004](docs/adr/0004-versions-api.md): the browser talks WebDAV to `remote.php/dav/versions/<user>/versions/<fileId>` as the Files app does; labels are the `nc:version-label` property |
 
-Two ways in, to be settled in #4 and written down as an ADR: the Files Versions app's PHP API (`OCA\Files_Versions\Versions\IVersionManager`) behind our routes, or the browser talking WebDAV to `remote.php/dav/versions/<user>/versions/<fileId>` the way the Files app's own versions tab does (labels are a WebDAV property there). Restore must leave the current state findable as a version (SPEC M10); check what Nextcloud 33 does on restore before adding anything.
+```js
+listVersions(fileId): Promise<{ id, time, label, size }[]>   // newest first; time in ms; the newest entry is the current file
+readVersion(fileId, id): Promise<string>                      // GET; read-only
+restoreVersion(fileId, id): Promise<void>                     // MOVE to restore/target; Nextcloud keeps the pre-restore state as a version
+nameVersion(fileId, id, label): Promise<void>                 // PROPPATCH; '' un-names
+```
+
+Restore keeps the current state as a version (SPEC M10) with nothing added, but that version is not named, so a size purge or an admin max age can still remove it; the panel may offer to name it. Named versions survive `versions:expire`. Details and the observed outputs are in the ADR.
 
 ### Import
 
@@ -349,8 +353,8 @@ Trees are immutable, so an entry is the tree before the change. Typing uses `mer
 
 | | |
 |---|---|
-| File | `src/api/outlines.js` (present) |
-| Tests | `tests/js/api/outlines.test.js` (present; mocks axios) |
+| Files | `src/api/outlines.js` (present), `src/api/versions.js` (present, WebDAV; see [Versions](#versions)) |
+| Tests | `tests/js/api/outlines.test.js`, `tests/js/api/versions.test.js` (present; mock axios) |
 | Owns | The HTTP calls to [the API](#api), with `@nextcloud/axios` (adds the request token) and `@nextcloud/router` `generateUrl('/apps/nc_outliner/api/...')` |
 | Issue | #106 (outline calls; merged). #96 (settings calls), #4, #27 and #113's browser side add their own calls here |
 | Called by | OutlineList, OutlineView, Saver |
@@ -456,10 +460,11 @@ What we bring in rather than write, and where it fits. New npm packages are adde
 | `@nextcloud/vue` | Every component (NcContent, NcAppNavigation, NcListItem, NcButton, NcDialog, NcCheckboxRadioSwitch, NcActions) | in `package.json` |
 | `@nextcloud/vite-config`, `@nextcloud/eslint-config` | Build and lint | in `package.json` |
 | `@nextcloud/dialogs` | The Publish folder picker (`getFilePickerBuilder`) and toasts (`showError`, `showSuccess`) | in `package.json` |
-| `@nextcloud/files` | File info and the WebDAV root, if versions go through WebDAV (#4) | in `package.json` |
+| `@nextcloud/auth` | The signed-in user's id for the versions WebDAV path (#4) | in `package.json` |
+| `@nextcloud/files` | File info and the WebDAV root | in `package.json` |
 | `@nextcloud/axios`, `@nextcloud/router` | The browser API client (#106): request token and app URLs | in `package.json` |
 | PHP `DOMDocument` (ext-dom), `XMLWriter`, `ZipArchive` (ext-zip) | OPML parse, `content.xml`, the `.odt` zip. Nextcloud already requires these extensions | built in |
-| Files Versions app | Versions and version labels (#4) | ships with Nextcloud |
+| Files Versions app | Versions and version labels, over WebDAV (#4, ADR 0004) | ships with Nextcloud |
 | Nextcloud Office (richdocuments) | Opens the published `.odt` (#9): open the file through the Files app with `openfile=true`; check the exact URL on Nextcloud 33 | installed on the server |
 | `sortablejs` (the drag library Nextcloud Tasks uses) | Candidate for drag (#98). Nesting by drop position is our own logic either way, through `moveTo`; native pointer events are the alternative | decide in #98 |
 | TipTap (Nextcloud Text's editor) | After 1.0 only, for rich text (F15). Not in 1.0 | after-1.0 |

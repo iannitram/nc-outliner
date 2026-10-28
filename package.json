@@ -14,6 +14,7 @@
     "test:php": "node tests/tools/php.mjs test"
   },
   "dependencies": {
+    "@nextcloud/auth": "^2.6.0",
     "@nextcloud/axios": "^2.6.0",
     "@nextcloud/dialogs": "^7.5.0",
     "@nextcloud/files": "^4.1.1",
