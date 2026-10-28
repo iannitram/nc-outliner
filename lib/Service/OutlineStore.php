@@ -153,37 +153,43 @@ final class OutlineStore implements IOutlineStore {
 	 * @throws NotFoundException when fileId is not found or not an outline
 	 */
 	public function save(string $uid, int $fileId, Outline $outline, string $ifMatch): string {
+		// Resolved before the lock only to check the file exists and to name the
+		// lock; its etag may already be stale once we hold the lock.
 		$file = $this->getOutlineFile($uid, $fileId);
-		$key = 'nc_outliner/save/' . $file->getId();
+		$key = 'nc_outliner/save/' . $fileId;
 
 		try {
 			$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, $file->getPath());
 		} catch (LockedException) {
-			throw new ConflictException($this->currentEtagOr($file, $ifMatch));
+			throw new ConflictException($this->freshEtagOr($uid, $fileId, $ifMatch));
 		}
 
 		try {
-			$currentEtag = $file->getEtag();
+			// A node's etag comes from the FileInfo loaded when it was resolved, so
+			// look the file up again now that no other save can write in between.
+			$current = $this->getOutlineFile($uid, $fileId);
+			$currentEtag = $current->getEtag();
 
 			if ($currentEtag !== $ifMatch) {
 				throw new ConflictException($currentEtag);
 			}
 
 			$xml = $this->codec->write($outline);
-			$file->putContent($xml);
+			$current->putContent($xml);
 
-			return $file->getEtag();
+			// The written node may keep its old FileInfo; read the new etag fresh.
+			return $this->getOutlineFile($uid, $fileId)->getEtag();
 		} catch (LockedException) {
 			// Locked by something else, e.g. the sync client or Files.
-			throw new ConflictException($this->currentEtagOr($file, $ifMatch));
+			throw new ConflictException($this->freshEtagOr($uid, $fileId, $ifMatch));
 		} finally {
 			$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
 		}
 	}
 
-	private function currentEtagOr(File $file, string $fallback): string {
+	private function freshEtagOr(string $uid, int $fileId, string $fallback): string {
 		try {
-			return $file->getEtag();
+			return $this->getOutlineFile($uid, $fileId)->getEtag();
 		} catch (\Throwable) {
 			return $fallback;
 		}

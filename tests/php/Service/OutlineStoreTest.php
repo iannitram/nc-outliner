@@ -411,6 +411,76 @@ final class OutlineStoreTest extends TestCase {
 		$this->assertSame([], $locks->held);
 	}
 
+	public function testSaveComparesIfMatchWithFreshEtagReadAfterTakingTheLock(): void {
+		// The node resolved before the lock still reports the etag from before
+		// another save wrote; the lookup after the lock sees the current one.
+		$beforeLock = $this->outlineFileMock('etag-old');
+		$afterLock = $this->outlineFileMock('etag-new');
+		$beforeLock->expects($this->never())->method('putContent');
+		$afterLock->expects($this->never())->method('putContent');
+		$locks = new FakeLockingProvider();
+		$store = $this->storeOverNodeSequence([$beforeLock, $afterLock], $locks);
+
+		try {
+			$store->save('alice', 42, new Outline('Plan', []), 'etag-old');
+			$this->fail('Expected ConflictException: the etag read after the lock is newer');
+		} catch (ConflictException $e) {
+			$this->assertSame('etag-new', $e->currentEtag);
+		}
+		$this->assertSame([], $locks->held);
+	}
+
+	public function testSaveReturnsPostWriteEtagFromFreshLookup(): void {
+		$beforeLock = $this->outlineFileMock('etag-1');
+		// The node written to keeps its cached FileInfo, so it still says etag-1.
+		$written = $this->outlineFileMock('etag-1');
+		$written->expects($this->once())->method('putContent')->with($this->isType('string'));
+		$afterWrite = $this->outlineFileMock('etag-2');
+		$afterWrite->expects($this->never())->method('putContent');
+		$store = $this->storeOverNodeSequence([$beforeLock, $written, $afterWrite]);
+
+		$etag = $store->save('alice', 42, new Outline('Plan', []), 'etag-1');
+
+		$this->assertSame('etag-2', $etag);
+	}
+
+	/** @return File&\PHPUnit\Framework\MockObject\MockObject */
+	private function outlineFileMock(string $etag): File {
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(42);
+		$file->method('getName')->willReturn('Plan.opml');
+		$file->method('getPath')->willReturn('/alice/files/Outlines/Plan.opml');
+		$file->method('getEtag')->willReturn($etag);
+		return $file;
+	}
+
+	/**
+	 * A store whose Outlines folder returns the given nodes for id 42 in turn,
+	 * one per getById() call, repeating the last one after that.
+	 *
+	 * @param list<File> $nodes
+	 */
+	private function storeOverNodeSequence(array $nodes, ?FakeLockingProvider $locks = null): OutlineStore {
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$userFolder = $this->createMock(Folder::class);
+		$outlinesFolder = $this->createMock(Folder::class);
+
+		$rootFolder->method('getUserFolder')->with('alice')->willReturn($userFolder);
+		$userFolder->method('nodeExists')->with('Outlines')->willReturn(true);
+		$userFolder->method('get')->with('Outlines')->willReturn($outlinesFolder);
+
+		$call = 0;
+		$outlinesFolder->method('getById')->with(42)->willReturnCallback(
+			function () use ($nodes, &$call): array {
+				$node = $nodes[min($call, count($nodes) - 1)];
+				$call++;
+				return [$node];
+			},
+		);
+
+		return new OutlineStore($rootFolder, new OpmlCodec(), $locks ?? new FakeLockingProvider());
+	}
+
 	private \ArrayObject $nodeLocked;
 
 	/**
