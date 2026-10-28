@@ -24,10 +24,10 @@ final class PublishService {
 
 	/** @return array{fileId: int, path: string, openUrl: string} */
 	public function publish(string $uid, int $outlineFileId, string $folderPath, string $name): array {
-		if (str_contains($folderPath, '\\') || preg_match('~(^|/)\.\.(/|$)~', $folderPath) === 1) {
+		if (str_contains($folderPath, '\\') || preg_match('~(^|/)\.\.(/|$)~', $folderPath) === 1 || preg_match('/[\x00-\x1f\x7f]/', $folderPath) === 1) {
 			throw new \InvalidArgumentException('Choose a folder inside your Files');
 		}
-		if ($name === '' || strpbrk($name, "\\/:*?\"<>|") !== false || str_ends_with($name, '.') || str_ends_with($name, ' ')) {
+		if ($name === '' || strpbrk($name, "\\/:*?\"<>|") !== false || preg_match('/[\x00-\x1f\x7f]/', $name) === 1 || str_ends_with($name, '.') || str_ends_with($name, ' ')) {
 			throw new \InvalidArgumentException('Name contains invalid characters');
 		}
 		$baseName = str_ends_with(strtolower($name), '.odt') ? substr($name, 0, -4) : $name;

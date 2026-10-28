@@ -56,7 +56,7 @@ final class PublishServiceTest extends TestCase {
 		$user->method('get')->willReturnCallback(static fn (string $path) => $path === 'Documents' ? $folder : $userFile);
 		$store->method('read')->willReturn(['outline' => new Outline('Plan')]);
 		$service = new PublishService($root, $store, new ContentWriter(), new OdtPackage(), $urls);
-		foreach ([['../Other', 'Plan'], ['Documents', 'bad/name']] as [$path, $name]) {
+		foreach ([['../Other', 'Plan'], ['Documents', 'bad/name'], ["bad\0folder", 'Plan'], ['Documents', "bad\nname"]] as [$path, $name]) {
 			try {
 				$service->publish('alice', 5, $path, $name);
 				$this->fail('Expected invalid publish target');

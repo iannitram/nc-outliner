@@ -6,6 +6,8 @@ namespace OCA\NcOutliner\Controller;
 
 use OCA\NcOutliner\AppInfo\Application;
 use OCA\NcOutliner\Service\PublishService;
+use OCA\NcOutliner\Service\NotFoundException;
+use OCA\NcOutliner\Opml\OpmlParseException;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
@@ -39,6 +41,14 @@ final class PublishController extends Controller {
 			), Http::STATUS_OK);
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (\OCP\Files\InvalidPathException $e) {
+			return new JSONResponse(['message' => 'Choose a valid document path'], Http::STATUS_BAD_REQUEST);
+		} catch (NotFoundException $e) {
+			return new JSONResponse(['message' => 'Outline not found'], Http::STATUS_NOT_FOUND);
+		} catch (\OCP\Files\NotPermittedException $e) {
+			return new JSONResponse(['message' => 'You cannot publish to this folder'], Http::STATUS_FORBIDDEN);
+		} catch (OpmlParseException $e) {
+			return new JSONResponse(['message' => 'The source outline is invalid'], Http::STATUS_UNPROCESSABLE_ENTITY);
 		}
 	}
 }
