@@ -154,13 +154,13 @@ final class OpmlCodec {
 		$body = $document->createElement('body');
 		$opml->appendChild($body);
 		foreach ($outline->rows as $row) {
-			$this->writeRow($document, $body, $row, $opml);
+			$this->writeRow($document, $body, $row);
 		}
 		
 		return $document->saveXML();
 	}
 
-	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row, \DOMElement $root): void {
+	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row): void {
 		$outline = $document->createElement('outline');
 		$parent->appendChild($outline);
 		// Let DOM handle escaping properly
@@ -198,7 +198,7 @@ final class OpmlCodec {
 		}
 		
 		foreach ($row->children as $child) {
-			$this->writeRow($document, $outline, $child, $root);
+			$this->writeRow($document, $outline, $child);
 		}
 		
 	}
