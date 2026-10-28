@@ -19,7 +19,7 @@ const NC = 'http://nextcloud.org/ns'
  *
  */
 function root() {
-	return `${generateRemoteUrl('dav')}/versions/${getCurrentUser().uid}`
+	return `${generateRemoteUrl('dav')}/versions/${encodeURIComponent(getCurrentUser().uid)}`
 }
 
 /**
@@ -57,7 +57,7 @@ function okProp(response, ns, name) {
 export async function listVersions(fileId) {
 	const response = await axios.request({
 		method: 'PROPFIND',
-		url: `${root()}/versions/${fileId}`,
+		url: `${root()}/versions/${encodeURIComponent(fileId)}`,
 		headers: { Depth: '1', 'Content-Type': 'application/xml' },
 		data: `<?xml version="1.0"?>
 <d:propfind xmlns:d="DAV:" xmlns:nc="${NC}"><d:prop><d:getlastmodified/><d:getcontentlength/><nc:version-label/></d:prop></d:propfind>`,
@@ -88,7 +88,7 @@ export async function listVersions(fileId) {
  * @return {Promise<string>}
  */
 export async function readVersion(fileId, id) {
-	const response = await axios.get(`${root()}/versions/${fileId}/${id}`, {
+	const response = await axios.get(`${root()}/versions/${encodeURIComponent(fileId)}/${encodeURIComponent(id)}`, {
 		responseType: 'text',
 		transformResponse: [(data) => data],
 	})
@@ -106,7 +106,7 @@ export async function readVersion(fileId, id) {
 export async function restoreVersion(fileId, id) {
 	await axios.request({
 		method: 'MOVE',
-		url: `${root()}/versions/${fileId}/${id}`,
+		url: `${root()}/versions/${encodeURIComponent(fileId)}/${encodeURIComponent(id)}`,
 		headers: { Destination: `${root()}/restore/target` },
 	})
 }
@@ -122,7 +122,7 @@ export async function restoreVersion(fileId, id) {
 export async function nameVersion(fileId, id, label) {
 	await axios.request({
 		method: 'PROPPATCH',
-		url: `${root()}/versions/${fileId}/${id}`,
+		url: `${root()}/versions/${encodeURIComponent(fileId)}/${encodeURIComponent(id)}`,
 		headers: { 'Content-Type': 'application/xml' },
 		data: `<?xml version="1.0"?>
 <d:propertyupdate xmlns:d="DAV:" xmlns:nc="${NC}"><d:set><d:prop><nc:version-label>${escapeXml(label)}</nc:version-label></d:prop></d:set></d:propertyupdate>`,
