@@ -64,6 +64,14 @@ const props = defineProps({
 		type: String,
 		default: '',
 	},
+	/**
+	 * Saves pending edits; resolves false when they could not be saved.
+	 * Publish reads the server's copy, so it must not run after a failed save.
+	 */
+	beforePublish: {
+		type: Function,
+		default: null,
+	},
 })
 
 const emit = defineEmits(['published'])
@@ -110,6 +118,10 @@ async function onPublishClick() {
 	publishing.value = true
 	openUrl.value = ''
 	try {
+		if (props.beforePublish && !(await props.beforePublish())) {
+			showError('Could not save your latest changes, so nothing was published. Try again.')
+			return
+		}
 		const result = await publish(props.fileId, chosenFolder, defaultName.value)
 		showSuccess(`Published to ${result.path}`)
 		openUrl.value = result.openUrl || ''

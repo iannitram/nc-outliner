@@ -107,6 +107,18 @@ describe('outlines API client', () => {
 		await expect(publish(7, 'InvalidFolder', 'Plan')).rejects.toThrow('Destination folder does not exist')
 	})
 
+	it('surfaces the server message when publish returns 403, 423 or 503', async () => {
+		const cases = [
+			[403, 'Cannot save the document in this folder. It may be read-only.'],
+			[423, 'The document is locked by another user or process. Try again later.'],
+			[503, 'The storage for this folder is unavailable. Try again later.'],
+		]
+		for (const [status, message] of cases) {
+			axios.post.mockRejectedValueOnce({ response: { status, data: { message } } })
+			await expect(publish(7, 'Documents', 'Plan')).rejects.toThrow(message)
+		}
+	})
+
 	it('surfaces outline not found when publish returns 404', async () => {
 		axios.post.mockRejectedValue({
 			response: { status: 404, data: {} },
