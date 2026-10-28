@@ -2,7 +2,7 @@
 import { nextTick, onUnmounted, provide, ref, watch } from 'vue'
 import OutlineRow from './OutlineRow.vue'
 import * as keymap from '../editor/keymap.js'
-import { updateRow } from '../model/outline.js'
+import { sortRows, updateRow } from '../model/outline.js'
 
 const props = defineProps({
 	history: {
@@ -15,6 +15,8 @@ const rootRef = ref(null)
 const tree = ref(props.history.current())
 const activeRowId = ref(null)
 const caretPos = ref(0)
+const sortBy = ref('text')
+const sortDirection = ref('asc')
 const inputRefs = new Map()
 
 let unsubscribe = null
@@ -130,6 +132,16 @@ function handleFocus(row, event) {
 	caretPos.value = event.target.selectionStart ?? 0
 }
 
+/** Apply the chosen permanent sort through History so it can be undone. */
+function applySort() {
+	props.history.execute(sortRows, [sortBy.value, sortDirection.value])
+}
+
+/** Switch between ascending and descending order. */
+function toggleSortDirection() {
+	sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+}
+
 provide('outlineEditor', {
 	onInput: handleInput,
 	onKeydown: handleKeydown,
@@ -156,14 +168,32 @@ defineExpose({
 		ref="rootRef"
 		class="outline-editor"
 		role="tree">
-		<OutlineRow
-			v-for="row in tree"
-			:key="row.id"
-			:row="row">
-			<template v-for="(_, name) in $slots" #[name]="slotProps">
-				<slot :name="name" v-bind="slotProps" />
-			</template>
-		</OutlineRow>
+		<div class="outline-sort" role="group" aria-label="Sort outline rows">
+			<label>
+				Sort rows by
+				<select v-model="sortBy" aria-label="Sort rows by">
+					<option value="text">Topic</option>
+					<option value="status">Status</option>
+					<option value="note">Note</option>
+				</select>
+			</label>
+			<button type="button" @click="toggleSortDirection">
+				{{ sortDirection === 'asc' ? 'Ascending' : 'Descending' }}
+			</button>
+			<button type="button" @click="applySort">
+				Sort rows
+			</button>
+		</div>
+		<div role="tree">
+			<OutlineRow
+				v-for="row in tree"
+				:key="row.id"
+				:row="row">
+				<template v-for="(_, name) in $slots" #[name]="slotProps">
+					<slot :name="name" v-bind="slotProps" />
+				</template>
+			</OutlineRow>
+		</div>
 	</div>
 </template>
 
@@ -174,5 +204,18 @@ defineExpose({
 	width: 100%;
 	display: flex;
 	flex-direction: column;
+}
+
+.outline-sort {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem;
+}
+
+.outline-sort label {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
 }
 </style>
