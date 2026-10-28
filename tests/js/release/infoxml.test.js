@@ -7,11 +7,11 @@ import { describe, expect, it } from 'vitest'
 const xml = readFileSync(resolve(process.cwd(), 'appinfo/info.xml'), 'utf8')
 
 function tag(name) {
-	const m = xml.match(new RegExp(String.raw`<${name}>\s*([^<]*?)\s*</${name}>`))
+	const m = xml.match(new RegExp('<' + name + '>\\s*([^<]*?)\\s*</' + name + '>'))
 	return m ? m[1] : null
 }
 function attrs(name) {
-	const m = xml.match(new RegExp(String.raw`<${name}\b([^>]*)/?>`))
+	const m = xml.match(new RegExp('<' + name + '\\b([^>]*)/?>'))
 	if (!m) {
 		return null
 	}
