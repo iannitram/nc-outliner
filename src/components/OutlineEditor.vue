@@ -372,7 +372,10 @@ defineExpose({
 </template>
 
 <style scoped>
+/* Level bands: the server's theme colour mixed into the background (ADR 0003 heading levels). */
 .outline-editor {
+	--band-1: color-mix(in srgb, var(--color-primary-element) 9%, var(--color-main-background));
+	--band-2: color-mix(in srgb, var(--color-primary-element) 4%, var(--color-main-background));
 	background-color: var(--color-main-background);
 	color: var(--color-main-text);
 	width: 100%;
@@ -381,6 +384,29 @@ defineExpose({
 	flex: 1;
 	min-height: 0;
 	overflow: auto;
+}
+
+[data-themes*=dark] .outline-editor,
+body[data-theme-dark] .outline-editor,
+[data-theme-dark] .outline-editor {
+	--band-1: color-mix(in srgb, var(--color-primary-element) 13%, var(--color-main-background));
+	--band-2: color-mix(in srgb, var(--color-primary-element) 6%, var(--color-main-background));
+}
+
+/* Nextcloud's "default" theme follows the system setting. */
+@media (prefers-color-scheme: dark) {
+	[data-themes*=default] .outline-editor,
+	body[data-theme-default] .outline-editor {
+		--band-1: color-mix(in srgb, var(--color-primary-element) 13%, var(--color-main-background));
+		--band-2: color-mix(in srgb, var(--color-primary-element) 6%, var(--color-main-background));
+	}
+
+	/* A provider forced to light wins over the system setting (same specificity, later). */
+	body [data-theme-light] .outline-editor,
+	[data-theme-light] .outline-editor {
+		--band-1: color-mix(in srgb, var(--color-primary-element) 9%, var(--color-main-background));
+		--band-2: color-mix(in srgb, var(--color-primary-element) 4%, var(--color-main-background));
+	}
 }
 
 .outline-sort {
