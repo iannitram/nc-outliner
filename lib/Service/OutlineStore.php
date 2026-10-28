@@ -10,6 +10,8 @@ use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException as OcpNotFoundException;
+use OCP\Files\NotPermittedException;
+use OCP\Files\AlreadyExistsException;
 
 /**
  * OutlineStore service: manages the user's Outlines/ folder and .opml outline files.
@@ -33,12 +35,28 @@ final class OutlineStore implements IOutlineStore {
 				if ($folder instanceof Folder) {
 					return $folder;
 				}
+				throw new FolderConflictException();
 			} catch (OcpNotFoundException) {
 				// Recreate below if disappeared
 			}
 		}
 
-		return $userFolder->newFolder('Outlines');
+		try {
+			return $userFolder->newFolder('Outlines');
+		} catch (NotPermittedException|AlreadyExistsException $e) {
+			// Another request may have created the folder after nodeExists().
+			try {
+				$folder = $userFolder->get('Outlines');
+			} catch (OcpNotFoundException) {
+				throw $e;
+			}
+
+			if ($folder instanceof Folder) {
+				return $folder;
+			}
+
+			throw new FolderConflictException();
+		}
 	}
 
 	/**
