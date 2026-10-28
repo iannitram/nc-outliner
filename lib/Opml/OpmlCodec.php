@@ -41,6 +41,16 @@ final class OpmlCodec {
 
 		$title = $head === null ? '' : ($this->childElement($head, 'title')?->textContent ?? '');
 		$publishPath = $head === null ? null : $this->namespacedChildText($head, 'publishPath');
+		$headExtra = [];
+		if ($head !== null) {
+			foreach ($head->childNodes as $child) {
+				if ($child instanceof \DOMElement && !(($child->namespaceURI === null && $child->localName === 'title') || ($child->namespaceURI === self::NS && $child->localName === 'publishPath'))) {
+					$copy = new \DOMDocument();
+					$copy->appendChild($copy->importNode($child, true));
+					$headExtra[] = (string)$copy->saveXML($copy->documentElement);
+				}
+			}
+		}
 		$rows = [];
 		foreach ($body->childNodes as $child) {
 			if ($child instanceof \DOMElement && $child->localName === 'outline') {
@@ -48,7 +58,7 @@ final class OpmlCodec {
 			}
 		}
 
-		return new Outline($title, $rows, $publishPath);
+		return new Outline($title, $rows, $publishPath, $headExtra);
 	}
 
 	private function childElement(\DOMElement $parent, string $name): ?\DOMElement {
@@ -82,6 +92,17 @@ final class OpmlCodec {
 		$id = $element->hasAttributeNS(self::NS, 'id')
 			? $element->getAttributeNS(self::NS, 'id')
 			: bin2hex(random_bytes(8));
+		$extra = [];
+		foreach ($element->attributes as $attribute) {
+			$uri = $attribute->namespaceURI;
+			if (($uri === null && in_array($attribute->nodeName, ['text', '_note'], true)) || ($uri === self::NS && in_array($attribute->localName, ['id', 'collapsed'], true)) || str_starts_with($attribute->nodeName, 'xmlns')) {
+				continue;
+			}
+			if ($uri !== null && $attribute->prefix !== 'xml') {
+				$extra['xmlns:' . $attribute->prefix] = $uri;
+			}
+			$extra[$attribute->nodeName] = $attribute->value;
+		}
 
 		return new Row(
 			$id,
@@ -89,6 +110,7 @@ final class OpmlCodec {
 			$element->getAttribute('_note'),
 			$element->getAttributeNS(self::NS, 'collapsed') === 'true',
 			$children,
+			$extra,
 		);
 	}
 
@@ -111,20 +133,36 @@ final class OpmlCodec {
 			$publishPath->textContent =$outline->publishPath;
 			$head->appendChild($publishPath);
 		}
+		foreach ($outline->headExtra as $xml) {
+			$extraDocument = new \DOMDocument();
+			$previous = libxml_use_internal_errors(true);
+			try {
+				$loaded = $extraDocument->loadXML($xml, LIBXML_NONET);
+			} finally {
+				libxml_clear_errors();
+				libxml_use_internal_errors($previous);
+			}
+			$element = $extraDocument->documentElement;
+			if (!$loaded || $extraDocument->doctype !== null || $element === null || ($element->namespaceURI === null && $element->localName === 'title') || ($element->namespaceURI === self::NS && $element->localName === 'publishPath')) {
+				continue;
+			}
+			$head->appendChild($document->importNode($element, true));
+		}
 		
 		$opml->appendChild($head);
 		
 		$body = $document->createElement('body');
+		$opml->appendChild($body);
 		foreach ($outline->rows as $row) {
 			$this->writeRow($document, $body, $row);
 		}
-		$opml->appendChild($body);
 		
 		return $document->saveXML();
 	}
 
 	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row): void {
 		$outline = $document->createElement('outline');
+		$parent->appendChild($outline);
 		// Let DOM handle escaping properly
 		$outline->setAttribute('text', $row->text);
 		if ($row->note !== '') {
@@ -134,11 +172,34 @@ final class OpmlCodec {
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
 		}
+		// Namespace declarations belong to each row: siblings can bind the same
+		// prefix to different URIs without changing the imported attribute names.
+		foreach ($row->extra as $name => $value) {
+			if (str_starts_with($name, 'xmlns:') && !in_array(substr($name, 6), ['nco', 'xml'], true)) {
+				$outline->setAttributeNS('http://www.w3.org/2000/xmlns/', $name, $value);
+			}
+		}
+		foreach ($row->extra as $name => $value) {
+			if (str_starts_with($name, 'xmlns')) {
+				continue;
+			}
+			if (str_contains($name, ':')) {
+				[$prefix, $localName] = explode(':', $name, 2);
+				$uri = $prefix === 'xml' ? 'http://www.w3.org/XML/1998/namespace' : ($prefix === 'nco' ? self::NS : ($row->extra['xmlns:' . $prefix] ?? null));
+				if ($uri === self::NS && in_array($localName, ['id', 'collapsed'], true)) {
+					continue;
+				}
+				if ($uri !== null) {
+					$outline->setAttributeNS($uri, $name, $value);
+				}
+			} elseif (!in_array($name, ['text', '_note'], true)) {
+				$outline->setAttribute($name, $value);
+			}
+		}
 		
 		foreach ($row->children as $child) {
 			$this->writeRow($document, $outline, $child);
 		}
 		
-		$parent->appendChild($outline);
 	}
 }

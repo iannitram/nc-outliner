@@ -252,6 +252,12 @@ All routes are under `/apps/nc_outliner/api`, take and return JSON, and are `#[N
 | Owns | The per-user theme override, `auto` (default), `light` or `dark`, in user config (`IConfig::getUserValue($uid, 'nc_outliner', 'theme', 'auto')`). A stored value outside the three reads back as `auto` |
 | Issue | #109 (server; merged in #151), #96 (browser) |
 
+Nextcloud 33 and `@nextcloud/vue` provide `NcThemeProvider` to enforce themes for UI subtrees. In `@nextcloud/vue` components and Nextcloud 33 stylesheets, themes are scoped via `[data-theme-dark]`, `[data-theme-light]`, and `[data-themes*=...]` selectors while providing `INJECTION_KEY_THEME` for `useIsDarkTheme`. `App.vue` wraps the application in `<NcThemeProvider :dark="theme === 'dark'" :light="theme === 'light'">`. When `theme` is `'auto'`, neither `dark` nor `light` is passed, so the app follows Nextcloud's ambient theme and system `prefers-color-scheme`. When `'dark'` or `'light'` is selected, `NcThemeProvider` enforces the theme scope on child elements and components. All colors in the app are derived from Nextcloud CSS theme variables without hardcoded literals.
+
+Dialog overlays are mounted inside the provider (`:container="null"` on `ConflictDialog.vue`'s `NcDialog`, forwarded to `NcModal`) so a forced theme reaches them.
+
+Overlay audit: `src/` has no other `NcDialog`, `NcModal`, `NcPopover`, `NcActions`, `NcSelect`, or direct teleport. `OutlineView.vue` also calls `@nextcloud/dialogs`' `showSuccess`: this global toast remains outside the provider and follows Nextcloud's theme. It has no in-place `container: null` option; its documented testing `selector` option creates a separate Vue toast manager on each call, so moving it requires managing a separate toast host and lifecycle rather than the dialog's in-place mounting fix. Keeping the global manager lets the copy confirmation survive outline navigation. `ThemeSetting.vue` uses a native select, whose browser popup has no teleport container.
+
 ### Versions
 
 | | |
@@ -421,11 +427,11 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | planned |
 | `src/components/VersionsPanel.vue` | Versions list, read-only preview, Restore, Name this version | #111 | planned |
 | `src/components/PublishButton.vue` | Publish to Doc: folder picker, then open in Nextcloud Office | #9 | planned |
-| `src/components/ThemeSetting.vue` | Auto / Light / Dark | #96 | planned |
+| `src/components/ThemeSetting.vue` | Auto / Light / Dark | #96 | present |
 | `src/main.js` + `src/App.vue` (Report a bug) | `installErrorBuffer()` at startup; craft-bugreport-web's `ReportButton` in the app navigation, given `{ app, version, commit, ncVersion, dropBase, dropToken, userName }` from initial state and `getWorkingFile()` returning the open outline as `.opml`; the drop base and token come from an admin setting stored server-side (`lib/Settings/`, IConfig app value) and are never committed | #124, #125 | planned |
 | `appinfo/info.xml` + `.github/workflows/release.yml` (updates from the admin panel) | The release fields the merged feed reads (id, a.b.c version, Nextcloud 33 range, PHP minimum; guarded by `tests/js/release/infoxml.test.js`) and the tag workflow that calls craft-nc-appstore's `build-app.yml@v1`; signing and publishing happen on the release-key machine (R35), never in CI | #128, #129, #130 | planned |
 
-Colours come only from Nextcloud's theme variables (`--color-main-background`, `--color-main-text`, `--color-border` and the rest), so the app follows Nextcloud's dark and light mode with no code. How the Light or Dark override forces the other set of variables inside the app is an open question for #96.
+Colours come only from Nextcloud's theme variables (`--color-main-background`, `--color-main-text`, `--color-border` and the rest), so the app follows Nextcloud's dark and light mode with no code. The Light or Dark override forces the theme using `@nextcloud/vue`'s `NcThemeProvider` (`:dark="theme === 'dark'"` and `:light="theme === 'light'"`), scoping `[data-theme-dark]` and `[data-theme-light]` across the app shell.
 
 ## Mac, PC and Linux
 
