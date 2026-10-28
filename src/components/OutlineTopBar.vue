@@ -72,7 +72,7 @@ onUnmounted(() => {
 			:title="title"
 			:beforePublish="beforePublish"
 			:iconOnly="effectiveNarrow"
-			@published="(path) => $emit('published', path)" />
+			@published="(path, openUrl) => $emit('published', path, openUrl)" />
 		<NcButton
 			ariaLabel="Versions"
 			title="Versions"

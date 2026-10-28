@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import StatusLine from '../../../src/components/StatusLine.vue'
 
@@ -113,6 +114,17 @@ describe('StatusLine.vue', () => {
 	})
 
 	describe('last-published link', () => {
+		it('keeps the narrow link clickable while its label can truncate', () => {
+			const wrapper = mount(StatusLine, { props: { status: 'saved', publishPath: '/Documents/A long document.odt', openUrl: '/open/44' } })
+			const link = wrapper.get('.published-link')
+			expect(link.attributes('aria-label')).toBe('Open document')
+			expect(link.attributes('href')).toBe('/open/44')
+			expect(link.get('.status-link-label').text()).toContain('Open document')
+			const source = readFileSync('src/components/StatusLine.vue', 'utf8')
+			expect(source).toMatch(/\.status-link-label\s*\{[^}]*min-width: 0;[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;/)
+			expect(source).toMatch(/\.status-link\s*\{[^}]*min-width: 24px;/)
+		})
+
 		it('does not render published link when publishPath is null', () => {
 			const wrapper = mount(StatusLine, {
 				props: { status: 'saved', publishPath: null },

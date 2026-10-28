@@ -44,7 +44,7 @@ export function getDefaultDocName(publishPath, title = '', name = '') {
 <script setup>
 import { getFilePickerBuilder, showError, showSuccess } from '@nextcloud/dialogs'
 import { NcButton } from '@nextcloud/vue'
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { publish } from '../api/outlines.js'
 
 const props = defineProps({
@@ -81,8 +81,10 @@ const props = defineProps({
 const emit = defineEmits(['published'])
 
 const publishing = ref(false)
-/** Link to the last published doc; the user clicks it (no popup block). */
-const openUrl = ref('')
+const published = ref(false)
+let publishedTimer
+const buttonLabel = computed(() => publishing.value ? 'Publishing…' : published.value ? 'Published' : 'Publish')
+onUnmounted(() => clearTimeout(publishedTimer))
 
 const startFolder = computed(() => getStartFolder(props.publishPath))
 const defaultName = computed(() => getDefaultDocName(props.publishPath, props.title, props.name))
@@ -97,7 +99,7 @@ async function onPublishClick() {
 
 	let chosenFolder
 	try {
-		const picker = getFilePickerBuilder('Publish to Doc')
+		const picker = getFilePickerBuilder(`Publish "${defaultName.value}.odt" to…`)
 			.setMultiSelect(false)
 			.allowDirectories(true)
 			.setMimeTypeFilter(['httpd/unix-directory'])
@@ -120,7 +122,8 @@ async function onPublishClick() {
 	}
 
 	publishing.value = true
-	openUrl.value = ''
+	published.value = false
+	clearTimeout(publishedTimer)
 	try {
 		if (props.beforePublish && !(await props.beforePublish())) {
 			showError('Could not save your latest changes, so nothing was published. Try again.')
@@ -128,8 +131,11 @@ async function onPublishClick() {
 		}
 		const result = await publish(props.fileId, chosenFolder, defaultName.value)
 		showSuccess(`Published to ${result.path}`)
-		openUrl.value = result.openUrl || ''
-		emit('published', result.path)
+		published.value = true
+		publishedTimer = setTimeout(() => {
+			published.value = false
+		}, 3000)
+		emit('published', result.path, result.openUrl || '')
 	} catch (error) {
 		showError(error.message || 'Could not publish document')
 	} finally {
@@ -142,13 +148,14 @@ async function onPublishClick() {
 	<span class="publish-button">
 		<NcButton
 			:disabled="publishing"
-			:ariaLabel="iconOnly ? 'Publish to Doc' : undefined"
-			:title="iconOnly ? 'Publish to Doc' : undefined"
+			:ariaLabel="iconOnly ? buttonLabel : undefined"
+			:title="iconOnly ? buttonLabel : undefined"
 			variant="tertiary"
 			@click="onPublishClick">
 			<template #icon>
 				<svg
 					class="publish-icon"
+					:class="{ published }"
 					viewBox="0 0 24 24"
 					width="20"
 					height="20"
@@ -159,23 +166,21 @@ async function onPublishClick() {
 						stroke-width="2"
 						stroke-linecap="round"
 						stroke-linejoin="round"
-						d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z M14 3v5h5 M9 14.5l3-3 3 3 M12 11.5V17.5" />
+						:d="published ? 'M5 12.5l4.5 4.5L19 7.5' : 'M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z M14 3v5h5 M9 14.5l3-3 3 3 M12 11.5V17.5'" />
 				</svg>
 			</template>
-			<span v-if="!iconOnly" class="publish-button-text">Publish to Doc</span>
+			<span v-if="!iconOnly" class="publish-button-text">{{ buttonLabel }}</span>
 		</NcButton>
-		<a
-			v-if="openUrl"
-			class="publish-open-link"
-			:href="openUrl"
-			target="_blank"
-			rel="noopener">Open document</a>
 	</span>
 </template>
 
 <style scoped>
 .publish-icon {
 	flex: none;
+}
+
+.publish-icon.published {
+	color: var(--color-success);
 }
 
 @container (max-width: 759px) {

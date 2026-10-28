@@ -251,8 +251,9 @@ describe('OutlineView autosave conflict flow', () => {
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })
 		await flushPromises()
 		const publishBtn = wrapper.findComponent({ name: 'PublishButton' })
-		publishBtn.vm.$emit('published', '/Documents/Plan.odt')
+		publishBtn.vm.$emit('published', '/Documents/Plan.odt', '/open/44')
 		await vi.advanceTimersByTimeAsync(1500)
+		expect(wrapper.get('.published-link').attributes('href')).toBe('/open/44')
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
 			publishPath: '/Documents/Plan.odt',
 		}), 'etag-1')

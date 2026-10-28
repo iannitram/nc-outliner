@@ -117,8 +117,8 @@ describe('OutlineTopBar.vue', () => {
 		expect(publishBtnComponent.props('fileId')).toBe(42)
 		expect(publishBtnComponent.props('publishPath')).toBe('/Documents/Garden.odt')
 
-		publishBtnComponent.vm.$emit('published', '/Documents/Garden.odt')
-		expect(wrapper.emitted('published')).toEqual([['/Documents/Garden.odt']])
+		publishBtnComponent.vm.$emit('published', '/Documents/Garden.odt', '/open/44')
+		expect(wrapper.emitted('published')).toEqual([['/Documents/Garden.odt', '/open/44']])
 	})
 
 	describe('Publish icon mode under 760 px', () => {
@@ -138,7 +138,7 @@ describe('OutlineTopBar.vue', () => {
 
 			const publishBtnComponent = wrapper.findComponent({ name: 'PublishButton' })
 			expect(publishBtnComponent.props('iconOnly')).toBe(false)
-			expect(wrapper.get('.publish-button-text').text()).toBe('Publish to Doc')
+			expect(wrapper.get('.publish-button-text').text()).toBe('Publish')
 			wrapper.unmount()
 		})
 
@@ -161,8 +161,8 @@ describe('OutlineTopBar.vue', () => {
 			expect(wrapper.find('.publish-button-text').exists()).toBe(false)
 
 			const publishBtn = publishBtnComponent.get('button')
-			expect(publishBtn.attributes('title')).toBe('Publish to Doc')
-			expect(publishBtn.attributes('aria-label')).toBe('Publish to Doc')
+			expect(publishBtn.attributes('title')).toBe('Publish')
+			expect(publishBtn.attributes('aria-label')).toBe('Publish')
 			expect(publishBtn.find('.publish-icon').exists()).toBe(true)
 
 			// Simulate phone width of 390 px

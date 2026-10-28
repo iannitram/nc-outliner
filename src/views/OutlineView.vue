@@ -24,6 +24,7 @@ const saveStatus = ref('saved')
 const conflictOpen = ref(false)
 const versionsOpen = ref(false)
 const sortOpen = ref(false)
+const publishedOpenUrl = ref('')
 let saver = null
 let unsubscribe = null
 let currentDocument = null
@@ -54,6 +55,7 @@ async function load({ discardLocal = false, fileId = props.fileId } = {}) {
 			return
 		}
 		conflictOpen.value = false
+		publishedOpenUrl.value = ''
 		name.value = result.name
 		etag.value = result.etag
 		saveStatus.value = 'saved'
@@ -187,9 +189,11 @@ async function beforeLeave() {
  * Update the publish path and trigger autosave.
  *
  * @param {string} newPath published document path
+ * @param {string} openUrl URL to open the published document
  */
-function onPublished(newPath) {
+function onPublished(newPath, openUrl = '') {
 	if (currentDocument) {
+		publishedOpenUrl.value = openUrl
 		currentDocument = { ...currentDocument, publishPath: newPath }
 		document.value = currentDocument
 		saver?.schedule(currentDocument)
@@ -261,6 +265,7 @@ watch(() => props.fileId, load)
 				@close="versionsOpen = false" />
 			<StatusLine
 				:status="saveStatus"
+				:openUrl="publishedOpenUrl"
 				:rows="document?.rows ?? []"
 				:publishPath="document?.publishPath ?? null" />
 		</template>

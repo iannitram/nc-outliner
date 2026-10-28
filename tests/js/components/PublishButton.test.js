@@ -37,6 +37,7 @@ describe('PublishButton.vue', () => {
 	afterEach(() => {
 		wrapper?.unmount()
 		wrapper = undefined
+		vi.useRealTimers()
 		vi.restoreAllMocks()
 	})
 
@@ -77,11 +78,11 @@ describe('PublishButton.vue', () => {
 		})
 
 		const button = wrapper.get('button')
-		expect(button.text()).toContain('Publish to Doc')
+		expect(button.text()).toBe('Publish')
 		await button.trigger('click')
 		await flushPromises()
 
-		expect(getFilePickerBuilder).toHaveBeenCalledWith('Publish to Doc')
+		expect(getFilePickerBuilder).toHaveBeenCalledWith('Publish "Plan.odt" to…')
 		expect(builderMock.setMultiSelect).toHaveBeenCalledWith(false)
 		expect(builderMock.allowDirectories).toHaveBeenCalledWith(true)
 		expect(builderMock.setMimeTypeFilter).toHaveBeenCalledWith(['httpd/unix-directory'])
@@ -89,14 +90,11 @@ describe('PublishButton.vue', () => {
 		expect(pickMock).toHaveBeenCalledTimes(1)
 		expect(publish).toHaveBeenCalledWith(7, '/Documents', 'Plan')
 		expect(showSuccess).toHaveBeenCalledWith('Published to /Documents/Plan.odt')
-		expect(wrapper.emitted('published')).toEqual([['/Documents/Plan.odt']])
+		expect(wrapper.emitted('published')).toEqual([['/Documents/Plan.odt', '/apps/files/?openfile=true&fileid=44']])
 		expect(wrapper.emitted('publish')).toBeUndefined()
 		// No popup: window.open is never used, the user clicks a link instead.
 		expect(window.open).not.toHaveBeenCalled()
-		const link = wrapper.get('a.publish-open-link')
-		expect(link.text()).toBe('Open document')
-		expect(link.attributes('href')).toBe('/apps/files/?openfile=true&fileid=44')
-		expect(link.attributes('target')).toBe('_blank')
+		expect(wrapper.find('a').exists()).toBe(false)
 	})
 
 	it('adds a Choose button whose callback confirms the folder (pick resolves its path)', async () => {
@@ -145,8 +143,8 @@ describe('PublishButton.vue', () => {
 
 		expect(builderMock.startAt).toHaveBeenCalledWith('/Work/Reports')
 		expect(publish).toHaveBeenCalledWith(12, '/Work/Reports', 'Q1Summary')
-		expect(wrapper.emitted('published')).toEqual([['/Work/Reports/Q1Summary.odt']])
-		expect(wrapper.get('a.publish-open-link').attributes('href')).toBe('/apps/files/?openfile=true&fileid=55')
+		expect(wrapper.emitted('published')).toEqual([['/Work/Reports/Q1Summary.odt', '/apps/files/?openfile=true&fileid=55']])
+		expect(getFilePickerBuilder).toHaveBeenCalledWith('Publish "Q1Summary.odt" to…')
 	})
 
 	it('does nothing when the folder picker is cancelled', async () => {
@@ -189,6 +187,7 @@ describe('PublishButton.vue', () => {
 	})
 
 	it('disables the button while publishing', async () => {
+		vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
 		let resolvePublish
 		const publishPromise = new Promise((resolve) => {
 			resolvePublish = resolve
@@ -211,6 +210,7 @@ describe('PublishButton.vue', () => {
 		await flushPromises()
 
 		expect(button.attributes('disabled')).toBeDefined()
+		expect(button.text()).toBe('Publishing…')
 
 		resolvePublish({
 			fileId: 44,
@@ -220,6 +220,12 @@ describe('PublishButton.vue', () => {
 		await flushPromises()
 
 		expect(button.attributes('disabled')).toBeUndefined()
+		expect(button.text()).toBe('Published')
+		expect(wrapper.get('.publish-icon').classes()).toContain('published')
+		await vi.advanceTimersByTimeAsync(2999)
+		expect(button.text()).toBe('Published')
+		await vi.advanceTimersByTimeAsync(1)
+		expect(button.text()).toBe('Publish')
 	})
 
 	it('saves pending edits after the folder is picked and before publishing', async () => {
@@ -301,8 +307,8 @@ describe('PublishButton.vue', () => {
 			})
 
 			const button = wrapper.get('button')
-			expect(button.attributes('title')).toBe('Publish to Doc')
-			expect(button.attributes('aria-label')).toBe('Publish to Doc')
+			expect(button.attributes('title')).toBe('Publish')
+			expect(button.attributes('aria-label')).toBe('Publish')
 			expect(wrapper.find('.publish-button-text').exists()).toBe(false)
 			expect(wrapper.find('.publish-icon').exists()).toBe(true)
 		})
@@ -329,7 +335,7 @@ describe('PublishButton.vue', () => {
 			await flushPromises()
 
 			expect(publish).toHaveBeenCalledWith(7, '/Documents', 'Plan')
-			expect(wrapper.emitted('published')).toEqual([['/Documents/Plan.odt']])
+			expect(wrapper.emitted('published')).toEqual([['/Documents/Plan.odt', '/apps/files/?openfile=true&fileid=44']])
 		})
 	})
 })
