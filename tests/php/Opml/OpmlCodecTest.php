@@ -179,4 +179,53 @@ final class OpmlCodecTest extends TestCase {
 		$this->assertStringContainsString('<body/>', $xml);
 		$this->assertSame([], (new OpmlCodec())->parse($xml)->rows);
 	}
+
+	public function testParsesNoteHiddenAttribute(): void {
+		$outline = $this->parse('<body><outline text="A" _note="n" nco:noteHidden="true"/></body>');
+
+		$this->assertSame('n', $outline->rows[0]->note);
+		$this->assertTrue($outline->rows[0]->noteHidden);
+	}
+
+	public function testDefaultsNoteHiddenToFalse(): void {
+		$outline = $this->parse('<body><outline text="A" _note="n"/></body>');
+
+		$this->assertFalse($outline->rows[0]->noteHidden);
+	}
+
+	public function testWritesNoteHiddenAttribute(): void {
+		$outline = new Outline('T', [new Row('r1', 'A', 'n', false, [], true)]);
+
+		$xml = (new OpmlCodec())->write($outline);
+		$this->assertStringContainsString('nco:noteHidden="true"', $xml);
+	}
+
+	public function testWritesNoNoteHiddenAttributeWhenFalse(): void {
+		$outline = new Outline('T', [new Row('r1', 'A', 'n')]);
+
+		$xml = (new OpmlCodec())->write($outline);
+		$this->assertStringNotContainsString('nco:noteHidden', $xml);
+	}
+
+	public function testRoundTripWithNoteHidden(): void {
+		$original = new Outline('T', [
+			new Row('r1', 'A', 'a note', false, [
+				new Row('r2', 'B', '', false, [], true),
+			], true),
+		]);
+
+		$codec = new OpmlCodec();
+		$parsed = $codec->parse($codec->write($original));
+
+		$this->assertEquals($original, $parsed);
+	}
+
+	public function testRowArrayRoundTripKeepsNoteHidden(): void {
+		$row = new Row('r1', 'A', 'a note', true, [new Row('r2', 'B', '', false, [], true)], true);
+
+		$parsed = Row::fromArray($row->toArray());
+
+		$this->assertEquals($row, $parsed);
+		$this->assertTrue($parsed->noteHidden);
+	}
 }

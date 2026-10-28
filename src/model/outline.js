@@ -8,6 +8,7 @@
  * @property {string} text
  * @property {string} note
  * @property {boolean} collapsed
+ * @property {boolean} noteHidden whether the note is hidden for this row
  * @property {Row[]} children
  *
  * @typedef {Row[]} Tree the root rows, in order
@@ -20,7 +21,7 @@
  * @return {Row}
  */
 export function newRow(text = '') {
-	return { id: newId(), text, note: '', collapsed: false, children: [] }
+	return { id: newId(), text, note: '', collapsed: false, noteHidden: false, children: [] }
 }
 
 /**
@@ -159,11 +160,11 @@ export function outdent(tree, id) {
 }
 
 /**
- * Issue #105. Set text, note or collapsed on one row.
+ * Issue #105. Set text, note, collapsed or noteHidden on one row.
  *
  * @param {Tree} tree
  * @param {string} id
- * @param {{text?: string, note?: string, collapsed?: boolean}} patch
+ * @param {{text?: string, note?: string, collapsed?: boolean, noteHidden?: boolean}} patch
  * @return {Tree}
  */
 export function updateRow(tree, id, patch) {
@@ -173,7 +174,7 @@ export function updateRow(tree, id, patch) {
 	}
 	const row = path.slice(0, -1).reduce((siblings, index) => siblings[index].children, tree)[path[path.length - 1]]
 	const updates = {}
-	for (const key of ['text', 'note', 'collapsed']) {
+	for (const key of ['text', 'note', 'collapsed', 'noteHidden']) {
 		if (Object.hasOwn(patch, key) && patch[key] !== row[key]) {
 			updates[key] = patch[key]
 		}

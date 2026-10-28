@@ -1,17 +1,93 @@
 <script setup>
-import { inject, onUnmounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, inject, nextTick, onUnmounted, ref, watch } from 'vue'
+import { updateRow } from '../model/outline.js'
 
 const props = defineProps({
 	row: {
 		type: Object,
 		required: true,
 	},
+	history: {
+		type: Object,
+		default: null,
+	},
 })
 
 const emit = defineEmits(['input-text', 'row-keydown', 'row-focus'])
 
 const inputRef = ref(null)
+const noteRef = ref(null)
+const addingNote = ref(false)
+const instance = getCurrentInstance()
 const editor = inject('outlineEditor', null)
+
+const noteShown = computed(() => !props.row.noteHidden && (addingNote.value || props.row.note !== ''))
+const noteToggleLabel = computed(() => {
+	if (noteShown.value) {
+		return 'Hide note'
+	}
+	return props.row.note ? 'Show note' : 'Add note'
+})
+
+/**
+ * The History that owns this row's tree. The editor provides its context under
+ * `outlineEditor`; tests may put the History there, otherwise walk up to the
+ * component that declares the History prop.
+ *
+ * @return {object|null} the outline History, or null outside an editor
+ */
+function resolveHistory() {
+	if (props.history) {
+		return props.history
+	}
+	if (editor?.history) {
+		return editor.history
+	}
+	let parent = instance?.parent
+	while (parent) {
+		if (parent.props?.history) {
+			return parent.props.history
+		}
+		parent = parent.parent
+	}
+	return null
+}
+
+/**
+ *
+ * @param {object} patch the updateRow patch
+ * @param {string} mergeKey the History merge key
+ */
+function applyNoteChange(patch, mergeKey) {
+	const history = resolveHistory()
+	if (!history) {
+		return
+	}
+	history.execute(updateRow, [props.row.id, patch], { mergeKey })
+}
+
+/**
+ *
+ * @param {InputEvent} event the note input event
+ */
+function handleNoteInput(event) {
+	addingNote.value = true
+	applyNoteChange({ note: event.target.value }, `note:${props.row.id}`)
+}
+
+/** Show or hide this row's note. */
+function toggleNote() {
+	if (noteShown.value) {
+		addingNote.value = false
+		applyNoteChange({ noteHidden: true }, `noteHidden:${props.row.id}`)
+		return
+	}
+	addingNote.value = true
+	if (props.row.noteHidden) {
+		applyNoteChange({ noteHidden: false }, `noteHidden:${props.row.id}`)
+	}
+	nextTick(() => noteRef.value?.focus())
+}
 
 /**
  *
@@ -123,6 +199,23 @@ defineExpose({
 				@focus="handleFocus">
 		</div>
 		<slot name="note" :row="row" />
+		<div class="outline-row__note-area">
+			<button
+				type="button"
+				class="outline-row__note-toggle"
+				:aria-expanded="noteShown"
+				@click="toggleNote">
+				{{ noteToggleLabel }}
+			</button>
+			<textarea
+				v-if="noteShown"
+				ref="noteRef"
+				class="outline-row__note"
+				:data-note-id="row.id"
+				:value="row.note"
+				aria-label="Row note"
+				@input="handleNoteInput" />
+		</div>
 		<div
 			v-if="!row.collapsed && row.children && row.children.length > 0"
 			class="outline-row__children"
@@ -172,5 +265,46 @@ defineExpose({
 
 .outline-row__children {
 	margin-left: 24px;
+}
+
+.outline-row__note-area {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 4px;
+	padding-left: 28px;
+}
+
+.outline-row__note-toggle {
+	background: transparent;
+	border: none;
+	color: var(--color-text-maxcontrast, var(--color-main-text));
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.85em;
+	padding: 2px 4px;
+}
+
+.outline-row__note-toggle:hover {
+	color: var(--color-main-text);
+	text-decoration: underline;
+}
+
+.outline-row__note {
+	box-sizing: border-box;
+	width: 100%;
+	background: transparent;
+	color: var(--color-main-text);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element, 3px);
+	padding: 6px 8px;
+	font: inherit;
+	line-height: 1.5;
+	resize: vertical;
+	outline: none;
+}
+
+.outline-row__note:focus {
+	border-color: var(--color-primary-element, var(--color-border));
 }
 </style>

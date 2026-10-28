@@ -18,20 +18,25 @@ final class Row {
 		public string $note = '',
 		public bool $collapsed = false,
 		public array $children = [],
+		public bool $noteHidden = false,
 	) {
 	}
 
 	/**
-	 * @return array{id: string, text: string, note: string, collapsed: bool, children: list<array<string, mixed>>}
+	 * @return array{id: string, text: string, note: string, collapsed: bool, children: list<array<string, mixed>>, noteHidden?: bool}
 	 */
 	public function toArray(): array {
-		return [
+		$data = [
 			'id' => $this->id,
 			'text' => $this->text,
 			'note' => $this->note,
 			'collapsed' => $this->collapsed,
 			'children' => array_map(static fn (Row $child): array => $child->toArray(), $this->children),
 		];
+		if ($this->noteHidden) {
+			$data['noteHidden'] = true;
+		}
+		return $data;
 	}
 
 	/**
@@ -48,6 +53,7 @@ final class Row {
 			(string)($data['note'] ?? ''),
 			(bool)($data['collapsed'] ?? false),
 			$children,
+			(bool)($data['noteHidden'] ?? false),
 		);
 	}
 }

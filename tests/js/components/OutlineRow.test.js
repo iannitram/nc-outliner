@@ -1,6 +1,8 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import OutlineRow from '../../../src/components/OutlineRow.vue'
+import { createHistory } from '../../../src/model/history.js'
+import { updateRow } from '../../../src/model/outline.js'
 
 describe('OutlineRow', () => {
 	let wrapper
@@ -90,5 +92,51 @@ describe('OutlineRow', () => {
 		})
 
 		expect(wrapper.find('[data-row-id="c1"]').exists()).toBe(false)
+	})
+
+	it('renders a note under the row and hides it when noteHidden is true', () => {
+		const row = { id: 'r1', text: 'Sample', note: 'Note text', collapsed: false, noteHidden: false, children: [] }
+		wrapper = mount(OutlineRow, {
+			props: { row },
+		})
+
+		expect(wrapper.get('textarea[data-note-id="r1"]').element.value).toBe('Note text')
+		expect(wrapper.get('.outline-row__note-toggle').text()).toBe('Hide note')
+		wrapper.unmount()
+
+		wrapper = mount(OutlineRow, {
+			props: { row: { ...row, noteHidden: true } },
+		})
+
+		expect(wrapper.find('textarea[data-note-id="r1"]').exists()).toBe(false)
+		expect(wrapper.get('.outline-row__note-toggle').text()).toBe('Show note')
+	})
+
+	it('writes a note through History with mergeKey "note:<id>"', async () => {
+		const row = { id: 'r1', text: 'Sample', note: '', collapsed: false, noteHidden: false, children: [] }
+		const history = createHistory([row])
+		const executeSpy = vi.spyOn(history, 'execute')
+		wrapper = mount(OutlineRow, {
+			props: { row },
+			global: {
+				provide: {
+					outlineEditor: {
+						history,
+						registerInput() {},
+						unregisterInput() {},
+					},
+				},
+			},
+		})
+
+		await wrapper.get('.outline-row__note-toggle').trigger('click')
+		await wrapper.get('textarea[data-note-id="r1"]').setValue('A note')
+
+		expect(executeSpy).toHaveBeenCalledWith(
+			updateRow,
+			['r1', { note: 'A note' }],
+			{ mergeKey: 'note:r1' },
+		)
+		expect(history.current()[0].note).toBe('A note')
 	})
 })

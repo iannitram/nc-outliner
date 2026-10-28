@@ -89,6 +89,7 @@ final class OpmlCodec {
 			$element->getAttribute('_note'),
 			$element->getAttributeNS(self::NS, 'collapsed') === 'true',
 			$children,
+			$element->getAttributeNS(self::NS, 'noteHidden') === 'true',
 		);
 	}
 
@@ -133,6 +134,9 @@ final class OpmlCodec {
 		$outline->setAttributeNS(self::NS, 'nco:id', $row->id);
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
+		}
+		if ($row->noteHidden) {
+			$outline->setAttributeNS(self::NS, 'nco:noteHidden', 'true');
 		}
 		
 		foreach ($row->children as $child) {
