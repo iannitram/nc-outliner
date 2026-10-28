@@ -1,4 +1,6 @@
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import OutlineRow from '../../../src/components/OutlineRow.vue'
 import { createHistory } from '../../../src/model/history.js'
@@ -8,20 +10,21 @@ describe('OutlineRow', () => {
 	let wrapper
 
 	afterEach(() => {
+		vi.unstubAllGlobals()
 		if (wrapper) {
 			wrapper.unmount()
 			wrapper = null
 		}
 	})
 
-	it('renders row text in an input and exposes focus method', () => {
+	it('renders row text in a wrapping textarea and exposes focus method', () => {
 		const row = { id: 'r1', text: 'Sample text', note: '', collapsed: false, children: [] }
 		wrapper = mount(OutlineRow, {
 			props: { row },
 			attachTo: document.body,
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		expect(input.element.value).toBe('Sample text')
 
 		wrapper.vm.focus('end')
@@ -34,13 +37,52 @@ describe('OutlineRow', () => {
 		expect(input.element.selectionEnd).toBe(0)
 	})
 
+	it('turns pasted line breaks into spaces, keeping the caret after the paste', async () => {
+		const row = { id: 'r1', text: '', note: '', collapsed: false, children: [] }
+		wrapper = mount(OutlineRow, { props: { row }, attachTo: document.body })
+		const input = wrapper.get('textarea.outline-row__input')
+		input.element.value = 'one\r\ntwo\nthree tail'
+		input.element.setSelectionRange(13, 13)
+		await input.trigger('input')
+		expect(input.element.value).toBe('one two three tail')
+		expect(input.element.selectionStart).toBe(13)
+		const emitted = wrapper.emitted('input-text')
+		expect(emitted[emitted.length - 1][1]).toBe('one two three tail')
+	})
+
+	it('grows wrapped text on input, width changes and History updates, then disconnects', async () => {
+		let resize
+		const disconnect = vi.fn()
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(callback) { resize = callback }
+			observe() {}
+			disconnect() { disconnect() }
+		})
+		const row = { id: 'r1', text: 'A long row', note: '', collapsed: false, children: [] }
+		wrapper = mount(OutlineRow, { props: { row } })
+		const input = wrapper.get('textarea.outline-row__input')
+		let height = 72
+		Object.defineProperty(input.element, 'scrollHeight', { get: () => height })
+		await input.setValue('A longer row that wraps')
+		expect(input.element.style.height).toBe('74px')
+		height = 108
+		resize([{ contentRect: { width: 200 } }])
+		expect(input.element.style.height).toBe('110px')
+		height = 24
+		await wrapper.setProps({ row: { ...row, text: 'Undo' } })
+		expect(input.element.style.height).toBe('26px')
+		wrapper.unmount()
+		wrapper = null
+		expect(disconnect).toHaveBeenCalledOnce()
+	})
+
 	it('emits input-text on input', async () => {
 		const row = { id: 'r1', text: 'Sample', note: '', collapsed: false, children: [] }
 		wrapper = mount(OutlineRow, {
 			props: { row },
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		await input.setValue('Modified')
 
 		expect(wrapper.emitted('input-text')).toBeTruthy()
@@ -54,7 +96,7 @@ describe('OutlineRow', () => {
 			props: { row },
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		await input.trigger('keydown', { key: 'Enter' })
 
 		expect(wrapper.emitted('row-keydown')).toBeTruthy()
@@ -101,7 +143,10 @@ describe('OutlineRow', () => {
 		})
 
 		expect(wrapper.get('textarea[data-note-id="r1"]').element.value).toBe('Note text')
-		expect(wrapper.get('.outline-row__note-toggle').text()).toBe('Hide note')
+		expect(wrapper.get('.outline-row__note-toggle').attributes('aria-label')).toBe('Hide note')
+		expect(wrapper.get('.outline-row__note-toggle').text()).toBe('')
+		expect(wrapper.find('.outline-row__note-toggle svg').exists()).toBe(true)
+		expect(wrapper.get('.outline-row__note-toggle').classes()).not.toContain('outline-row__note-toggle--always')
 		wrapper.unmount()
 
 		wrapper = mount(OutlineRow, {
@@ -109,7 +154,8 @@ describe('OutlineRow', () => {
 		})
 
 		expect(wrapper.find('textarea[data-note-id="r1"]').exists()).toBe(false)
-		expect(wrapper.get('.outline-row__note-toggle').text()).toBe('Show note')
+		expect(wrapper.get('.outline-row__note-toggle').attributes('aria-label')).toBe('Show note')
+		expect(wrapper.get('.outline-row__note-toggle').classes()).toContain('outline-row__note-toggle--always')
 	})
 
 	it('writes a note through History with mergeKey "note:<id>"', async () => {
@@ -140,6 +186,28 @@ describe('OutlineRow', () => {
 		expect(history.current()[0].note).toBe('A note')
 	})
 
+	it('keeps noteHidden through History when the note icon is clicked', async () => {
+		const row = { id: 'r1', text: 'Sample', note: 'Note text', collapsed: false, noteHidden: false, children: [] }
+		const history = createHistory([row])
+		wrapper = mount(OutlineRow, {
+			props: { row },
+			global: {
+				provide: {
+					outlineEditor: { history, registerInput() {}, unregisterInput() {} },
+				},
+			},
+		})
+
+		await wrapper.get('.outline-row__note-toggle').trigger('click')
+		expect(history.current()[0].noteHidden).toBe(true)
+		expect(history.current()[0].note).toBe('Note text')
+
+		await wrapper.setProps({ row: history.current()[0] })
+		expect(wrapper.find('textarea[data-note-id="r1"]').exists()).toBe(false)
+		await wrapper.get('.outline-row__note-toggle').trigger('click')
+		expect(history.current()[0].noteHidden).toBe(false)
+	})
+
 	it('renders a disclosure control for rows with children and a bullet for leaves', () => {
 		wrapper = mount(OutlineRow, {
 			props: {
@@ -155,5 +223,26 @@ describe('OutlineRow', () => {
 
 		expect(wrapper.find('button[aria-expanded="true"]').exists()).toBe(true)
 		expect(wrapper.find('[data-row-id="r1"] > .outline-row__line .outline-row__bullet').exists()).toBe(false)
+	})
+
+	// jsdom does no layout, so pin the alignment rules in the component's CSS source.
+	describe('first-line alignment CSS', () => {
+		const css = readFileSync(resolve(process.cwd(), 'src/components/OutlineRow.vue'), 'utf8')
+		const rule = (selector) => {
+			const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+			const match = css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`))
+			return match ? match[1] : ''
+		}
+
+		it('keeps the line top-aligned so wrapped text starts at the top', () => {
+			expect(rule('.outline-row__line')).toMatch(/align-items:\s*flex-start/)
+		})
+
+		it('gives the bullet and the row count the first line height', () => {
+			expect(rule('.outline-row__bullet')).toMatch(/height:\s*34px/)
+			expect(rule('.outline-row__bullet')).toMatch(/align-items:\s*center/)
+			expect(rule('.outline-row__more')).toMatch(/height:\s*34px/)
+			expect(rule('.outline-row__more')).toMatch(/align-items:\s*center/)
+		})
 	})
 })

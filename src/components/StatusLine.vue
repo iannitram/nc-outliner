@@ -166,11 +166,11 @@ const displayPublishPath = computed(() => {
 		<a
 			v-if="publishPath"
 			class="status-link published-link"
+			aria-label="Open document"
 			:href="openUrl || '#'"
 			target="_blank"
 			rel="noopener">
-			<span class="publish-path">Published to {{ displayPublishPath }} · </span>
-			<b>Open document</b>
+			<span class="status-link-label"><span class="publish-path">Published to {{ displayPublishPath }} · </span><b>Open document</b></span>
 			<svg
 				class="status-icon"
 				viewBox="0 0 24 24"
@@ -203,6 +203,7 @@ const displayPublishPath = computed(() => {
 	white-space: nowrap;
 	overflow: hidden;
 	background: var(--color-main-background);
+	min-width: 0;
 }
 
 .save-status {
@@ -225,11 +226,24 @@ const displayPublishPath = computed(() => {
 	}
 }
 
+.status-counts,
+.status-save,
+.status-dot {
+	flex: none;
+}
+
 .status-spacer {
 	flex: 1;
 }
 
+.status-link-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .status-link {
+	min-width: 24px;
 	color: var(--color-text-maxcontrast);
 	text-decoration: none;
 	display: inline-flex;

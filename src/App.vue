@@ -4,6 +4,7 @@ import {
 	NcAppNavigation,
 	NcAppNavigationItem,
 	NcAppNavigationNew,
+	NcAppNavigationSettings,
 	NcContent,
 	NcThemeProvider,
 } from '@nextcloud/vue'
@@ -276,13 +277,17 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 				<p v-if="outlinesError" role="alert" class="app-settings-error">
 					{{ outlinesError }}
 				</p>
-				<ThemeSetting
-					:modelValue="theme"
-					:disabled="settingsLoading"
-					@update:modelValue="(val) => theme = val" />
-				<p v-if="settingsError" role="alert" class="app-settings-error">
-					{{ settingsError }}
-				</p>
+				<template #footer>
+					<NcAppNavigationSettings name="Outliner settings">
+						<ThemeSetting
+							:modelValue="theme"
+							:disabled="settingsLoading"
+							@update:modelValue="(val) => theme = val" />
+						<p v-if="settingsError" role="alert" class="app-settings-error">
+							{{ settingsError }}
+						</p>
+					</NcAppNavigationSettings>
+				</template>
 			</NcAppNavigation>
 			<NcAppContent>
 				<OutlineView v-if="fileId !== null" ref="outlineView" :fileId="fileId" />
@@ -320,8 +325,8 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 	text-overflow: ellipsis;
 }
 
+/* #197: the open entry sits on Nextcloud's primary highlight; use its text colour for contrast */
 :deep(.active) .outline-entry-date {
-	color: inherit;
-	opacity: 0.8;
+	color: var(--color-primary-element-text);
 }
 </style>

@@ -30,7 +30,7 @@ const props = defineProps({
 	},
 })
 
-defineEmits(['published', 'openVersions'])
+defineEmits(['published', 'openVersions', 'openSort'])
 
 const topBarRef = ref(null)
 const observedNarrow = ref(false)
@@ -59,7 +59,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-	<header ref="topBarRef" class="outline-top-bar tb">
+	<header ref="topBarRef" class="outline-top-bar tb" :class="{ 'outline-top-bar--narrow': effectiveNarrow }">
 		<span class="nav-toggle-spacer" aria-hidden="true" />
 		<h1 class="title" :title="title">
 			{{ title }}
@@ -72,7 +72,7 @@ onUnmounted(() => {
 			:title="title"
 			:beforePublish="beforePublish"
 			:iconOnly="effectiveNarrow"
-			@published="(path) => $emit('published', path)" />
+			@published="(path, openUrl) => $emit('published', path, openUrl)" />
 		<NcButton
 			ariaLabel="Versions"
 			title="Versions"
@@ -97,6 +97,24 @@ onUnmounted(() => {
 		</NcButton>
 		<NcActions :forceMenu="true" ariaLabel="More actions">
 			<slot name="actions">
+				<NcActionButton @click="$emit('openSort')">
+					<template #icon>
+						<svg
+							viewBox="0 0 24 24"
+							width="20"
+							height="20"
+							aria-hidden="true">
+							<path
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M7 4v16 M4 17l3 3 3-3 M13 6h8 M13 11h6 M13 16h4" />
+						</svg>
+					</template>
+					Sort rows…
+				</NcActionButton>
 				<NcActionButton @click="$emit('openVersions')">
 					Versions
 				</NcActionButton>
@@ -107,6 +125,7 @@ onUnmounted(() => {
 
 <style scoped>
 .outline-top-bar {
+	min-width: 0;
 	height: 52px;
 	flex: none;
 	display: flex;
@@ -137,5 +156,14 @@ onUnmounted(() => {
 
 .spacer {
 	flex: 1;
+}
+.outline-top-bar > :deep(.publish-button),
+.outline-top-bar > :deep(.button-vue),
+.outline-top-bar > :deep(.action-item) {
+	flex: none;
+}
+
+.outline-top-bar--narrow {
+	padding-inline: 4px;
 }
 </style>

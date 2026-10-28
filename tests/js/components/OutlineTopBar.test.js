@@ -88,6 +88,22 @@ describe('OutlineTopBar.vue', () => {
 		}
 	})
 
+	it('puts "Sort rows…" and "Versions" in the ... menu and emits openSort and openVersions', async () => {
+		// The real popover renders its items lazily in a teleport, so show the slot in place.
+		const wrapper = mount(OutlineTopBar, {
+			props: { title: 'Community garden plan', fileId: 42 },
+			global: {
+				stubs: { NcActions: { template: '<div class="actions-stub"><slot /></div>' } },
+			},
+		})
+		const entries = wrapper.findAllComponents({ name: 'NcActionButton' })
+		expect(entries.map((entry) => entry.text())).toEqual(['Sort rows…', 'Versions'])
+		await entries[0].find('button').trigger('click')
+		expect(wrapper.emitted('openSort')).toHaveLength(1)
+		await entries[1].find('button').trigger('click')
+		expect(wrapper.emitted('openVersions')).toHaveLength(1)
+	})
+
 	it('renders PublishButton and forwards published event', async () => {
 		const wrapper = mount(OutlineTopBar, {
 			props: {
@@ -101,8 +117,8 @@ describe('OutlineTopBar.vue', () => {
 		expect(publishBtnComponent.props('fileId')).toBe(42)
 		expect(publishBtnComponent.props('publishPath')).toBe('/Documents/Garden.odt')
 
-		publishBtnComponent.vm.$emit('published', '/Documents/Garden.odt')
-		expect(wrapper.emitted('published')).toEqual([['/Documents/Garden.odt']])
+		publishBtnComponent.vm.$emit('published', '/Documents/Garden.odt', '/open/44')
+		expect(wrapper.emitted('published')).toEqual([['/Documents/Garden.odt', '/open/44']])
 	})
 
 	describe('Publish icon mode under 760 px', () => {
@@ -122,7 +138,7 @@ describe('OutlineTopBar.vue', () => {
 
 			const publishBtnComponent = wrapper.findComponent({ name: 'PublishButton' })
 			expect(publishBtnComponent.props('iconOnly')).toBe(false)
-			expect(wrapper.get('.publish-button-text').text()).toBe('Publish to Doc')
+			expect(wrapper.get('.publish-button-text').text()).toBe('Publish')
 			wrapper.unmount()
 		})
 
@@ -145,8 +161,8 @@ describe('OutlineTopBar.vue', () => {
 			expect(wrapper.find('.publish-button-text').exists()).toBe(false)
 
 			const publishBtn = publishBtnComponent.get('button')
-			expect(publishBtn.attributes('title')).toBe('Publish to Doc')
-			expect(publishBtn.attributes('aria-label')).toBe('Publish to Doc')
+			expect(publishBtn.attributes('title')).toBe('Publish')
+			expect(publishBtn.attributes('aria-label')).toBe('Publish')
 			expect(publishBtn.find('.publish-icon').exists()).toBe(true)
 
 			// Simulate phone width of 390 px
