@@ -12,6 +12,7 @@ import { createSaver } from '../editor/saver.js'
 import { mdiEyeOutline } from '../icons.js'
 import { createHistory } from '../model/history.js'
 import { sortRows } from '../model/outline.js'
+import { crashLogWarning } from '../services/crashLog.js' // TEMPORARY: remove after the crash-rate review (owner, 2026-10-28)
 import { resetVersionsSidebar, versionsSidebar } from './versionsSidebarState.js'
 
 const props = defineProps({ fileId: { type: Number, required: true } })
@@ -85,8 +86,16 @@ async function load({ discardLocal = false, fileId = props.fileId } = {}) {
 				}
 				return saved
 			},
-			onStatus: (status) => { saveStatus.value = status },
-			onConflict: () => { conflictOpen.value = true },
+			onStatus: (status) => {
+				saveStatus.value = status
+				if (status === 'error') {
+					crashLogWarning('save failed') // TEMPORARY: remove after the crash-rate review (owner, 2026-10-28)
+				}
+			},
+			onConflict: () => {
+				conflictOpen.value = true
+				crashLogWarning('save conflict') // TEMPORARY: remove after the crash-rate review (owner, 2026-10-28)
+			},
 		})
 		unsubscribe = history.value.subscribe((rows) => {
 			currentDocument = { ...currentDocument, rows }
