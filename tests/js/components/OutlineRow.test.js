@@ -1,4 +1,6 @@
 import { mount } from '@vue/test-utils'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import OutlineRow from '../../../src/components/OutlineRow.vue'
 import { createHistory } from '../../../src/model/history.js'
@@ -208,5 +210,26 @@ describe('OutlineRow', () => {
 
 		expect(wrapper.find('button[aria-expanded="true"]').exists()).toBe(true)
 		expect(wrapper.find('[data-row-id="r1"] > .outline-row__line .outline-row__bullet').exists()).toBe(false)
+	})
+
+	// jsdom does no layout, so pin the alignment rules in the component's CSS source.
+	describe('first-line alignment CSS', () => {
+		const css = readFileSync(resolve(process.cwd(), 'src/components/OutlineRow.vue'), 'utf8')
+		const rule = (selector) => {
+			const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+			const match = css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`))
+			return match ? match[1] : ''
+		}
+
+		it('keeps the line top-aligned so wrapped text starts at the top', () => {
+			expect(rule('.outline-row__line')).toMatch(/align-items:\s*flex-start/)
+		})
+
+		it('gives the bullet and the row count the first line height', () => {
+			expect(rule('.outline-row__bullet')).toMatch(/height:\s*34px/)
+			expect(rule('.outline-row__bullet')).toMatch(/align-items:\s*center/)
+			expect(rule('.outline-row__more')).toMatch(/height:\s*34px/)
+			expect(rule('.outline-row__more')).toMatch(/align-items:\s*center/)
+		})
 	})
 })

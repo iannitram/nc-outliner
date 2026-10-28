@@ -536,6 +536,10 @@ defineExpose({
 
 .outline-row__more {
 	flex: none;
+	/* Same height as the input's first line, centred on it, so the label sits on the title's text. */
+	display: inline-flex;
+	align-items: center;
+	height: 34px;
 	margin-left: 8px;
 	margin-right: 4px;
 	font-size: 12.5px;
@@ -572,8 +576,12 @@ defineExpose({
 }
 
 .outline-row__bullet {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	width: 24px;
 	min-width: 24px;
+	height: 34px;
 	text-align: center;
 }
 
