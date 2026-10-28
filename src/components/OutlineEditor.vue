@@ -97,7 +97,21 @@ function handleInput(row, event) {
  * @param {import('../model/outline.js').Row} row the row to toggle
  */
 function toggleCollapsed(row) {
+	if (!row.collapsed && activeRowId.value && row.id !== activeRowId.value && containsRow(row, activeRowId.value)) {
+		props.history.execute(updateRow, [row.id, { collapsed: true }])
+		focus(row.id, caretPos.value)
+		return
+	}
 	props.history.execute(updateRow, [row.id, { collapsed: !row.collapsed }])
+}
+
+/**
+ * @param {import('../model/outline.js').Row} row the possible ancestor
+ * @param {string} id the row id to find
+ * @return {boolean}
+ */
+function containsRow(row, id) {
+	return Boolean(row.children && row.children.some((child) => child.id === id || containsRow(child, id)))
 }
 
 /**

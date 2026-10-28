@@ -217,6 +217,72 @@ describe('OutlineEditor', () => {
 		expect(history.current()[0].collapsed).toBe(false)
 	})
 
+	it('moves focus to a collapsed ancestor when its focused descendant is hidden', async () => {
+		const history = createHistory([{
+			id: 'r1',
+			text: 'Parent',
+			note: '',
+			collapsed: false,
+			children: [{ id: 'r2', text: 'Child', note: '', collapsed: false, children: [] }],
+		}])
+		wrapper = mount(OutlineEditor, { props: { history }, attachTo: document.body })
+		const childInput = wrapper.find('[data-row-id="r2"] input').element
+		childInput.focus()
+		childInput.setSelectionRange(2, 2)
+
+		await wrapper.find('button[aria-expanded="true"]').trigger('click')
+
+		const parentInput = wrapper.find('[data-row-id="r1"] input').element
+		expect(document.activeElement).toBe(parentInput)
+	})
+
+	it('keeps focus on the row when collapsing that focused row with ArrowLeft', async () => {
+		const history = createHistory([{
+			id: 'r1',
+			text: 'Parent',
+			note: '',
+			collapsed: false,
+			children: [{ id: 'r2', text: 'Child', note: '', collapsed: false, children: [] }],
+		}])
+		wrapper = mount(OutlineEditor, { props: { history }, attachTo: document.body })
+		const parentInput = wrapper.find('[data-row-id="r1"] input').element
+		parentInput.focus()
+		parentInput.setSelectionRange(0, 0)
+
+		parentInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true }))
+		await wrapper.vm.$nextTick()
+
+		expect(document.activeElement).toBe(parentInput)
+		expect(history.current()[0].collapsed).toBe(true)
+	})
+
+	it('does not move focus when collapsing an unrelated row', async () => {
+		const history = createHistory([
+			{
+				id: 'r1',
+				text: 'Unrelated parent',
+				note: '',
+				collapsed: false,
+				children: [{ id: 'r2', text: 'Child', note: '', collapsed: false, children: [] }],
+			},
+			{
+				id: 'r3',
+				text: 'Focused row',
+				note: '',
+				collapsed: false,
+				children: [],
+			},
+		])
+		wrapper = mount(OutlineEditor, { props: { history }, attachTo: document.body })
+		const focusedInput = wrapper.find('[data-row-id="r3"] input').element
+		focusedInput.focus()
+
+		await wrapper.find('button[aria-expanded="true"]').trigger('click')
+
+		expect(document.activeElement).toBe(focusedInput)
+		expect(history.current()[0].collapsed).toBe(true)
+	})
+
 	it('renders handle, toggle/triangle/bullet, and note slots', () => {
 		const initialTree = [
 			{ id: 'r1', text: 'Row with slots', note: '', collapsed: false, children: [] },
