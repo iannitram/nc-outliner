@@ -47,11 +47,11 @@ final class PublishControllerTest extends TestCase {
 		$user->method('getUID')->willReturn('alice');
 		$session->method('getUser')->willReturn($user);
 		$urls = $this->createMock(IURLGenerator::class);
-		$urls->expects($this->once())->method('linkToRoute')->with('files.view.index', ['openfile'=>'true','fileid'=>22])->willReturn('/apps/files/?openfile=true&fileid=22');
+		$urls->expects($this->once())->method('linkToRoute')->with('files.View.showFile', ['fileid'=>22])->willReturn('/index.php/f/22');
 		$controller = new PublishController($this->createMock(IRequest::class), $service, $session, $urls);
 		$response = $controller->publish(7, '', 'Plan');
 		$this->assertSame(Http::STATUS_OK, $response->getStatus());
-		$this->assertSame(['fileId'=>22,'path'=>'/Plan.odt','openUrl'=>'/apps/files/?openfile=true&fileid=22'], $response->getData());
+		$this->assertSame(['fileId'=>22,'path'=>'/Plan.odt','openUrl'=>'/index.php/f/22'], $response->getData());
 	}
 
 	public function testMissingOutlineReturns404(): void {

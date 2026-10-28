@@ -285,7 +285,7 @@ OmniOutliner's checkbox attribute must be read from a real OmniOutliner export (
 | Files | `lib/Service/PublishService.php`, `lib/Controller/PublishController.php` (present) |
 | Owns | Outline to `.odt` in the folder the user picked, overwriting an earlier copy there (Nextcloud keeps its versions) |
 | Issue | #113 (server), #9 (button, picker, open in Office) |
-| Open URL | `files.view.index` with `openfile=true` and `fileid=<published file id>` opens the file in Files and lets Nextcloud Office handle it |
+| Open URL | `files.View.showFile` with `fileid=<published file id>` (`/index.php/f/<id>`), which redirects to the Files app with `openfile=true` and opens Nextcloud Office; checked on NC 33.0.10 (#173) |
 
 ```php
 final class PublishService {
@@ -461,7 +461,7 @@ What we bring in rather than write, and where it fits. New npm packages are adde
 | `@nextcloud/axios`, `@nextcloud/router` | The browser API client (#106): request token and app URLs | in `package.json` |
 | PHP `DOMDocument` (ext-dom), `XMLWriter`, `ZipArchive` (ext-zip) | OPML parse, `content.xml`, the `.odt` zip. Nextcloud already requires these extensions | built in |
 | Files Versions app | Versions and version labels (#4) | ships with Nextcloud |
-| Nextcloud Office (richdocuments) | Opens the published `.odt` (#9): open the file through the Files app with `openfile=true`; check the exact URL on Nextcloud 33 | installed on the server |
+| Nextcloud Office (richdocuments) | Opens the published `.odt` (#9): open the file at `/index.php/f/<id>` (the Files app opens it with `openfile=true`) | installed on the server |
 | `sortablejs` (the drag library Nextcloud Tasks uses) | Candidate for drag (#98). Nesting by drop position is our own logic either way, through `moveTo`; native pointer events are the alternative | decide in #98 |
 | TipTap (Nextcloud Text's editor) | After 1.0 only, for rich text (F15). Not in 1.0 | after-1.0 |
 
