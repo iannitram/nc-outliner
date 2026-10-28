@@ -37,6 +37,19 @@ describe('OutlineRow', () => {
 		expect(input.element.selectionEnd).toBe(0)
 	})
 
+	it('turns pasted line breaks into spaces, keeping the caret after the paste', async () => {
+		const row = { id: 'r1', text: '', note: '', collapsed: false, children: [] }
+		wrapper = mount(OutlineRow, { props: { row }, attachTo: document.body })
+		const input = wrapper.get('textarea.outline-row__input')
+		input.element.value = 'one\r\ntwo\nthree tail'
+		input.element.setSelectionRange(13, 13)
+		await input.trigger('input')
+		expect(input.element.value).toBe('one two three tail')
+		expect(input.element.selectionStart).toBe(13)
+		const emitted = wrapper.emitted('input-text')
+		expect(emitted[emitted.length - 1][1]).toBe('one two three tail')
+	})
+
 	it('grows wrapped text on input, width changes and History updates, then disconnects', async () => {
 		let resize
 		const disconnect = vi.fn()

@@ -191,6 +191,13 @@ watch(
  * @param {InputEvent} event the input event
  */
 function handleInput(event) {
+	// A row is one line: pasted line breaks become spaces, as the old single-line input did.
+	const el = event.target
+	if (/[\r\n]/.test(el.value)) {
+		const caret = el.value.slice(0, el.selectionStart ?? el.value.length).replace(/\r\n|\r|\n/g, ' ').length
+		el.value = el.value.replace(/\r\n|\r|\n/g, ' ')
+		el.setSelectionRange?.(caret, caret)
+	}
 	fitText()
 	if (editor) {
 		editor.onInput(props.row, event)
