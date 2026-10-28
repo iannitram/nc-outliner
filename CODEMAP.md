@@ -24,7 +24,7 @@ Merged in #84.
 | Path | What it is |
 |---|---|
 | `appinfo/info.xml` | App id `nc_outliner`, name "Outliner", Nextcloud 33 only, the navigation entry (route `nc_outliner.page.index`) |
-| `appinfo/routes.php` | Routes: `GET /` (page#index), the five outline routes and the two settings routes (see [API](#api)). Later routes are added here |
+| `appinfo/routes.php` | Routes: `GET /` (page#index), the five outline routes, the publish route and the two settings routes (see [API](#api)). Later routes are added here |
 | `lib/AppInfo/Application.php` | App bootstrap; holds `APP_ID`; registers `IOutlineStore` as an alias of `OutlineStore` |
 | `lib/Controller/PageController.php` | `index()` returns the `main` template |
 | `templates/main.php` | Loads the built script `js/nc_outliner-main.mjs` and stylesheet `css/nc_outliner-style.css`; has the mount div `#nc_outliner` |
@@ -282,9 +282,10 @@ OmniOutliner's checkbox attribute must be read from a real OmniOutliner export (
 
 | | |
 |---|---|
-| Files | `lib/Service/PublishService.php`, `lib/Controller/PublishController.php` (planned) |
+| Files | `lib/Service/PublishService.php`, `lib/Controller/PublishController.php` (present) |
 | Owns | Outline to `.odt` in the folder the user picked, overwriting an earlier copy there (Nextcloud keeps its versions) |
 | Issue | #113 (server), #9 (button, picker, open in Office) |
+| Open URL | `files.view.index` with `openfile=true` and `fileid=<published file id>` opens the file in Files and lets Nextcloud Office handle it |
 
 ```php
 final class PublishService {
