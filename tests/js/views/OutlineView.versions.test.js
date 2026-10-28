@@ -1,6 +1,8 @@
 import { NcAppContent, NcContent, NcIconSvgWrapper } from '@nextcloud/vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import OutlineTopBar from '../../../src/components/OutlineTopBar.vue'
+import SortDialog from '../../../src/components/SortDialog.vue'
 import VersionsSidebar from '../../../src/components/VersionsSidebar.vue'
 import OutlineView from '../../../src/views/OutlineView.vue'
 import { listOutlines, readOutline, saveOutline } from '../../../src/api/outlines.js'
@@ -142,6 +144,21 @@ describe('OutlineView: versions in the sidebar with a read-only preview (#185)',
 
 		expect(document.body.querySelectorAll('.outline-row')).toHaveLength(2)
 		expect(saveOutline).not.toHaveBeenCalled()
+	})
+
+	it('offers no sort while a version is previewed, so the hidden current outline is not changed', async () => {
+		await preview()
+		const topBar = wrapper.findComponent(OutlineTopBar)
+
+		expect(topBar.props('sortDisabled')).toBe(true)
+		topBar.vm.$emit('openSort')
+		await flushPromises()
+
+		expect(wrapper.findComponent(SortDialog).props('open')).toBe(false)
+		expect(saveOutline).not.toHaveBeenCalled()
+
+		await click(textButton('Back to current'))
+		expect(topBar.props('sortDisabled')).toBe(false)
 	})
 
 	it('says "This version can\'t be opened" instead of raw text when the version is not OPML', async () => {

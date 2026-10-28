@@ -28,6 +28,11 @@ const props = defineProps({
 		type: Boolean,
 		default: false,
 	},
+	/** True while a read-only version preview is shown: there is nothing to sort. */
+	sortDisabled: {
+		type: Boolean,
+		default: false,
+	},
 })
 
 defineEmits(['published', 'openVersions', 'openSort'])
@@ -97,7 +102,7 @@ onUnmounted(() => {
 		</NcButton>
 		<NcActions :forceMenu="true" ariaLabel="More actions">
 			<slot name="actions">
-				<NcActionButton @click="$emit('openSort')">
+				<NcActionButton :disabled="sortDisabled" @click="$emit('openSort')">
 					<template #icon>
 						<svg
 							viewBox="0 0 24 24"

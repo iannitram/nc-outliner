@@ -254,7 +254,10 @@ function onPublished(newPath, openUrl = '') {
  * @param {{by: 'text'|'status'|'note', direction: 'asc'|'desc'}} choice the dialog's choice
  */
 function applySort({ by, direction }) {
-	history.value?.execute(sortRows, [by, direction])
+	// A version preview is read-only: sorting then would change the hidden current outline.
+	if (!preview.value) {
+		history.value?.execute(sortRows, [by, direction])
+	}
 	sortOpen.value = false
 }
 
@@ -316,9 +319,10 @@ watch(() => props.fileId, () => {
 				:publishPath="document?.publishPath ?? null"
 				:name="name"
 				:beforePublish="flushPendingSave"
+				:sortDisabled="Boolean(preview)"
 				@published="onPublished"
 				@openVersions="toggleVersions"
-				@openSort="sortOpen = true" />
+				@openSort="sortOpen = !preview" />
 			<template v-if="preview">
 				<div class="version-banner" role="status">
 					<NcIconSvgWrapper class="version-banner__icon" :path="mdiEyeOutline" :size="20" />
