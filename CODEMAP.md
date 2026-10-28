@@ -254,6 +254,10 @@ All routes are under `/apps/nc_outliner/api`, take and return JSON, and are `#[N
 
 Nextcloud 33 and `@nextcloud/vue` provide `NcThemeProvider` to enforce themes for UI subtrees. In `@nextcloud/vue` components and Nextcloud 33 stylesheets, themes are scoped via `[data-theme-dark]`, `[data-theme-light]`, and `[data-themes*=...]` selectors while providing `INJECTION_KEY_THEME` for `useIsDarkTheme`. `App.vue` wraps the application in `<NcThemeProvider :dark="theme === 'dark'" :light="theme === 'light'">`. When `theme` is `'auto'`, neither `dark` nor `light` is passed, so the app follows Nextcloud's ambient theme and system `prefers-color-scheme`. When `'dark'` or `'light'` is selected, `NcThemeProvider` enforces the theme scope on child elements and components. All colors in the app are derived from Nextcloud CSS theme variables without hardcoded literals.
 
+Dialog overlays are mounted inside the provider (`:container="null"` on `ConflictDialog.vue`'s `NcDialog`, forwarded to `NcModal`) so a forced theme reaches them.
+
+Overlay audit: `src/` has no other `NcDialog`, `NcModal`, `NcPopover`, `NcActions`, `NcSelect`, or direct teleport. `OutlineView.vue` also calls `@nextcloud/dialogs`' `showSuccess`: this global toast remains outside the provider and follows Nextcloud's theme. It has no in-place `container: null` option; its documented testing `selector` option creates a separate Vue toast manager on each call, so moving it requires managing a separate toast host and lifecycle rather than the dialog's in-place mounting fix. Keeping the global manager lets the copy confirmation survive outline navigation. `ThemeSetting.vue` uses a native select, whose browser popup has no teleport container.
+
 ### Versions
 
 | | |

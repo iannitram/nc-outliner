@@ -9,6 +9,7 @@ const emit = defineEmits(['reload', 'keepCopy'])
 	<NcDialog
 		v-if="open"
 		:open="open"
+		:container="null"
 		name="Changed somewhere else"
 		:noClose="true">
 		<p>{{ name }} was changed in another tab or device. Your changes are not saved yet.</p>
