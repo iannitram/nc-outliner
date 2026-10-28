@@ -16,6 +16,8 @@ final class Outline {
 		public string $title = '',
 		public array $rows = [],
 		public ?string $publishPath = null,
+		/** @var list<array{id: string, name: string, type: string, width: int, hidden: bool, summary?: string}> */
+		public array $columns = [],
 	) {
 	}
 }

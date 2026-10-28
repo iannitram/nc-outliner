@@ -138,6 +138,15 @@ final class OpmlCodecTest extends TestCase {
 		$this->assertEquals($original, $parsed);
 	}
 
+	public function testRoundTripsColumnsAndTypedRowValues(): void {
+		$original = new Outline('Plan', [new Row('r1', 'A', '', false, [], ['c1' => 12.5, 'c2' => true])], null, [
+			['id' => 'c1', 'name' => 'Estimate', 'type' => 'number', 'width' => 140, 'hidden' => false, 'summary' => 'sum'],
+			['id' => 'c2', 'name' => 'Done', 'type' => 'checkbox', 'width' => 100, 'hidden' => false, 'summary' => 'count'],
+		]);
+		$codec = new OpmlCodec();
+		$this->assertEquals($original, $codec->parse($codec->write($original)));
+	}
+
 	public function testWritesNoNoteAttributeForEmptyNote(): void {
 		$xml = (new OpmlCodec())->write(new Outline('T', [new Row('r1', 'A', '')]));
 

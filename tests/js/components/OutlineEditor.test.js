@@ -33,7 +33,7 @@ describe('OutlineEditor', () => {
 			attachTo: document.body,
 		})
 
-		const inputs = wrapper.findAll('input')
+		const inputs = wrapper.findAll('.outline-row__input')
 		expect(inputs).toHaveLength(3)
 		expect(inputs[0].element.value).toBe('First row')
 
@@ -60,7 +60,7 @@ describe('OutlineEditor', () => {
 			attachTo: document.body,
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		const runCommandSpy = vi.spyOn(keymap, 'runCommand').mockImplementation(() => {})
 		vi.spyOn(keymap, 'commandForKey').mockReturnValue('newRowBelow')
 
@@ -89,7 +89,7 @@ describe('OutlineEditor', () => {
 			attachTo: document.body,
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		const runCommandSpy = vi.spyOn(keymap, 'runCommand').mockImplementation(() => {})
 		vi.spyOn(keymap, 'commandForKey').mockReturnValue(null)
 

@@ -1,5 +1,7 @@
 <script setup>
 import { inject, onUnmounted, ref, watch } from 'vue'
+import ColumnCell from './ColumnCell.vue'
+import { summarizeColumn } from '../model/columns.js'
 
 const props = defineProps({
 	row: {
@@ -121,6 +123,20 @@ defineExpose({
 				@input="handleInput"
 				@keydown="handleKeydown"
 				@focus="handleFocus">
+			<template v-for="column in (editor?.columns?.() || [])" :key="column.id">
+				<span
+					v-if="row.children?.length && column.summary && column.summary !== 'none'"
+					class="outline-row__summary"
+					:style="{ width: `${column.width}px` }"
+					:aria-label="`${column.name} summary`">
+					{{ summarizeColumn(row, column, column.summary) ?? '' }}
+				</span>
+				<ColumnCell
+					v-else
+					:column="column"
+					:value="row.values?.[column.id]"
+					@update:value="editor.setColumnValue(row, column.id, $event)" />
+			</template>
 		</div>
 		<slot name="note" :row="row" />
 		<div
@@ -169,6 +185,8 @@ defineExpose({
 	border-color: var(--color-primary-element, var(--color-border));
 	background-color: var(--color-main-background);
 }
+
+.outline-row__summary { flex: 0 0 auto; }
 
 .outline-row__children {
 	margin-left: 24px;

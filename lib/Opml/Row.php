@@ -18,6 +18,8 @@ final class Row {
 		public string $note = '',
 		public bool $collapsed = false,
 		public array $children = [],
+		/** @var array<string, mixed> */
+		public array $values = [],
 	) {
 	}
 
@@ -31,6 +33,7 @@ final class Row {
 			'note' => $this->note,
 			'collapsed' => $this->collapsed,
 			'children' => array_map(static fn (Row $child): array => $child->toArray(), $this->children),
+			'values' => $this->values,
 		];
 	}
 
@@ -48,6 +51,7 @@ final class Row {
 			(string)($data['note'] ?? ''),
 			(bool)($data['collapsed'] ?? false),
 			$children,
+			(array)($data['values'] ?? []),
 		);
 	}
 }

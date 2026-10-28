@@ -67,8 +67,8 @@ final class OutlineControllerTest extends TestCase {
 			'name' => 'Plan.opml',
 			'etag' => 'e1',
 			'outline' => ['title' => 'Plan', 'rows' => [
-				['id' => 'r1', 'text' => 'First', 'note' => '', 'collapsed' => false, 'children' => []],
-			], 'publishPath' => null],
+				['id' => 'r1', 'text' => 'First', 'note' => '', 'collapsed' => false, 'children' => [], 'values' => []],
+			], 'publishPath' => null, 'columns' => []],
 		], $response->getData());
 		$this->assertSame(Http::STATUS_NOT_FOUND, $this->controller->show(7)->getStatus());
 	}

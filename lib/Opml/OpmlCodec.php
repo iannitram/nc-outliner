@@ -41,6 +41,7 @@ final class OpmlCodec {
 
 		$title = $head === null ? '' : ($this->childElement($head, 'title')?->textContent ?? '');
 		$publishPath = $head === null ? null : $this->namespacedChildText($head, 'publishPath');
+		$columns = $head === null ? [] : $this->namespacedJsonChild($head, 'columns', []);
 		$rows = [];
 		foreach ($body->childNodes as $child) {
 			if ($child instanceof \DOMElement && $child->localName === 'outline') {
@@ -48,7 +49,7 @@ final class OpmlCodec {
 			}
 		}
 
-		return new Outline($title, $rows, $publishPath);
+		return new Outline($title, $rows, $publishPath, $columns);
 	}
 
 	private function childElement(\DOMElement $parent, string $name): ?\DOMElement {
@@ -71,6 +72,15 @@ final class OpmlCodec {
 		return null;
 	}
 
+	private function namespacedJsonChild(\DOMElement $parent, string $name, array $default): array {
+		$value = $this->namespacedChildText($parent, $name);
+		if ($value === null || $value === '') {
+			return $default;
+		}
+		$decoded = json_decode($value, true);
+		return is_array($decoded) ? $decoded : $default;
+	}
+
 	private function parseRow(\DOMElement $element): Row {
 		$children = [];
 		foreach ($element->childNodes as $child) {
@@ -89,7 +99,16 @@ final class OpmlCodec {
 			$element->getAttribute('_note'),
 			$element->getAttributeNS(self::NS, 'collapsed') === 'true',
 			$children,
+			$this->namespacedJsonAttribute($element, 'values', []),
 		);
+	}
+
+	private function namespacedJsonAttribute(\DOMElement $element, string $name, array $default): array {
+		if (!$element->hasAttributeNS(self::NS, $name)) {
+			return $default;
+		}
+		$decoded = json_decode($element->getAttributeNS(self::NS, $name), true);
+		return is_array($decoded) ? $decoded : $default;
 	}
 
 	public function write(Outline $outline): string {
@@ -110,6 +129,11 @@ final class OpmlCodec {
 			$publishPath = $document->createElement('nco:publishPath');
 			$publishPath->textContent =$outline->publishPath;
 			$head->appendChild($publishPath);
+		}
+		if ($outline->columns !== []) {
+			$columns = $document->createElement('nco:columns');
+			$columns->textContent = json_encode($outline->columns, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+			$head->appendChild($columns);
 		}
 		
 		$opml->appendChild($head);
@@ -133,6 +157,9 @@ final class OpmlCodec {
 		$outline->setAttributeNS(self::NS, 'nco:id', $row->id);
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
+		}
+		if ($row->values !== []) {
+			$outline->setAttributeNS(self::NS, 'nco:values', json_encode($row->values, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 		}
 		
 		foreach ($row->children as $child) {

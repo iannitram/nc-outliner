@@ -1,7 +1,9 @@
 <script setup>
-import { nextTick, onUnmounted, provide, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, provide, ref, watch } from 'vue'
+import ColumnsBar from './ColumnsBar.vue'
 import OutlineRow from './OutlineRow.vue'
 import * as keymap from '../editor/keymap.js'
+import { sortRowsByColumn } from '../model/columns.js'
 import { updateRow } from '../model/outline.js'
 
 const props = defineProps({
@@ -9,13 +11,25 @@ const props = defineProps({
 		type: Object,
 		required: true,
 	},
+	columns: { type: Array, default: () => [] },
 })
+
+const emit = defineEmits(['outlineChange'])
 
 const rootRef = ref(null)
 const tree = ref(props.history.current())
 const activeRowId = ref(null)
 const caretPos = ref(0)
 const inputRefs = new Map()
+const keepSorted = ref(false)
+const sortState = ref(null)
+const visibleTree = computed(() => {
+	if (!keepSorted.value || !sortState.value) {
+		return tree.value
+	}
+	const column = props.columns.find((item) => item.id === sortState.value.id)
+	return column ? sortRowsByColumn(tree.value, column, sortState.value.direction) : tree.value
+})
 
 let unsubscribe = null
 
@@ -144,7 +158,29 @@ provide('outlineEditor', {
 	unregisterInput: (id) => {
 		inputRefs.delete(id)
 	},
+	columns: () => props.columns.filter((column) => !column.hidden),
+	setColumnValue: (row, columnId, value) => props.history.execute(updateRow, [row.id, { values: { ...(row.values ?? {}), [columnId]: value } }]),
 })
+
+/**
+ *
+ * @param {import('../model/outline.js').Tree} rows sorted rows to record
+ */
+function sortPermanently(rows) {
+	props.history.execute(() => rows, [])
+}
+
+/**
+ *
+ * @param {import('../model/outline.js').Tree} rows sorted rows
+ * @param {{id: string, direction: string}} state active sort column and direction
+ */
+function handleSort(rows, state) {
+	sortState.value = state
+	if (!keepSorted.value) {
+		sortPermanently(rows)
+	}
+}
 
 defineExpose({
 	focus,
@@ -156,8 +192,14 @@ defineExpose({
 		ref="rootRef"
 		class="outline-editor"
 		role="tree">
+		<ColumnsBar
+			:outline="{ columns, rows: tree }"
+			:keepSorted="keepSorted"
+			@update:outline="emit('outlineChange', $event)"
+			@sort="handleSort"
+			@update:keepSorted="keepSorted = $event" />
 		<OutlineRow
-			v-for="row in tree"
+			v-for="row in visibleTree"
 			:key="row.id"
 			:row="row">
 			<template v-for="(_, name) in $slots" #[name]="slotProps">

@@ -119,15 +119,16 @@ final class OutlineController extends Controller {
 		foreach ((array)($data['rows'] ?? []) as $row) {
 			$rows[] = Row::fromArray((array)$row);
 		}
-		return new Outline((string)($data['title'] ?? ''), $rows, isset($data['publishPath']) ? (string)$data['publishPath'] : null);
+		return new Outline((string)($data['title'] ?? ''), $rows, isset($data['publishPath']) ? (string)$data['publishPath'] : null, (array)($data['columns'] ?? []));
 	}
 
-	/** @return array{title: string, rows: list<array<string, mixed>>, publishPath: ?string} */
+	/** @return array{title: string, rows: list<array<string, mixed>>, publishPath: ?string, columns: list<array<string, mixed>>} */
 	private function outlineToArray(Outline $outline): array {
 		return [
 			'title' => $outline->title,
 			'rows' => array_map(static fn (Row $row): array => $row->toArray(), $outline->rows),
 			'publishPath' => $outline->publishPath,
+			'columns' => $outline->columns,
 		];
 	}
 }

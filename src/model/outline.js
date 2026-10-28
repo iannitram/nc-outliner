@@ -173,7 +173,7 @@ export function updateRow(tree, id, patch) {
 	}
 	const row = path.slice(0, -1).reduce((siblings, index) => siblings[index].children, tree)[path[path.length - 1]]
 	const updates = {}
-	for (const key of ['text', 'note', 'collapsed']) {
+	for (const key of ['text', 'note', 'collapsed', 'values']) {
 		if (Object.hasOwn(patch, key) && patch[key] !== row[key]) {
 			updates[key] = patch[key]
 		}
