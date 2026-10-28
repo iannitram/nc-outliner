@@ -60,13 +60,14 @@ vi.mock('../../../src/editor/saver.js', async (importOriginal) => {
 
 vi.mock('../../../src/components/OutlineEditor.vue', () => ({
 	default: {
+		name: 'OutlineEditor',
 		props: ['history'],
 		methods: {
 			edit() {
 				this.history.execute((rows) => [{ ...rows[0], text: 'Edited' }], [])
 			},
 		},
-		template: '<button @click="edit">Edit outline</button>',
+		template: '<div class="outline-editor"><button @click="edit">Edit outline</button></div>',
 	},
 }))
 
@@ -231,5 +232,29 @@ describe('OutlineView autosave conflict flow', () => {
 		await flushPromises()
 		expect(scheduleSpy).toHaveBeenCalledTimes(1)
 		expect(scheduleSpy).toHaveBeenCalledWith(expect.objectContaining({ publishPath: '/Documents/Plan.odt' }))
+	})
+
+	it('pins the status line as the last child of the flex column view and positions the editor area as the scroll container', async () => {
+		wrapper = mount(OutlineView, { props: { fileId: 3 } })
+		await flushPromises()
+
+		const view = wrapper.find('.outline-view')
+		expect(view.exists()).toBe(true)
+
+		const children = Array.from(view.element.children)
+		const topBar = wrapper.find('.outline-top-bar')
+		const editor = wrapper.find('.outline-editor')
+		const statusLine = wrapper.find('.status-line')
+
+		expect(topBar.exists()).toBe(true)
+		expect(editor.exists()).toBe(true)
+		expect(statusLine.exists()).toBe(true)
+
+		expect(children[0]).toBe(topBar.element)
+		expect(children.indexOf(editor.element)).toBeGreaterThan(0)
+		expect(children.indexOf(editor.element)).toBeLessThan(children.length - 1)
+		expect(children[children.length - 1]).toBe(statusLine.element)
+		expect(view.element.lastElementChild).toBe(statusLine.element)
+		expect(editor.classes()).toContain('outline-editor')
 	})
 })

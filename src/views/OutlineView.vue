@@ -238,31 +238,49 @@ watch(() => props.fileId, load)
 			<button v-if="history.current().length === 0" type="button" @click="addFirstRow">
 				Add first row
 			</button>
-			<OutlineEditor v-if="history" :history="history" />
+			<OutlineEditor v-if="history" :history="history" class="outline-editor" />
+			<ConflictDialog
+				:open="conflictOpen"
+				:name="name"
+				@reload="reloadAfterConflict"
+				@keepCopy="keepCopy" />
+			<VersionsPanel
+				:fileId="props.fileId"
+				:open="versionsOpen"
+				:flush="flushBeforeRestore"
+				:reload="reloadAfterRestore"
+				@close="versionsOpen = false" />
 			<StatusLine
 				:status="saveStatus"
 				:rows="document?.rows ?? []"
 				:publishPath="document?.publishPath ?? null" />
 		</template>
-		<ConflictDialog
-			:open="conflictOpen"
-			:name="name"
-			@reload="reloadAfterConflict"
-			@keepCopy="keepCopy" />
-		<VersionsPanel
-			:fileId="props.fileId"
-			:open="versionsOpen"
-			:flush="flushBeforeRestore"
-			:reload="reloadAfterRestore"
-			@close="versionsOpen = false" />
 	</section>
 </template>
 
 <style scoped>
 .outline-view {
 	width: 100%;
+	height: 100%;
 	display: flex;
 	flex-direction: column;
-	min-height: 100%;
+	overflow: hidden;
+}
+
+.outline-top-bar,
+:deep(.outline-top-bar) {
+	flex: none;
+}
+
+.outline-editor,
+:deep(.outline-editor) {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+}
+
+.status-line,
+:deep(.status-line) {
+	flex: none;
 }
 </style>
