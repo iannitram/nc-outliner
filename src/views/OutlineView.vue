@@ -1,4 +1,5 @@
 <script setup>
+import { showSuccess } from '@nextcloud/dialogs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConflictDialog from '../components/ConflictDialog.vue'
 import OutlineEditor from '../components/OutlineEditor.vue'
@@ -128,6 +129,7 @@ async function keepCopy() {
 		saver = null
 		currentSession = null
 		window.location.hash = `#/outline/${copy.fileId}`
+		showSuccess(`Saved as ${copy.name}`)
 	} catch {
 		error.value = 'Could not save your changes as a copy.'
 	}

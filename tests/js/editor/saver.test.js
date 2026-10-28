@@ -54,4 +54,33 @@ describe('createSaver', () => {
 		await vi.advanceTimersByTimeAsync(10000)
 		expect(save).toHaveBeenCalledTimes(2)
 	})
+
+	it('retries repeated failures after 2000 ms, then 5000 ms more, then 15000 ms more, and later retries keep the 15 s interval', async () => {
+		const save = vi.fn().mockRejectedValue(new Error('offline'))
+		const saver = createSaver({ save })
+		saver.schedule('doc')
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(save).toHaveBeenCalledTimes(1)
+		expect(saver.status()).toBe('error')
+
+		await vi.advanceTimersByTimeAsync(1999)
+		expect(save).toHaveBeenCalledTimes(1)
+		await vi.advanceTimersByTimeAsync(1)
+		expect(save).toHaveBeenCalledTimes(2)
+
+		await vi.advanceTimersByTimeAsync(4999)
+		expect(save).toHaveBeenCalledTimes(2)
+		await vi.advanceTimersByTimeAsync(1)
+		expect(save).toHaveBeenCalledTimes(3)
+
+		await vi.advanceTimersByTimeAsync(14999)
+		expect(save).toHaveBeenCalledTimes(3)
+		await vi.advanceTimersByTimeAsync(1)
+		expect(save).toHaveBeenCalledTimes(4)
+
+		await vi.advanceTimersByTimeAsync(14999)
+		expect(save).toHaveBeenCalledTimes(4)
+		await vi.advanceTimersByTimeAsync(1)
+		expect(save).toHaveBeenCalledTimes(5)
+	})
 })
