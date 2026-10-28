@@ -26,13 +26,21 @@ export const commands = {
 	indent(ctx) {
 		const executed = ctx.history.execute(indent, [ctx.rowId])
 		if (executed) {
-			ctx.focus(ctx.rowId)
+			if (ctx.caret === undefined) {
+				ctx.focus(ctx.rowId)
+			} else {
+				ctx.focus(ctx.rowId, ctx.caret)
+			}
 		}
 	},
 	outdent(ctx) {
 		const executed = ctx.history.execute(outdent, [ctx.rowId])
 		if (executed) {
-			ctx.focus(ctx.rowId)
+			if (ctx.caret === undefined) {
+				ctx.focus(ctx.rowId)
+			} else {
+				ctx.focus(ctx.rowId, ctx.caret)
+			}
 		}
 	},
 }

@@ -109,27 +109,30 @@ onUnmounted(() => {
  */
 function focus(rowId, where = 'start') {
 	activeRowId.value = rowId
-	let el = inputRefs.get(rowId)
-	if (!el && rootRef.value) {
-		el = rootRef.value.querySelector(`[data-row-id="${rowId}"] .outline-row__input, .outline-row__input[data-row-id="${rowId}"]`)
+	const find = () => {
+		const ref = inputRefs.get(rowId)
+		if (ref && ref.isConnected) {
+			return ref
+		}
+		return rootRef.value?.querySelector(`[data-row-id="${rowId}"] .outline-row__input, .outline-row__input[data-row-id="${rowId}"]`) || null
 	}
-	if (el) {
+	const apply = (el) => {
 		el.focus()
-		const pos = where === 'end' ? el.value.length : (typeof where === 'number' ? where : 0)
+		const pos = where === 'end' ? el.value.length : (typeof where === 'number' ? Math.min(where, el.value.length) : 0)
 		el.setSelectionRange(pos, pos)
-	} else {
-		nextTick(() => {
-			let deferredEl = inputRefs.get(rowId)
-			if (!deferredEl && rootRef.value) {
-				deferredEl = rootRef.value.querySelector(`[data-row-id="${rowId}"] .outline-row__input, .outline-row__input[data-row-id="${rowId}"]`)
-			}
-			if (deferredEl) {
-				deferredEl.focus()
-				const pos = where === 'end' ? deferredEl.value.length : (typeof where === 'number' ? where : 0)
-				deferredEl.setSelectionRange(pos, pos)
-			}
-		})
 	}
+	const el = find()
+	if (el) {
+		apply(el)
+	}
+	// A structural change (indent, outdent, move) re-renders the row under a new parent, so the
+	// input focused above is replaced on the next render. Focus the row's new input once it exists.
+	nextTick(() => {
+		const current = find()
+		if (current && document.activeElement !== current) {
+			apply(current)
+		}
+	})
 }
 
 /**
@@ -193,6 +196,7 @@ function handleKeydown(row, event) {
 		keymap.runCommand(command, {
 			history: props.history,
 			rowId: row.id,
+			caret: selStart,
 			focus,
 		})
 	}
