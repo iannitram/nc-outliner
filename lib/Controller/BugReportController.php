@@ -17,6 +17,7 @@ use OCP\IRequest;
 use OCP\IUserSession;
 use OCP\Share\Exceptions\ShareNotFound;
 use OCP\Share\IManager as IShareManager;
+use OCP\Share\IShare;
 use Psr\Log\LoggerInterface;
 
 final class BugReportController extends Controller {
@@ -82,35 +83,36 @@ final class BugReportController extends Controller {
 			return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
 		}
 		if ($share !== null) {
-			if (($share->getPermissions() & Constants::PERMISSION_CREATE) === 0) {
-				$this->logger->error('Bug report relay: the drop share does not allow creating files', ['app' => Application::APP_ID]);
+			// Core's getShareByToken() drops expired shares but never checks a share's password (the
+			// public-share auth layer does that), so every condition is checked here. A refusal never
+			// falls back to HTTP: that would hand the same share to the public endpoint.
+			$refusal = $this->localDropRefusal($share);
+			if ($refusal !== null) {
+				$this->logger->error('Bug report relay: ' . $refusal, ['app' => Application::APP_ID]);
 				return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
 			}
-			$this->countAttempt($user->getUID(), $times, $now);
 			try {
+				/** @var Folder $folder */
 				$folder = $share->getNode();
-				if (!$folder instanceof Folder) {
-					$this->logger->error('Bug report relay: the drop share is not a folder', ['app' => Application::APP_ID]);
-					return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
-				}
 				$folder->newFile($file['name'], $bytes);
-				return new JSONResponse(['sent' => true], 201);
 			} catch (\Throwable $e) {
 				$this->logger->error('Bug report relay: could not write the report into the drop share: ' . get_class($e), ['app' => Application::APP_ID]);
 				return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
 			}
+			$this->countAttempt($user->getUID(), $times, $now);
+			return new JSONResponse(['sent' => true], 201);
 		}
 		if ($base === '') {
 			$this->logger->error('Bug report relay: the drop token is not a share here and no drop base URL is set', ['app' => Application::APP_ID]);
 			return new JSONResponse(['message' => 'Bug reports are not set up for this app.'], 503);
 		}
-		$this->countAttempt($user->getUID(), $times, $now);
 		try {
 			$response = $this->clientService->newClient()->put(
 				rtrim($base, '/') . '/public.php/dav/files/' . rawurlencode($token) . '/' . $file['name'],
 				['body' => $bytes, 'headers' => ['Content-Type' => 'application/zip'], 'allow_redirects' => false],
 			);
 			if (in_array($response->getStatusCode(), [201, 204], true)) {
+				$this->countAttempt($user->getUID(), $times, $now);
 				return new JSONResponse(['sent' => true], 201);
 			}
 			$this->logger->error('Bug report relay: the drop answered HTTP ' . $response->getStatusCode(), ['app' => Application::APP_ID]);
@@ -119,6 +121,34 @@ final class BugReportController extends Controller {
 			$this->logger->error('Bug report relay: the HTTP upload to the drop failed: ' . get_class($e), ['app' => Application::APP_ID]);
 		}
 		return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
+	}
+
+	/**
+	 * Why a share may not take a local write, or null when it may. Only an open link or email
+	 * folder share qualifies: no password, not expired, a folder node, create permission.
+	 */
+	private function localDropRefusal(IShare $share): ?string {
+		if (!in_array($share->getShareType(), [IShare::TYPE_LINK, IShare::TYPE_EMAIL], true)) {
+			return 'the drop token is not a link or email share';
+		}
+		if ((string)$share->getPassword() !== '') {
+			return 'the drop share is password protected';
+		}
+		$expires = $share->getExpirationDate();
+		if ($expires !== null && $expires <= new \DateTime()) {
+			return 'the drop share has expired';
+		}
+		if (($share->getPermissions() & Constants::PERMISSION_CREATE) === 0) {
+			return 'the drop share does not allow creating files';
+		}
+		try {
+			if (!$share->getNode() instanceof Folder) {
+				return 'the drop share is not a folder';
+			}
+		} catch (\Throwable $e) {
+			return 'the drop share folder could not be opened: ' . get_class($e);
+		}
+		return null;
 	}
 
 	/**
