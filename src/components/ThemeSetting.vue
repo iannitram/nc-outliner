@@ -1,6 +1,7 @@
 <script setup>
 defineProps({
 	modelValue: { type: String, default: 'auto' },
+	disabled: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -11,6 +12,7 @@ const emit = defineEmits(['update:modelValue'])
 		<span>Theme</span>
 		<select
 			:value="modelValue"
+			:disabled="disabled"
 			aria-label="Theme"
 			@change="emit('update:modelValue', $event.target.value)">
 			<option value="auto">Auto</option>

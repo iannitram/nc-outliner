@@ -10,6 +10,7 @@ const hash = ref(window.location.hash)
 const outlineView = ref(null)
 const theme = ref('auto')
 const settingsError = ref('')
+const settingsBusy = ref(true)
 let hashChangeGeneration = 0
 const fileId = computed(() => {
 	const match = hash.value.match(/^#\/outline\/(\d+)$/)
@@ -55,6 +56,10 @@ function showList() {
 
 /** @param {'auto'|'light'|'dark'} value user's theme override */
 async function updateTheme(value) {
+	if (settingsBusy.value) {
+		return
+	}
+	settingsBusy.value = true
 	const previous = theme.value
 	theme.value = value
 	settingsError.value = ''
@@ -64,6 +69,8 @@ async function updateTheme(value) {
 	} catch {
 		theme.value = previous
 		settingsError.value = 'Could not save the theme setting.'
+	} finally {
+		settingsBusy.value = false
 	}
 }
 
@@ -73,6 +80,8 @@ onMounted(async () => {
 		theme.value = (await getSettings()).theme
 	} catch {
 		settingsError.value = 'Could not load the theme setting.'
+	} finally {
+		settingsBusy.value = false
 	}
 })
 onUnmounted(() => window.removeEventListener('hashchange', syncHash))
@@ -85,7 +94,7 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 				<NcButton @click="showList">
 					My outlines
 				</NcButton>
-				<ThemeSetting :modelValue="theme" @update:modelValue="updateTheme" />
+				<ThemeSetting :modelValue="theme" :disabled="settingsBusy" @update:modelValue="updateTheme" />
 				<p v-if="settingsError" role="alert">
 					{{ settingsError }}
 				</p>

@@ -46,4 +46,30 @@ describe('App', () => {
 		expect(wrapper.find('[data-theme-light="true"]').exists()).toBe(true)
 		wrapper.unmount()
 	})
+
+	it('keeps the theme control disabled until loading and the current write finish', async () => {
+		vi.clearAllMocks()
+		let finishLoad
+		let finishSave
+		getSettings.mockReturnValueOnce(new Promise((resolve) => {
+			finishLoad = resolve
+		}))
+		setSettings.mockReturnValueOnce(new Promise((resolve) => {
+			finishSave = resolve
+		}))
+		const wrapper = mount(App)
+		expect(wrapper.get('select').element.disabled).toBe(true)
+		finishLoad({ theme: 'auto' })
+		await flushPromises()
+		expect(wrapper.get('select').element.disabled).toBe(false)
+		await wrapper.get('select').setValue('dark')
+		expect(wrapper.get('select').element.disabled).toBe(true)
+		wrapper.findComponent({ name: 'ThemeSetting' }).vm.$emit('update:modelValue', 'light')
+		expect(setSettings).toHaveBeenCalledTimes(1)
+		finishSave({ theme: 'dark' })
+		await flushPromises()
+		expect(wrapper.find('[data-theme-dark="true"]').exists()).toBe(true)
+		expect(wrapper.get('select').element.disabled).toBe(false)
+		wrapper.unmount()
+	})
 })
