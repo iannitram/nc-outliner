@@ -194,6 +194,27 @@ describe('VersionsPanel.vue', () => {
 		expect(document.body.querySelector('[role="alert"]').textContent).toContain('not saved')
 	})
 
+	it('does not restore when saving the pending edits fails outright', async () => {
+		const flush = vi.fn().mockRejectedValue(new Error('offline'))
+		const reload = vi.fn(async () => {})
+		await open({ flush, reload })
+
+		await click(button('Restore', row(2)))
+
+		expect(restoreVersion).not.toHaveBeenCalled()
+		expect(reload).not.toHaveBeenCalled()
+		expect(document.body.querySelector('[role="alert"]').textContent).toBe('Could not restore this version.')
+	})
+
+	it('asks the parent to close when Escape is pressed', async () => {
+		await open()
+
+		document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+		await flushPromises()
+
+		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+
 	it('shows a message when the list cannot be loaded', async () => {
 		listVersions.mockRejectedValue(new Error('offline'))
 
