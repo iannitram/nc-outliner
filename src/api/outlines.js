@@ -56,3 +56,15 @@ export async function saveCopy(fileId, outline) {
 	const response = await axios.post(`${outlinesUrl}/${fileId}/copy`, { outline })
 	return response.data
 }
+
+/** @return {Promise<{theme: 'auto'|'light'|'dark'}>} */
+export async function getSettings() {
+	const response = await axios.get(generateUrl('/apps/nc_outliner/api/settings'))
+	return response.data
+}
+
+/** @param {'auto'|'light'|'dark'} theme @return {Promise<{theme: 'auto'|'light'|'dark'}>} */
+export async function setSettings(theme) {
+	const response = await axios.put(generateUrl('/apps/nc_outliner/api/settings'), { theme })
+	return response.data
+}
