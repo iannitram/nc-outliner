@@ -34,8 +34,7 @@ final class PublishController extends Controller {
 	public function publish(int $fileId, string $folder = '', string $name = ''): JSONResponse {
 		try {
 			$result = $this->publishService->publish($this->userSession->getUser()->getUID(), $fileId, $folder, $name);
-			return new JSONResponse($result + ['openUrl' => $this->urlGenerator->linkToRoute('files.view.index', [
-				'openfile' => 'true',
+			return new JSONResponse($result + ['openUrl' => $this->urlGenerator->linkToRoute('files.View.showFile', [
 				'fileid' => $result['fileId'],
 			])]);
 		} catch (NotFoundException) {
