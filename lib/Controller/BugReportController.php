@@ -70,8 +70,6 @@ final class BugReportController extends Controller {
 		if (strlen($bytes) > 10 * 1024 * 1024) {
 			return new JSONResponse(['message' => 'The report is too large.'], 413);
 		}
-		$times[] = $now;
-		$this->config->setUserValue($user->getUID(), Application::APP_ID, 'bug_report_times', json_encode($times));
 		// The drop is normally a File Drop share on this same Nextcloud: write the zip into it
 		// directly, so nothing goes over the network (owner, 2026-10-28). Only a token that is not
 		// a share here falls back to the drop's public WebDAV URL.
@@ -88,6 +86,7 @@ final class BugReportController extends Controller {
 				$this->logger->error('Bug report relay: the drop share does not allow creating files', ['app' => Application::APP_ID]);
 				return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
 			}
+			$this->countAttempt($user->getUID(), $times, $now);
 			try {
 				$folder = $share->getNode();
 				if (!$folder instanceof Folder) {
@@ -105,6 +104,7 @@ final class BugReportController extends Controller {
 			$this->logger->error('Bug report relay: the drop token is not a share here and no drop base URL is set', ['app' => Application::APP_ID]);
 			return new JSONResponse(['message' => 'Bug reports are not set up for this app.'], 503);
 		}
+		$this->countAttempt($user->getUID(), $times, $now);
 		try {
 			$response = $this->clientService->newClient()->put(
 				rtrim($base, '/') . '/public.php/dav/files/' . rawurlencode($token) . '/' . $file['name'],
@@ -119,5 +119,15 @@ final class BugReportController extends Controller {
 			$this->logger->error('Bug report relay: the HTTP upload to the drop failed: ' . get_class($e), ['app' => Application::APP_ID]);
 		}
 		return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
+	}
+
+	/**
+	 * Record one sending attempt for the hourly rate limit.
+	 *
+	 * @param list<int> $times the user's attempts within the last hour
+	 */
+	private function countAttempt(string $uid, array $times, int $now): void {
+		$times[] = $now;
+		$this->config->setUserValue($uid, Application::APP_ID, 'bug_report_times', json_encode($times));
 	}
 }
