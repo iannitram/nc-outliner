@@ -106,7 +106,7 @@ function focus(rowId, where = 'start') {
 	activeRowId.value = rowId
 	let el = inputRefs.get(rowId)
 	if (!el && rootRef.value) {
-		el = rootRef.value.querySelector(`[data-row-id="${rowId}"] input, input[data-row-id="${rowId}"]`)
+		el = rootRef.value.querySelector(`[data-row-id="${rowId}"] .outline-row__input, .outline-row__input[data-row-id="${rowId}"]`)
 	}
 	if (el) {
 		el.focus()
@@ -116,7 +116,7 @@ function focus(rowId, where = 'start') {
 		nextTick(() => {
 			let deferredEl = inputRefs.get(rowId)
 			if (!deferredEl && rootRef.value) {
-				deferredEl = rootRef.value.querySelector(`[data-row-id="${rowId}"] input, input[data-row-id="${rowId}"]`)
+				deferredEl = rootRef.value.querySelector(`[data-row-id="${rowId}"] .outline-row__input, .outline-row__input[data-row-id="${rowId}"]`)
 			}
 			if (deferredEl) {
 				deferredEl.focus()
@@ -378,33 +378,35 @@ defineExpose({
 		ref="rootRef"
 		class="outline-editor"
 		role="tree">
-		<div role="tree">
-			<OutlineRow
-				v-for="row in tree"
-				:key="row.id"
-				:row="row">
-				<template v-for="(_, name) in $slots" #[name]="slotProps">
-					<slot :name="name" v-bind="slotProps" />
-				</template>
-			</OutlineRow>
-			<div
-				v-if="isEmpty"
-				class="outline-row level-1 outline-placeholder"
-				role="treeitem">
-				<div class="outline-row__line">
-					<span class="outline-placeholder__gutter" aria-hidden="true" />
-					<span class="outline-row__bullet" aria-hidden="true">•</span>
-					<input
-						ref="placeholderRef"
-						type="text"
-						class="outline-placeholder__input"
-						placeholder="Type your first heading"
-						aria-label="Type your first heading"
-						@input="handlePlaceholderInput">
+		<div class="outline-column">
+			<div role="tree">
+				<OutlineRow
+					v-for="row in tree"
+					:key="row.id"
+					:row="row">
+					<template v-for="(_, name) in $slots" #[name]="slotProps">
+						<slot :name="name" v-bind="slotProps" />
+					</template>
+				</OutlineRow>
+				<div
+					v-if="isEmpty"
+					class="outline-row level-1 outline-placeholder"
+					role="treeitem">
+					<div class="outline-row__line">
+						<span class="outline-placeholder__gutter" aria-hidden="true" />
+						<span class="outline-row__bullet" aria-hidden="true">•</span>
+						<input
+							ref="placeholderRef"
+							type="text"
+							class="outline-placeholder__input"
+							placeholder="Type your first heading"
+							aria-label="Type your first heading"
+							@input="handlePlaceholderInput">
+					</div>
 				</div>
 			</div>
+			<KeyboardHints :rowCount="rowCount" />
 		</div>
-		<KeyboardHints :rowCount="rowCount" />
 	</div>
 </template>
 
@@ -416,11 +418,37 @@ defineExpose({
 	background-color: var(--color-main-background);
 	color: var(--color-main-text);
 	width: 100%;
+	min-width: 0;
+	container: outline-editor / inline-size;
 	display: flex;
 	flex-direction: column;
 	flex: 1;
 	min-height: 0;
 	overflow: auto;
+}
+
+.outline-column {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 820px;
+	margin: 0 auto;
+	padding: 6px 44px 28px;
+}
+
+@container outline-editor (max-width: 759px) {
+	.outline-column {
+		padding-inline: 24px;
+	}
+}
+
+@container outline-editor (max-width: 599px) {
+	.outline-column {
+		padding-inline: 8px;
+	}
+
+	.outline-placeholder__input {
+		font-size: 18px;
+	}
 }
 
 [data-themes*=dark] .outline-editor,

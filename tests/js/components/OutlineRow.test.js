@@ -8,20 +8,21 @@ describe('OutlineRow', () => {
 	let wrapper
 
 	afterEach(() => {
+		vi.unstubAllGlobals()
 		if (wrapper) {
 			wrapper.unmount()
 			wrapper = null
 		}
 	})
 
-	it('renders row text in an input and exposes focus method', () => {
+	it('renders row text in a wrapping textarea and exposes focus method', () => {
 		const row = { id: 'r1', text: 'Sample text', note: '', collapsed: false, children: [] }
 		wrapper = mount(OutlineRow, {
 			props: { row },
 			attachTo: document.body,
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		expect(input.element.value).toBe('Sample text')
 
 		wrapper.vm.focus('end')
@@ -34,13 +35,39 @@ describe('OutlineRow', () => {
 		expect(input.element.selectionEnd).toBe(0)
 	})
 
+	it('grows wrapped text on input, width changes and History updates, then disconnects', async () => {
+		let resize
+		const disconnect = vi.fn()
+		vi.stubGlobal('ResizeObserver', class {
+			constructor(callback) { resize = callback }
+			observe() {}
+			disconnect() { disconnect() }
+		})
+		const row = { id: 'r1', text: 'A long row', note: '', collapsed: false, children: [] }
+		wrapper = mount(OutlineRow, { props: { row } })
+		const input = wrapper.get('textarea.outline-row__input')
+		let height = 72
+		Object.defineProperty(input.element, 'scrollHeight', { get: () => height })
+		await input.setValue('A longer row that wraps')
+		expect(input.element.style.height).toBe('74px')
+		height = 108
+		resize([{ contentRect: { width: 200 } }])
+		expect(input.element.style.height).toBe('110px')
+		height = 24
+		await wrapper.setProps({ row: { ...row, text: 'Undo' } })
+		expect(input.element.style.height).toBe('26px')
+		wrapper.unmount()
+		wrapper = null
+		expect(disconnect).toHaveBeenCalledOnce()
+	})
+
 	it('emits input-text on input', async () => {
 		const row = { id: 'r1', text: 'Sample', note: '', collapsed: false, children: [] }
 		wrapper = mount(OutlineRow, {
 			props: { row },
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		await input.setValue('Modified')
 
 		expect(wrapper.emitted('input-text')).toBeTruthy()
@@ -54,7 +81,7 @@ describe('OutlineRow', () => {
 			props: { row },
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		await input.trigger('keydown', { key: 'Enter' })
 
 		expect(wrapper.emitted('row-keydown')).toBeTruthy()

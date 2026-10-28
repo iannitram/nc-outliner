@@ -59,7 +59,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-	<header ref="topBarRef" class="outline-top-bar tb">
+	<header ref="topBarRef" class="outline-top-bar tb" :class="{ 'outline-top-bar--narrow': effectiveNarrow }">
 		<span class="nav-toggle-spacer" aria-hidden="true" />
 		<h1 class="title" :title="title">
 			{{ title }}
@@ -125,6 +125,7 @@ onUnmounted(() => {
 
 <style scoped>
 .outline-top-bar {
+	min-width: 0;
 	height: 52px;
 	flex: none;
 	display: flex;
@@ -155,5 +156,14 @@ onUnmounted(() => {
 
 .spacer {
 	flex: 1;
+}
+.outline-top-bar > :deep(.publish-button),
+.outline-top-bar > :deep(.button-vue),
+.outline-top-bar > :deep(.action-item) {
+	flex: none;
+}
+
+.outline-top-bar--narrow {
+	padding-inline: 4px;
 }
 </style>

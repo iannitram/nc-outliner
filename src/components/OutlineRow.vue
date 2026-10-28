@@ -1,5 +1,5 @@
 <script setup>
-import { computed, getCurrentInstance, inject, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { updateRow } from '../model/outline.js'
 
 const props = defineProps({
@@ -22,6 +22,32 @@ const emit = defineEmits(['input-text', 'row-keydown', 'row-focus'])
 
 const inputRef = ref(null)
 const noteRef = ref(null)
+let textObserver
+let textWidth
+
+/** Resize wrapped text after edits, undo, and changes to the available width. */
+function fitText() {
+	const el = inputRef.value
+	if (el) {
+		el.style.height = 'auto'
+		el.style.height = `${el.scrollHeight + 2}px`
+	}
+}
+
+watch(() => props.row.text, fitText, { flush: 'post' })
+onMounted(() => {
+	fitText()
+	if (typeof ResizeObserver !== 'undefined') {
+		textObserver = new ResizeObserver(([entry]) => {
+			if (entry && entry.contentRect.width !== textWidth) {
+				textWidth = entry.contentRect.width
+				fitText()
+			}
+		})
+		textObserver.observe(inputRef.value)
+	}
+})
+onUnmounted(() => textObserver?.disconnect())
 const addingNote = ref(false)
 const instance = getCurrentInstance()
 const editor = inject('outlineEditor', null)
@@ -131,7 +157,7 @@ function toggleNote() {
 
 /**
  *
- * @param {HTMLInputElement|null} el the row input element
+ * @param {HTMLTextAreaElement|null} el the row input element
  */
 function onInputRef(el) {
 	inputRef.value = el
@@ -165,6 +191,7 @@ watch(
  * @param {InputEvent} event the input event
  */
 function handleInput(event) {
+	fitText()
 	if (editor) {
 		editor.onInput(props.row, event)
 	}
@@ -182,6 +209,10 @@ function handleKeydown(event) {
 	}
 	// eslint-disable-next-line vue/custom-event-name-casing
 	emit('row-keydown', props.row.id, event)
+	// Enter remains an outline command; modified Enter must not insert a hard break.
+	if (event.key === 'Enter' && !event.isComposing) {
+		event.preventDefault()
+	}
 }
 
 /**
@@ -322,9 +353,9 @@ defineExpose({
 					<span class="outline-row__bullet" aria-hidden="true">•</span>
 				</slot>
 			</slot>
-			<input
+			<textarea
 				:ref="onInputRef"
-				type="text"
+				rows="1"
 				class="outline-row__input"
 				:class="{ 'outline-row__input--folded': foldedLabel }"
 				:style="foldedLabel ? { '--title-ch': Math.max(row.text.length, 1) } : undefined"
@@ -333,7 +364,7 @@ defineExpose({
 				:aria-label="row.text || 'Row text'"
 				@input="handleInput"
 				@keydown="handleKeydown"
-				@focus="handleFocus">
+				@focus="handleFocus" />
 			<span v-if="foldedLabel" class="outline-row__more">{{ foldedLabel }}</span>
 			<button
 				type="button"
@@ -392,11 +423,12 @@ defineExpose({
 	display: flex;
 	flex-direction: column;
 	width: 100%;
+	min-width: 0;
 }
 
 .outline-row__line {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	min-height: 32px;
 	gap: 4px;
 }
@@ -410,6 +442,11 @@ defineExpose({
 }
 
 .outline-row__input {
+	box-sizing: border-box;
+	resize: none;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
 	flex: 1;
 	min-width: 0;
 	background: transparent;
@@ -545,7 +582,8 @@ defineExpose({
 }
 
 .outline-row__children {
-	margin-left: 24px;
+	margin-left: var(--outline-indent, 24px);
+	min-width: 0;
 }
 
 .outline-row__note-area {
@@ -615,5 +653,25 @@ defineExpose({
 .outline-row__note:focus {
 	border-color: var(--color-primary-element, var(--color-border));
 	color: var(--color-main-text);
+}
+@container outline-editor (max-width: 599px) {
+	.outline-row {
+		--outline-indent: 16px;
+	}
+
+	.outline-row.level-1 > .outline-row__line .outline-row__input {
+		font-size: 18px;
+	}
+}
+
+@media (hover: none) {
+	.outline-row__handle {
+		display: none;
+	}
+
+	.outline-row__note-area {
+		/* The hidden handle and its gap no longer occupy the text gutter. */
+		padding-left: 28px;
+	}
 }
 </style>
