@@ -13,6 +13,7 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
 use OCP\Files\NotFoundException as FilesNotFoundException;
 use OCP\Files\NotPermittedException;
+use OCP\Files\StorageInvalidException;
 use OCP\Files\StorageNotAvailableException;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -43,7 +44,11 @@ final class PublishController extends Controller {
 			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (FilesNotFoundException) {
 			return new JSONResponse(['message' => 'Destination folder does not exist'], Http::STATUS_BAD_REQUEST);
-		} catch (NotPermittedException | StorageNotAvailableException | LockedException) {
+		} catch (LockedException) {
+			return new JSONResponse(['message' => 'The document is locked by another user or process. Try again later.'], Http::STATUS_LOCKED);
+		} catch (StorageNotAvailableException | StorageInvalidException) {
+			return new JSONResponse(['message' => 'The storage for this folder is unavailable. Try again later.'], Http::STATUS_SERVICE_UNAVAILABLE);
+		} catch (NotPermittedException) {
 			return new JSONResponse(['message' => 'Cannot save the document in this folder. It may be read-only.'], Http::STATUS_FORBIDDEN);
 		}
 	}
