@@ -10,6 +10,7 @@
  * @property {boolean} collapsed
  * @property {boolean} noteHidden whether the note is hidden for this row
  * @property {Row[]} children
+ * @property {Record<string, unknown>} [extra] opaque OPML attributes retained by every edit
  *
  * @typedef {Row[]} Tree the root rows, in order
  */

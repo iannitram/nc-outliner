@@ -16,7 +16,7 @@ final class OutlineStoreFolderTest extends TestCase {
 	private function makeStore(Folder $userFolder): OutlineStore {
 		$rootFolder = $this->createMock(IRootFolder::class);
 		$rootFolder->method('getUserFolder')->with('alice')->willReturn($userFolder);
-		return new OutlineStore($rootFolder, new OpmlCodec());
+		return new OutlineStore($rootFolder, new OpmlCodec(), $this->createMock(\OCP\Lock\ILockingProvider::class));
 	}
 
 	public function testEnsureFolderUsesTheFolderAnotherRequestCreatedFirst(): void {

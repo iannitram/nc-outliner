@@ -139,4 +139,21 @@ describe('OutlineRow', () => {
 		)
 		expect(history.current()[0].note).toBe('A note')
 	})
+
+	it('renders a disclosure control for rows with children and a bullet for leaves', () => {
+		wrapper = mount(OutlineRow, {
+			props: {
+				row: {
+					id: 'r1',
+					text: 'Parent',
+					note: '',
+					collapsed: false,
+					children: [{ id: 'c1', text: 'Child', note: '', collapsed: false, children: [] }],
+				},
+			},
+		})
+
+		expect(wrapper.find('button[aria-expanded="true"]').exists()).toBe(true)
+		expect(wrapper.find('[data-row-id="r1"] > .outline-row__line .outline-row__bullet').exists()).toBe(false)
+	})
 })

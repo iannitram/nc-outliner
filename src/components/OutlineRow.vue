@@ -156,6 +156,13 @@ function handleFocus(event) {
 	emit('row-focus', props.row.id, event)
 }
 
+/** Toggle this row's expanded state through the editor history. */
+function toggleCollapsed() {
+	if (editor && props.row.children && props.row.children.length > 0) {
+		editor.toggleCollapsed(props.row)
+	}
+}
+
 /**
  *
  * @param {number|'start'|'end'} where the caret position
@@ -182,9 +189,21 @@ defineExpose({
 		:aria-expanded="row.children && row.children.length > 0 ? !row.collapsed : undefined">
 		<div class="outline-row__line">
 			<slot name="handle" :row="row" />
-			<slot name="toggle" :row="row">
-				<slot name="triangle" :row="row">
-					<slot name="bullet" :row="row" />
+			<slot name="toggle" :row="row" :toggle="toggleCollapsed">
+				<template v-if="row.children && row.children.length > 0">
+					<slot name="triangle" :row="row" :toggle="toggleCollapsed">
+						<button
+							type="button"
+							class="outline-row__disclosure"
+							:aria-label="row.collapsed ? 'Expand row' : 'Collapse row'"
+							:aria-expanded="!row.collapsed"
+							@click="toggleCollapsed">
+							{{ row.collapsed ? '▸' : '▾' }}
+						</button>
+					</slot>
+				</template>
+				<slot v-else name="bullet" :row="row">
+					<span class="outline-row__bullet" aria-hidden="true">•</span>
 				</slot>
 			</slot>
 			<input
@@ -256,6 +275,23 @@ defineExpose({
 	font: inherit;
 	line-height: 1.5;
 	outline: none;
+}
+
+.outline-row__disclosure {
+	width: 24px;
+	min-width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+}
+
+.outline-row__bullet {
+	width: 24px;
+	min-width: 24px;
+	text-align: center;
 }
 
 .outline-row__input:focus {

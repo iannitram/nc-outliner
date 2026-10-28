@@ -11,6 +11,7 @@ namespace OCA\NcOutliner\Opml;
 final class Row {
 	/**
 	 * @param list<Row> $children
+	 * @param array<string, string> $extra unknown attributes, keyed by qualified name
 	 */
 	public function __construct(
 		public string $id,
@@ -18,12 +19,13 @@ final class Row {
 		public string $note = '',
 		public bool $collapsed = false,
 		public array $children = [],
+		public array $extra = [],
 		public bool $noteHidden = false,
 	) {
 	}
 
 	/**
-	 * @return array{id: string, text: string, note: string, collapsed: bool, children: list<array<string, mixed>>, noteHidden?: bool}
+	 * @return array{id: string, text: string, note: string, collapsed: bool, children: list<array<string, mixed>>, extra: array<string, string>, noteHidden?: bool}
 	 */
 	public function toArray(): array {
 		$data = [
@@ -32,6 +34,7 @@ final class Row {
 			'note' => $this->note,
 			'collapsed' => $this->collapsed,
 			'children' => array_map(static fn (Row $child): array => $child->toArray(), $this->children),
+			'extra' => $this->extra,
 		];
 		if ($this->noteHidden) {
 			$data['noteHidden'] = true;
@@ -47,12 +50,19 @@ final class Row {
 		foreach ((array)($data['children'] ?? []) as $child) {
 			$children[] = self::fromArray((array)$child);
 		}
+		$extra = [];
+		foreach ((array)($data['extra'] ?? []) as $name => $value) {
+			if (is_string($value)) {
+				$extra[(string)$name] = $value;
+			}
+		}
 		return new Row(
 			(string)($data['id'] ?? ''),
 			(string)($data['text'] ?? ''),
 			(string)($data['note'] ?? ''),
 			(bool)($data['collapsed'] ?? false),
 			$children,
+			$extra,
 			(bool)($data['noteHidden'] ?? false),
 		);
 	}
