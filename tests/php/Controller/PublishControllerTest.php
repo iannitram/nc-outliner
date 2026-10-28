@@ -12,14 +12,18 @@ use OCA\NcOutliner\Service\IOutlineStore;
 use OCA\NcOutliner\Service\NotFoundException;
 use OCA\NcOutliner\Service\PublishService;
 use OCP\AppFramework\Http;
+use OCP\AppFramework\Http\JSONResponse;
 use OCP\Files\Folder;
 use OCP\Files\File;
 use OCP\Files\NotPermittedException;
+use OCP\Files\StorageInvalidException;
+use OCP\Files\StorageNotAvailableException;
 use OCP\Files\IRootFolder;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUser;
 use OCP\IUserSession;
+use OCP\Lock\LockedException;
 use PHPUnit\Framework\TestCase;
 
 final class PublishControllerTest extends TestCase {
@@ -123,5 +127,47 @@ final class PublishControllerTest extends TestCase {
 		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
 		$this->assertIsString($response->getData()['message'] ?? null);
 		$this->assertNotSame('', $response->getData()['message']);
+	}
+
+	public function testLockedDestinationReturns423WithMessage(): void {
+		$response = $this->publishWhenNewFileThrows(new LockedException('/Plan.odt'));
+		$this->assertSame(Http::STATUS_LOCKED, $response->getStatus());
+		$this->assertSame('The document is locked by another user or process. Try again later.', $response->getData()['message']);
+	}
+
+	public function testUnavailableStorageReturns503WithMessage(): void {
+		$response = $this->publishWhenNewFileThrows($this->createMock(StorageNotAvailableException::class)); // ctor needs OC, not stubbed
+		$this->assertSame(Http::STATUS_SERVICE_UNAVAILABLE, $response->getStatus());
+		$this->assertSame('The storage for this folder is unavailable. Try again later.', $response->getData()['message']);
+	}
+
+	public function testInvalidStorageReturns503WithMessage(): void {
+		$response = $this->publishWhenNewFileThrows(new StorageInvalidException('broken'));
+		$this->assertSame(Http::STATUS_SERVICE_UNAVAILABLE, $response->getStatus());
+		$this->assertSame('The storage for this folder is unavailable. Try again later.', $response->getData()['message']);
+	}
+
+	public function testUnrelatedErrorStillPropagates(): void {
+		$this->expectException(\RuntimeException::class);
+		$this->publishWhenNewFileThrows(new \RuntimeException('boom'));
+	}
+
+	private function publishWhenNewFileThrows(\Throwable $error): JSONResponse {
+		$userFolder = $this->createMock(Folder::class);
+		$destination = $this->createMock(Folder::class);
+		$root = $this->createMock(IRootFolder::class);
+		$root->method('getUserFolder')->willReturn($userFolder);
+		$userFolder->method('get')->willReturn($destination);
+		$destination->method('nodeExists')->willReturn(false);
+		$destination->method('newFile')->willThrowException($error);
+		$store = $this->createMock(IOutlineStore::class);
+		$store->method('read')->willReturn(['fileId' => 7, 'name' => 'x', 'etag' => 'e', 'outline' => new Outline('Plan', [])]);
+		$service = new PublishService($store, $root, new ContentWriter(), new OdtPackage());
+		$session = $this->createMock(IUserSession::class);
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$session->method('getUser')->willReturn($user);
+		$controller = new PublishController($this->createMock(IRequest::class), $service, $session, $this->createMock(IURLGenerator::class));
+		return $controller->publish(7, '', 'Plan');
 	}
 }

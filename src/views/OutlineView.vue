@@ -166,11 +166,20 @@ function onVisibilityChange() {
 }
 
 /**
+ * Save pending edits now. Resolves true only when nothing is left unsaved.
+ *
+ * @return {Promise<boolean>} true when the server has the latest outline
+ */
+async function flushPendingSave() {
+	await saver?.flush()
+	return !saver?.isDirty()
+}
+
+/**
  *
  */
 async function beforeLeave() {
-	await saver?.flush()
-	return !saver?.isDirty()
+	return flushPendingSave()
 }
 
 /**
@@ -227,6 +236,7 @@ watch(() => props.fileId, load)
 					:publishPath="document?.publishPath ?? null"
 					:name="name"
 					:title="title"
+					:beforePublish="flushPendingSave"
 					@published="onPublished" />
 				<NcButton @click="versionsOpen = true">
 					Versions

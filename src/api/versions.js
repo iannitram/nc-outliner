@@ -16,24 +16,31 @@ const DAV = 'DAV:'
 const NC = 'http://nextcloud.org/ns'
 
 /**
+ * The signed-in user's versions root (the user id is one encoded path segment).
  *
+ * @return {string}
  */
 function root() {
-	return `${generateRemoteUrl('dav')}/versions/${getCurrentUser().uid}`
+	return `${generateRemoteUrl('dav')}/versions/${encodeURIComponent(getCurrentUser().uid)}`
 }
 
 /**
+ * Escape text for use as XML element content.
  *
- * @param text
+ * @param {string} text the raw text
+ * @return {string}
  */
 function escapeXml(text) {
 	return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /**
- * @param {Element} response @param {string} ns @param {string} name
- * @param ns
- * @param name
+ * A property's text from the response's 200 propstat, or null when it is missing there.
+ *
+ * @param {Element} response one d:response element
+ * @param {string} ns the property's namespace
+ * @param {string} name the property's local name
+ * @return {string|null}
  */
 function okProp(response, ns, name) {
 	for (const propstat of response.getElementsByTagNameNS(DAV, 'propstat')) {
@@ -51,13 +58,13 @@ function okProp(response, ns, name) {
 /**
  * The versions of one outline, newest first.
  *
- * @param {number} fileId
+ * @param {number} fileId the outline's Nextcloud file id
  * @return {Promise<Version[]>}
  */
 export async function listVersions(fileId) {
 	const response = await axios.request({
 		method: 'PROPFIND',
-		url: `${root()}/versions/${fileId}`,
+		url: `${root()}/versions/${encodeURIComponent(fileId)}`,
 		headers: { Depth: '1', 'Content-Type': 'application/xml' },
 		data: `<?xml version="1.0"?>
 <d:propfind xmlns:d="DAV:" xmlns:nc="${NC}"><d:prop><d:getlastmodified/><d:getcontentlength/><nc:version-label/></d:prop></d:propfind>`,
@@ -71,7 +78,7 @@ export async function listVersions(fileId) {
 		}
 		const href = entry.getElementsByTagNameNS(DAV, 'href')[0].textContent
 		versions.push({
-			id: href.replace(/\/$/, '').split('/').pop(),
+			id: decodeURIComponent(href.replace(/\/$/, '').split('/').pop()),
 			time: Date.parse(modified),
 			label: okProp(entry, NC, 'version-label') ?? '',
 			size: Number(okProp(entry, DAV, 'getcontentlength') ?? 0),
@@ -83,12 +90,12 @@ export async function listVersions(fileId) {
 /**
  * One older version's text, read-only (a GET never changes anything).
  *
- * @param {number} fileId
- * @param {string} id
+ * @param {number} fileId the outline's Nextcloud file id
+ * @param {string} id the version id, as listVersions gives it
  * @return {Promise<string>}
  */
 export async function readVersion(fileId, id) {
-	const response = await axios.get(`${root()}/versions/${fileId}/${id}`, {
+	const response = await axios.get(`${root()}/versions/${encodeURIComponent(fileId)}/${encodeURIComponent(id)}`, {
 		responseType: 'text',
 		transformResponse: [(data) => data],
 	})
@@ -99,14 +106,14 @@ export async function readVersion(fileId, id) {
  * Make an older version the file again. Nextcloud first keeps the state the file was in as a
  * version, so the restore can be undone.
  *
- * @param {number} fileId
- * @param {string} id
+ * @param {number} fileId the outline's Nextcloud file id
+ * @param {string} id the version id, as listVersions gives it
  * @return {Promise<void>}
  */
 export async function restoreVersion(fileId, id) {
 	await axios.request({
 		method: 'MOVE',
-		url: `${root()}/versions/${fileId}/${id}`,
+		url: `${root()}/versions/${encodeURIComponent(fileId)}/${encodeURIComponent(id)}`,
 		headers: { Destination: `${root()}/restore/target` },
 	})
 }
@@ -114,15 +121,15 @@ export async function restoreVersion(fileId, id) {
 /**
  * Name a version; a named version is never cleaned up. An empty label un-names it.
  *
- * @param {number} fileId
- * @param {string} id
- * @param {string} label
+ * @param {number} fileId the outline's Nextcloud file id
+ * @param {string} id the version id, as listVersions gives it
+ * @param {string} label the new name; empty to un-name
  * @return {Promise<void>}
  */
 export async function nameVersion(fileId, id, label) {
 	await axios.request({
 		method: 'PROPPATCH',
-		url: `${root()}/versions/${fileId}/${id}`,
+		url: `${root()}/versions/${encodeURIComponent(fileId)}/${encodeURIComponent(id)}`,
 		headers: { 'Content-Type': 'application/xml' },
 		data: `<?xml version="1.0"?>
 <d:propertyupdate xmlns:d="DAV:" xmlns:nc="${NC}"><d:set><d:prop><nc:version-label>${escapeXml(label)}</nc:version-label></d:prop></d:set></d:propertyupdate>`,
