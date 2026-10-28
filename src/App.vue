@@ -1,5 +1,5 @@
 <script setup>
-import { NcAppContent, NcAppNavigation, NcButton, NcContent, NcThemeProvider } from '@nextcloud/vue'
+import { NcAppContent, NcAppNavigation, NcAppNavigationSettings, NcButton, NcContent, NcThemeProvider } from '@nextcloud/vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import ThemeSetting from './components/ThemeSetting.vue'
 import OutlineList from './views/OutlineList.vue'
@@ -75,13 +75,17 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 				<NcButton @click="showList">
 					My outlines
 				</NcButton>
-				<ThemeSetting
-					:modelValue="theme"
-					:disabled="settingsLoading"
-					@update:modelValue="(val) => theme = val" />
-				<p v-if="settingsError" role="alert" class="app-settings-error">
-					{{ settingsError }}
-				</p>
+				<template #footer>
+					<NcAppNavigationSettings name="Outliner settings">
+						<ThemeSetting
+							:modelValue="theme"
+							:disabled="settingsLoading"
+							@update:modelValue="(val) => theme = val" />
+						<p v-if="settingsError" role="alert" class="app-settings-error">
+							{{ settingsError }}
+						</p>
+					</NcAppNavigationSettings>
+				</template>
 			</NcAppNavigation>
 			<NcAppContent>
 				<OutlineView v-if="fileId !== null" ref="outlineView" :fileId="fileId" />

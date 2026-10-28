@@ -14,7 +14,8 @@ vi.mock('@nextcloud/vue', () => {
 	return {
 		NcContent: container,
 		NcAppContent: container,
-		NcAppNavigation: container,
+		NcAppNavigation: { template: '<div><slot /><footer><slot name="footer" /></footer></div>' },
+		NcAppNavigationSettings: { props: ['name'], template: '<section :aria-label="name"><slot /></section>' },
 		NcButton: container,
 		NcThemeProvider: themeProvider,
 	}
@@ -39,6 +40,7 @@ describe('App', () => {
 		const wrapper = mount(App)
 		await flushPromises()
 		expect(wrapper.text()).toContain('My outlines view')
+		expect(wrapper.find('footer [aria-label="Outliner settings"] input[value="auto"]').exists()).toBe(true)
 		window.location.hash = '#/outline/42'
 		window.dispatchEvent(new Event('hashchange'))
 		await flushPromises()
@@ -104,19 +106,19 @@ describe('App', () => {
 		expect(wrapper.find('[data-theme-dark]').exists()).toBe(false)
 		expect(wrapper.find('[data-theme-light]').exists()).toBe(false)
 
-		await wrapper.get('select[aria-label="Theme"]').setValue('dark')
+		await wrapper.get('input[value="dark"]').setValue()
 		await flushPromises()
 
 		expect(setSettings).toHaveBeenCalledWith('dark')
 		expect(wrapper.find('[data-theme-dark="true"]').exists()).toBe(true)
 
-		await wrapper.get('select[aria-label="Theme"]').setValue('light')
+		await wrapper.get('input[value="light"]').setValue()
 		await flushPromises()
 
 		expect(setSettings).toHaveBeenCalledWith('light')
 		expect(wrapper.find('[data-theme-light="true"]').exists()).toBe(true)
 
-		await wrapper.get('select[aria-label="Theme"]').setValue('auto')
+		await wrapper.get('input[value="auto"]').setValue()
 		await flushPromises()
 
 		expect(setSettings).toHaveBeenCalledWith('auto')
@@ -132,12 +134,12 @@ describe('App', () => {
 		}))
 
 		const wrapper = mount(App)
-		expect(wrapper.get('select[aria-label="Theme"]').element.disabled).toBe(true)
+		expect(wrapper.get('input[value="auto"]').element.disabled).toBe(true)
 
 		finishLoad({ theme: 'auto' })
 		await flushPromises()
 
-		expect(wrapper.get('select[aria-label="Theme"]').element.disabled).toBe(false)
+		expect(wrapper.get('input[value="auto"]').element.disabled).toBe(false)
 		wrapper.unmount()
 	})
 })

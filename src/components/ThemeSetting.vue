@@ -19,11 +19,15 @@ watch(() => props.modelValue, (val) => {
 })
 
 /**
- * @param {Event} event change event on select
+ * @param {Event} event change event on a theme radio
  */
-async function onSelectChange(event) {
+async function onThemeChange(event) {
+	if (props.disabled || saving.value) {
+		return
+	}
 	const nextTheme = event.target.value
 	const previousTheme = props.modelValue
+	selected.value = nextTheme
 	saving.value = true
 	errorMessage.value = ''
 	try {
@@ -33,7 +37,6 @@ async function onSelectChange(event) {
 		emit('update:modelValue', savedTheme)
 	} catch (error) {
 		selected.value = previousTheme
-		event.target.value = previousTheme
 		errorMessage.value = 'Could not save the theme setting.'
 		emit('error', error)
 	} finally {
@@ -44,18 +47,19 @@ async function onSelectChange(event) {
 
 <template>
 	<div class="theme-setting-container">
-		<label class="theme-setting">
-			<span>Theme</span>
-			<select
-				:value="selected"
-				:disabled="disabled || saving"
-				aria-label="Theme"
-				@change="onSelectChange">
-				<option value="auto">Auto</option>
-				<option value="light">Light</option>
-				<option value="dark">Dark</option>
-			</select>
-		</label>
+		<fieldset class="theme-setting">
+			<legend>Theme</legend>
+			<label v-for="option in [{ value: 'auto', label: 'Follow Nextcloud' }, { value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]" :key="option.value">
+				<input
+					type="radio"
+					name="outliner-theme"
+					:value="option.value"
+					:checked="selected === option.value"
+					:disabled="disabled || saving"
+					@change="onThemeChange">
+				<span>{{ option.label }}</span>
+			</label>
+		</fieldset>
 		<p v-if="errorMessage" role="alert" class="theme-setting__error">
 			{{ errorMessage }}
 		</p>
@@ -70,19 +74,31 @@ async function onSelectChange(event) {
 }
 
 .theme-setting {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 0.5rem;
+	border: 0;
+	margin: 0;
+	padding: 6px 12px 8px;
 	color: var(--color-main-text);
 }
 
-select {
-	color: var(--color-main-text);
-	background: var(--color-main-background);
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-element);
-	padding: 0.35rem;
+.theme-setting legend {
+	font-size: 13.5px;
+	font-weight: 600;
+	margin-bottom: 2px;
+	padding: 0;
+}
+
+.theme-setting label {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-height: 36px;
+	font-size: 14.5px;
+	cursor: pointer;
+}
+
+.theme-setting input {
+	margin: 0;
+	accent-color: var(--color-primary-element);
 }
 
 .theme-setting__error {
