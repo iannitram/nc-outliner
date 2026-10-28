@@ -4,7 +4,7 @@
  * runs it. The editor (issue #91) calls commandForKey on keydown and, when it gets
  * a name, calls preventDefault() and runCommand(). See CODEMAP.md, "Keyboard".
  *
- * @typedef {{key: string, shiftKey: boolean, ctrlKey: boolean, altKey: boolean, metaKey: boolean}} KeyInfo
+ * @typedef {{key: string, shiftKey: boolean, ctrlKey: boolean, altKey: boolean, metaKey: boolean, isComposing?: boolean}} KeyInfo
  * @typedef {{isMac: boolean, rowEmpty: boolean, caretAtStart: boolean, caretAtEnd: boolean, hasChildren: boolean, collapsed: boolean}} KeyContext
  * @typedef {{history: import('../model/history.js').History, rowId: string, focus: (rowId: string, where?: 'start'|'end') => void}} CommandContext
  * @typedef {{binding: (event: KeyInfo, context: KeyContext) => string|null, commands: Record<string, (ctx: CommandContext) => void>}} KeyGroup
