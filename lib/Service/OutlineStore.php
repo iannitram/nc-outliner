@@ -12,6 +12,8 @@ use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException as OcpNotFoundException;
 use OCP\Files\NotPermittedException;
 use OCP\Files\AlreadyExistsException;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 
 /**
  * OutlineStore service: manages the user's Outlines/ folder and .opml outline files.
@@ -141,21 +143,36 @@ final class OutlineStore implements IOutlineStore {
 	/**
 	 * Saves the outline with an etag guard.
 	 *
-	 * @throws ConflictException when $ifMatch does not match current etag
+	 * The etag check and the write run under an exclusive file lock, so two saves
+	 * with the same If-Match cannot both pass the check. A save that finds the file
+	 * already locked is refused as a conflict, carrying the current etag.
+	 *
+	 * @throws ConflictException when $ifMatch does not match current etag, or the file is locked by another write
 	 * @throws NotFoundException when fileId is not found or not an outline
 	 */
 	public function save(string $uid, int $fileId, Outline $outline, string $ifMatch): string {
 		$file = $this->getOutlineFile($uid, $fileId);
-		$currentEtag = $file->getEtag();
 
-		if ($currentEtag !== $ifMatch) {
-			throw new ConflictException($currentEtag);
+		try {
+			$file->lock(ILockingProvider::LOCK_EXCLUSIVE);
+		} catch (LockedException) {
+			throw new ConflictException($file->getEtag());
 		}
 
-		$xml = $this->codec->write($outline);
-		$file->putContent($xml);
+		try {
+			$currentEtag = $file->getEtag();
 
-		return $file->getEtag();
+			if ($currentEtag !== $ifMatch) {
+				throw new ConflictException($currentEtag);
+			}
+
+			$xml = $this->codec->write($outline);
+			$file->putContent($xml);
+
+			return $file->getEtag();
+		} finally {
+			$file->unlock(ILockingProvider::LOCK_EXCLUSIVE);
+		}
 	}
 
 	/**

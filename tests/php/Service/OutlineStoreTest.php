@@ -13,6 +13,8 @@ use OCA\NcOutliner\Service\OutlineStore;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 use PHPUnit\Framework\TestCase;
 
 final class OutlineStoreTest extends TestCase {
@@ -301,6 +303,131 @@ final class OutlineStoreTest extends TestCase {
 		// 2. Matching etag saves successfully and returns new etag
 		$newEtag = $store->save('alice', 42, $outline, 'etag-current');
 		$this->assertSame('etag-new', $newEtag);
+	}
+
+	public function testSaveTakesExclusiveLockAroundEtagCheckAndWrite(): void {
+		[$store, $file] = $this->storeWithRecordingFile();
+		$events = [];
+		$file->method('getEtag')->willReturnCallback(function () use (&$events): string {
+			$events[] = 'getEtag';
+			return 'etag-1';
+		});
+		$file->expects($this->once())->method('lock')->with(ILockingProvider::LOCK_EXCLUSIVE)
+			->willReturnCallback(function () use (&$events): void {
+				$events[] = 'lock';
+			});
+		$file->expects($this->once())->method('putContent')->willReturnCallback(function () use (&$events): void {
+			$events[] = 'putContent';
+		});
+		$file->expects($this->once())->method('unlock')->with(ILockingProvider::LOCK_EXCLUSIVE)
+			->willReturnCallback(function () use (&$events): void {
+				$events[] = 'unlock';
+			});
+
+		$etag = $store->save('alice', 42, new Outline('Plan', [new Row('r1', 'Row 1', '')]), 'etag-1');
+
+		$this->assertSame('etag-1', $etag);
+		$this->assertSame(['lock', 'getEtag', 'putContent', 'getEtag', 'unlock'], $events);
+	}
+
+	public function testSaveReleasesLockWhenPutContentThrows(): void {
+		[$store, $file] = $this->storeWithRecordingFile();
+		$events = [];
+		$file->method('getEtag')->willReturn('etag-1');
+		$file->expects($this->once())->method('lock')->with(ILockingProvider::LOCK_EXCLUSIVE)
+			->willReturnCallback(function () use (&$events): void {
+				$events[] = 'lock';
+			});
+		$file->expects($this->once())->method('putContent')
+			->willThrowException(new \RuntimeException('disk full'));
+		$file->expects($this->once())->method('unlock')->with(ILockingProvider::LOCK_EXCLUSIVE)
+			->willReturnCallback(function () use (&$events): void {
+				$events[] = 'unlock';
+			});
+
+		try {
+			$store->save('alice', 42, new Outline('Plan', []), 'etag-1');
+			$this->fail('Expected the write failure to propagate');
+		} catch (\RuntimeException $e) {
+			$this->assertSame('disk full', $e->getMessage());
+		}
+
+		$this->assertSame(['lock', 'unlock'], $events);
+	}
+
+	public function testSaveMapsLockedExceptionToConflictWithCurrentEtagAndWritesNothing(): void {
+		[$store, $file] = $this->storeWithRecordingFile();
+		$file->method('getEtag')->willReturn('etag-current');
+		$file->expects($this->once())->method('lock')
+			->willThrowException(new LockedException('/Outlines/Plan.opml'));
+		$file->expects($this->never())->method('putContent');
+		$file->expects($this->never())->method('unlock');
+
+		try {
+			$store->save('alice', 42, new Outline('Plan', []), 'etag-current');
+			$this->fail('Expected ConflictException when the file is locked');
+		} catch (ConflictException $e) {
+			$this->assertSame('etag-current', $e->currentEtag);
+		}
+	}
+
+	public function testSecondSaveWithSameIfMatchIsRefusedWhileFirstHoldsTheLock(): void {
+		[$store, $file] = $this->storeWithRecordingFile();
+		$held = false;
+		$writes = 0;
+		$secondOutcome = null;
+
+		$file->method('getEtag')->willReturn('etag-1');
+		$file->method('lock')->willReturnCallback(function () use (&$held): void {
+			if ($held) {
+				throw new LockedException('/Outlines/Plan.opml');
+			}
+			$held = true;
+		});
+		$file->method('unlock')->willReturnCallback(function () use (&$held): void {
+			$held = false;
+		});
+		// The first save is still inside putContent() when the second save arrives.
+		$file->expects($this->once())->method('putContent')->willReturnCallback(
+			function () use ($store, &$writes, &$secondOutcome): void {
+				$writes++;
+				try {
+					$store->save('alice', 42, new Outline('Second', []), 'etag-1');
+					$secondOutcome = 'saved';
+				} catch (ConflictException $e) {
+					$secondOutcome = $e->currentEtag;
+				}
+			},
+		);
+
+		$firstEtag = $store->save('alice', 42, new Outline('First', []), 'etag-1');
+
+		$this->assertSame('etag-1', $firstEtag);
+		$this->assertSame(1, $writes);
+		$this->assertSame('etag-1', $secondOutcome);
+		$this->assertFalse($held);
+	}
+
+	/**
+	 * A store over a mocked File with id 42 in the user's Outlines folder.
+	 *
+	 * @return array{0: OutlineStore, 1: File&\PHPUnit\Framework\MockObject\MockObject}
+	 */
+	private function storeWithRecordingFile(): array {
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$userFolder = $this->createMock(Folder::class);
+		$outlinesFolder = $this->createMock(Folder::class);
+		$file = $this->createMock(File::class);
+
+		$rootFolder->method('getUserFolder')->with('alice')->willReturn($userFolder);
+		$userFolder->method('nodeExists')->with('Outlines')->willReturn(true);
+		$userFolder->method('get')->with('Outlines')->willReturn($outlinesFolder);
+
+		$file->method('getId')->willReturn(42);
+		$file->method('getName')->willReturn('Plan.opml');
+		$outlinesFolder->method('getById')->with(42)->willReturn([$file]);
+
+		return [new OutlineStore($rootFolder, new OpmlCodec()), $file];
 	}
 
 	public function testSaveCopyWritesNameMyCopyOpml(): void {
