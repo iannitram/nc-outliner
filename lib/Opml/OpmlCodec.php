@@ -41,6 +41,16 @@ final class OpmlCodec {
 
 		$title = $head === null ? '' : ($this->childElement($head, 'title')?->textContent ?? '');
 		$publishPath = $head === null ? null : $this->namespacedChildText($head, 'publishPath');
+		$headExtra = [];
+		if ($head !== null) {
+			foreach ($head->childNodes as $child) {
+				if ($child instanceof \DOMElement && !(($child->namespaceURI === null && $child->localName === 'title') || ($child->namespaceURI === self::NS && $child->localName === 'publishPath'))) {
+					$copy = new \DOMDocument();
+					$copy->appendChild($copy->importNode($child, true));
+					$headExtra[] = (string)$copy->saveXML($copy->documentElement);
+				}
+			}
+		}
 		$rows = [];
 		foreach ($body->childNodes as $child) {
 			if ($child instanceof \DOMElement && $child->localName === 'outline') {
@@ -48,7 +58,7 @@ final class OpmlCodec {
 			}
 		}
 
-		return new Outline($title, $rows, $publishPath);
+		return new Outline($title, $rows, $publishPath, $headExtra);
 	}
 
 	private function childElement(\DOMElement $parent, string $name): ?\DOMElement {
@@ -82,6 +92,17 @@ final class OpmlCodec {
 		$id = $element->hasAttributeNS(self::NS, 'id')
 			? $element->getAttributeNS(self::NS, 'id')
 			: bin2hex(random_bytes(8));
+		$extra = [];
+		foreach ($element->attributes as $attribute) {
+			$uri = $attribute->namespaceURI;
+			if (($uri === null && in_array($attribute->nodeName, ['text', '_note'], true)) || ($uri === self::NS && in_array($attribute->localName, ['id', 'collapsed'], true)) || str_starts_with($attribute->nodeName, 'xmlns')) {
+				continue;
+			}
+			if ($uri !== null && $attribute->prefix !== 'xml') {
+				$extra['xmlns:' . $attribute->prefix] = $uri;
+			}
+			$extra[$attribute->nodeName] = $attribute->value;
+		}
 
 		return new Row(
 			$id,
@@ -89,6 +110,7 @@ final class OpmlCodec {
 			$element->getAttribute('_note'),
 			$element->getAttributeNS(self::NS, 'collapsed') === 'true',
 			$children,
+			$extra,
 		);
 	}
 
@@ -111,19 +133,25 @@ final class OpmlCodec {
 			$publishPath->textContent =$outline->publishPath;
 			$head->appendChild($publishPath);
 		}
+		foreach ($outline->headExtra as $xml) {
+			$fragment = $document->createDocumentFragment();
+			if ($fragment->appendXML($xml)) {
+				$head->appendChild($fragment);
+			}
+		}
 		
 		$opml->appendChild($head);
 		
 		$body = $document->createElement('body');
 		foreach ($outline->rows as $row) {
-			$this->writeRow($document, $body, $row);
+			$this->writeRow($document, $body, $row, $opml);
 		}
 		$opml->appendChild($body);
 		
 		return $document->saveXML();
 	}
 
-	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row): void {
+	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row, \DOMElement $root): void {
 		$outline = $document->createElement('outline');
 		// Let DOM handle escaping properly
 		$outline->setAttribute('text', $row->text);
@@ -134,9 +162,24 @@ final class OpmlCodec {
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
 		}
+		foreach ($row->extra as $name => $value) {
+			if (str_starts_with($name, 'xmlns:')) {
+				if (!$root->hasAttribute($name)) {
+					$root->setAttribute($name, $value);
+				}
+			} elseif (str_contains($name, ':')) {
+				[$prefix] = explode(':', $name, 2);
+				$uri = $row->extra['xmlns:' . $prefix] ?? null;
+				if ($uri !== null) {
+					$outline->setAttributeNS($uri, $name, $value);
+				}
+			} elseif (!in_array($name, ['text', '_note'], true)) {
+				$outline->setAttribute($name, $value);
+			}
+		}
 		
 		foreach ($row->children as $child) {
-			$this->writeRow($document, $outline, $child);
+			$this->writeRow($document, $outline, $child, $root);
 		}
 		
 		$parent->appendChild($outline);
