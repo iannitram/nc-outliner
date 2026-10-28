@@ -7,6 +7,7 @@ namespace OCA\NcOutliner\Controller;
 use OCA\NcOutliner\AppInfo\Application;
 use OCA\NcOutliner\Opml\OpmlParseException;
 use OCA\NcOutliner\Opml\Outline;
+use OCA\NcOutliner\Opml\OpmlCodec;
 use OCA\NcOutliner\Opml\Row;
 use OCA\NcOutliner\Service\ConflictException;
 use OCA\NcOutliner\Service\FolderConflictException;
@@ -26,6 +27,15 @@ final class OutlineController extends Controller {
 		private readonly IUserSession $userSession,
 	) {
 		parent::__construct(Application::APP_ID, $request);
+	}
+
+	#[NoAdminRequired]
+	public function export(): JSONResponse {
+		$outline = $this->outlineParam($this->request->getParams());
+		if ($outline === null) {
+			return $this->outlineRequired();
+		}
+		return new JSONResponse(['data' => (new OpmlCodec())->write($this->outlineFromArray($outline))]);
 	}
 
 	#[NoAdminRequired]

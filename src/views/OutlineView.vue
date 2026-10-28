@@ -7,7 +7,7 @@ import OutlineTopBar from '../components/OutlineTopBar.vue'
 import SortDialog from '../components/SortDialog.vue'
 import StatusLine from '../components/StatusLine.vue'
 import VersionsPanel from '../components/VersionsPanel.vue'
-import { readOutline, saveCopy, saveOutline } from '../api/outlines.js'
+import { exportOpml, readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
 import { createHistory } from '../model/history.js'
 import { sortRows } from '../model/outline.js'
@@ -210,7 +210,15 @@ function applySort({ by, direction }) {
 	sortOpen.value = false
 }
 
-defineExpose({ beforeLeave })
+/** @return {Promise<object|null>} OPML including the current unsaved edits */
+async function getWorkingFile() {
+	if (loading.value || !currentDocument || currentSession?.fileId !== props.fileId) {
+		return null
+	}
+	return { name: 'outline.opml', type: 'text/x-opml', data: await exportOpml(currentDocument) }
+}
+
+defineExpose({ beforeLeave, getWorkingFile })
 
 onMounted(() => {
 	load()

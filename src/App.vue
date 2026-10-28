@@ -1,4 +1,7 @@
 <script setup>
+import { getRequestToken } from '@nextcloud/auth'
+import { loadState } from '@nextcloud/initial-state'
+import { generateUrl } from '@nextcloud/router'
 import {
 	NcAppContent,
 	NcAppNavigation,
@@ -8,6 +11,7 @@ import {
 	NcContent,
 	NcThemeProvider,
 } from '@nextcloud/vue'
+import { ReportButton } from 'craft-bugreport-web'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import ThemeSetting from './components/ThemeSetting.vue'
 import OutlineList from './views/OutlineList.vue'
@@ -19,6 +23,16 @@ const STORAGE_KEY = 'nc_outliner_last_outline'
 
 const hash = ref(window.location.hash)
 const outlineView = ref(null)
+const reportState = loadState('nc_outliner', 'bugReport', {})
+const reportConfig = {
+	app: 'Outliner',
+	version: reportState.version,
+	commit: reportState.commit,
+	ncVersion: reportState.ncVersion,
+	relayUrl: generateUrl('/apps/nc_outliner/api/bugreport'),
+	headers: { requesttoken: getRequestToken() },
+}
+
 const theme = ref('auto')
 const settingsLoading = ref(true)
 const settingsError = ref('')
@@ -31,6 +45,11 @@ const fileId = computed(() => {
 	const match = hash.value.match(/^#\/outline\/(\d+)$/)
 	return match ? Number(match[1]) : null
 })
+
+/** @return {Promise<object|null>} the current outline, only when one is open */
+async function getWorkingFile() {
+	return fileId.value === null ? null : (outlineView.value?.getWorkingFile() ?? null)
+}
 
 /**
  * Format an outline's modified time for display in navigation.
@@ -260,6 +279,10 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 	<NcThemeProvider :dark="theme === 'dark'" :light="theme === 'light'">
 		<NcContent appName="nc_outliner">
 			<NcAppNavigation ariaLabel="Outliner navigation">
+				<ReportButton :config="reportConfig" :getWorkingFile="getWorkingFile" />
+				<p v-if="reportState.configured === false" role="status">
+					Bug reports are not set up for this app.
+				</p>
 				<NcAppNavigationNew text="New outline" @click="createNewOutline" />
 				<NcAppNavigationItem
 					v-for="entry in outlines"
