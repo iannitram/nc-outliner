@@ -74,9 +74,9 @@ describe('OutlineView flex column structure (#183)', () => {
 		expect(children[children.length - 1]).toBe(statusLine.element)
 		expect(view.element.lastElementChild).toBe(statusLine.element)
 
-		// The editor area contains both the sort bar and the rows tree
+		// The editor area contains the rows tree; sorting lives in the ... menu (#189)
 		expect(editor.classes()).toContain('outline-editor')
-		expect(editor.find('.outline-sort').exists()).toBe(true)
+		expect(editor.find('.outline-sort').exists()).toBe(false)
 		expect(editor.find('[role="tree"]').exists()).toBe(true)
 
 		wrapper.unmount()

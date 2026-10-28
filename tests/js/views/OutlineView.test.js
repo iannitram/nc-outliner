@@ -151,6 +151,37 @@ describe('OutlineView autosave conflict flow', () => {
 		}), 'etag-1')
 	})
 
+	it('sorts through the dialog as one undoable History step', async () => {
+		readOutline.mockResolvedValue({
+			fileId: 3,
+			name: 'Plan.opml',
+			etag: 'etag-1',
+			outline: {
+				title: 'Plan',
+				rows: [
+					{ id: 'b', text: 'Beta', note: '', collapsed: false, children: [] },
+					{ id: 'a', text: 'Alpha', note: '', collapsed: false, children: [] },
+				],
+				publishPath: null,
+			},
+		})
+		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
+		await flushPromises()
+		expect(document.body.textContent).not.toContain('Sort rows')
+
+		wrapper.findComponent({ name: 'OutlineTopBar' }).vm.$emit('openSort')
+		await flushPromises()
+		const sortButton = Array.from(document.body.querySelectorAll('button')).find((el) => el.textContent.trim() === 'Sort')
+		sortButton.click()
+		await flushPromises()
+
+		const history = wrapper.findComponent({ name: 'OutlineEditor' }).props('history')
+		expect(history.current().map((row) => row.id)).toEqual(['a', 'b'])
+		history.undo()
+		expect(history.current().map((row) => row.id)).toEqual(['b', 'a'])
+		expect(history.canUndo()).toBe(false)
+	})
+
 	it('shows a success toast after keepCopy succeeds', async () => {
 		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
 		await flushPromises()

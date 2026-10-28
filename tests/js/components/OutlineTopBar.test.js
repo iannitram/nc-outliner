@@ -88,6 +88,22 @@ describe('OutlineTopBar.vue', () => {
 		}
 	})
 
+	it('puts "Sort rows…" and "Versions" in the ... menu and emits openSort and openVersions', async () => {
+		// The real popover renders its items lazily in a teleport, so show the slot in place.
+		const wrapper = mount(OutlineTopBar, {
+			props: { title: 'Community garden plan', fileId: 42 },
+			global: {
+				stubs: { NcActions: { template: '<div class="actions-stub"><slot /></div>' } },
+			},
+		})
+		const entries = wrapper.findAllComponents({ name: 'NcActionButton' })
+		expect(entries.map((entry) => entry.text())).toEqual(['Sort rows…', 'Versions'])
+		await entries[0].find('button').trigger('click')
+		expect(wrapper.emitted('openSort')).toHaveLength(1)
+		await entries[1].find('button').trigger('click')
+		expect(wrapper.emitted('openVersions')).toHaveLength(1)
+	})
+
 	it('renders PublishButton and forwards published event', async () => {
 		const wrapper = mount(OutlineTopBar, {
 			props: {

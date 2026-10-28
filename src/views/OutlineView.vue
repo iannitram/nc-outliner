@@ -4,11 +4,13 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConflictDialog from '../components/ConflictDialog.vue'
 import OutlineEditor from '../components/OutlineEditor.vue'
 import OutlineTopBar from '../components/OutlineTopBar.vue'
+import SortDialog from '../components/SortDialog.vue'
 import StatusLine from '../components/StatusLine.vue'
 import VersionsPanel from '../components/VersionsPanel.vue'
 import { readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
 import { createHistory } from '../model/history.js'
+import { sortRows } from '../model/outline.js'
 
 const props = defineProps({ fileId: { type: Number, required: true } })
 const loading = ref(true)
@@ -21,6 +23,7 @@ const title = computed(() => document.value?.title || name.value)
 const saveStatus = ref('saved')
 const conflictOpen = ref(false)
 const versionsOpen = ref(false)
+const sortOpen = ref(false)
 let saver = null
 let unsubscribe = null
 let currentDocument = null
@@ -193,6 +196,16 @@ function onPublished(newPath) {
 	}
 }
 
+/**
+ * Sort every level through History, so one undo reverses it.
+ *
+ * @param {{by: 'text'|'status'|'note', direction: 'asc'|'desc'}} choice the dialog's choice
+ */
+function applySort({ by, direction }) {
+	history.value?.execute(sortRows, [by, direction])
+	sortOpen.value = false
+}
+
 defineExpose({ beforeLeave })
 
 onMounted(() => {
@@ -228,8 +241,13 @@ watch(() => props.fileId, load)
 				:name="name"
 				:beforePublish="flushPendingSave"
 				@published="onPublished"
-				@openVersions="versionsOpen = true" />
+				@openVersions="versionsOpen = true"
+				@openSort="sortOpen = true" />
 			<OutlineEditor v-if="history" :history="history" class="outline-editor" />
+			<SortDialog
+				:open="sortOpen"
+				@close="sortOpen = false"
+				@sort="applySort" />
 			<ConflictDialog
 				:open="conflictOpen"
 				:name="name"

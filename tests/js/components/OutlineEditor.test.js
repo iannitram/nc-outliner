@@ -333,21 +333,16 @@ describe('OutlineEditor', () => {
 		expect(wrapper.find('.slot-note').text()).toBe('my note')
 	})
 
-	it('sorts rows through shared history so the change can be undone', async () => {
+	it('shows no sort controls (sorting lives in the ... menu)', () => {
 		const history = createHistory([
 			{ id: 'b', text: 'Beta', note: '', collapsed: false, children: [] },
 			{ id: 'a', text: 'Alpha', note: '', collapsed: false, children: [] },
 		])
 		wrapper = mount(OutlineEditor, { props: { history } })
 
-		await wrapper.get('button:last-child').trigger('click')
-		expect(history.current().map((row) => row.id)).toEqual(['a', 'b'])
-		history.undo()
-		expect(history.current().map((row) => row.id)).toEqual(['b', 'a'])
-
-		await wrapper.get('select').setValue('note')
-		await wrapper.findAll('button')[0].trigger('click')
-		expect(wrapper.findAll('button')[0].text()).toContain('Descending')
+		expect(wrapper.find('.outline-sort').exists()).toBe(false)
+		expect(wrapper.find('select').exists()).toBe(false)
+		expect(wrapper.text()).not.toContain('Sort rows')
 	})
 
 	it('drops a row before another row as one undoable move', async () => {
@@ -449,18 +444,15 @@ describe('OutlineEditor', () => {
 		expect(wrapper.get('textarea[data-note-id="r1"]').element.value).toBe('My note')
 	})
 
-	it('renders as a scroll container (.outline-editor) containing both the sort bar and the rows tree', () => {
+	it('renders as a scroll container (.outline-editor) containing the rows tree and no sort bar', () => {
 		const history = createHistory([
 			{ id: 'r1', text: 'First row', note: '', collapsed: false, children: [] },
 		])
 		wrapper = mount(OutlineEditor, { props: { history } })
 
 		expect(wrapper.classes()).toContain('outline-editor')
-		const sortBar = wrapper.find('.outline-sort')
-		const treeContainer = wrapper.find('[role="tree"]')
-		expect(sortBar.exists()).toBe(true)
-		expect(treeContainer.exists()).toBe(true)
-		expect(wrapper.element.contains(sortBar.element)).toBe(true)
+		expect(wrapper.find('.outline-sort').exists()).toBe(false)
+		expect(wrapper.find('[role="tree"]').exists()).toBe(true)
 	})
 
 	describe('empty outline', () => {

@@ -30,7 +30,7 @@ const props = defineProps({
 	},
 })
 
-defineEmits(['published', 'openVersions'])
+defineEmits(['published', 'openVersions', 'openSort'])
 
 const topBarRef = ref(null)
 const observedNarrow = ref(false)
@@ -97,6 +97,24 @@ onUnmounted(() => {
 		</NcButton>
 		<NcActions :forceMenu="true" ariaLabel="More actions">
 			<slot name="actions">
+				<NcActionButton @click="$emit('openSort')">
+					<template #icon>
+						<svg
+							viewBox="0 0 24 24"
+							width="20"
+							height="20"
+							aria-hidden="true">
+							<path
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M7 4v16 M4 17l3 3 3-3 M13 6h8 M13 11h6 M13 16h4" />
+						</svg>
+					</template>
+					Sort rows…
+				</NcActionButton>
 				<NcActionButton @click="$emit('openVersions')">
 					Versions
 				</NcActionButton>

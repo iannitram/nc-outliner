@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, provide, ref, watch } from 
 import KeyboardHints from './KeyboardHints.vue'
 import OutlineRow from './OutlineRow.vue'
 import * as keymap from '../editor/keymap.js'
-import { moveTo, newRow, remove, sortRows, updateRow } from '../model/outline.js'
+import { moveTo, newRow, remove, updateRow } from '../model/outline.js'
 
 const props = defineProps({
 	history: {
@@ -20,8 +20,6 @@ const dragSourceId = ref(null)
 const dropTarget = ref(null)
 const inputRefs = new Map()
 const placeholderRef = ref(null)
-const sortBy = ref('text')
-const sortDirection = ref('asc')
 
 /**
  * @param {import('../model/outline.js').Tree} rows the rows to count
@@ -205,16 +203,6 @@ function handleFocus(row, event) {
 	caretPos.value = event.target.selectionStart ?? 0
 }
 
-/** Apply the chosen permanent sort through History so it can be undone. */
-function applySort() {
-	props.history.execute(sortRows, [sortBy.value, sortDirection.value])
-}
-
-/** Switch between ascending and descending order. */
-function toggleSortDirection() {
-	sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
-}
-
 /**
  * @param {import('../model/outline.js').Tree} rows the rows to search
  * @param {string} id the row id to find
@@ -390,22 +378,6 @@ defineExpose({
 		ref="rootRef"
 		class="outline-editor"
 		role="tree">
-		<div class="outline-sort" role="group" aria-label="Sort outline rows">
-			<label>
-				Sort rows by
-				<select v-model="sortBy" aria-label="Sort rows by">
-					<option value="text">Topic</option>
-					<option value="status">Status</option>
-					<option value="note">Note</option>
-				</select>
-			</label>
-			<button type="button" @click="toggleSortDirection">
-				{{ sortDirection === 'asc' ? 'Ascending' : 'Descending' }}
-			</button>
-			<button type="button" @click="applySort">
-				Sort rows
-			</button>
-		</div>
 		<div role="tree">
 			<OutlineRow
 				v-for="row in tree"
@@ -472,19 +444,6 @@ body[data-theme-dark] .outline-editor,
 		--band-1: color-mix(in srgb, var(--color-primary-element) 9%, var(--color-main-background));
 		--band-2: color-mix(in srgb, var(--color-primary-element) 4%, var(--color-main-background));
 	}
-}
-
-.outline-sort {
-	display: flex;
-	align-items: center;
-	gap: 0.5rem;
-	padding: 0.5rem;
-}
-
-.outline-sort label {
-	display: flex;
-	align-items: center;
-	gap: 0.35rem;
 }
 
 .outline-placeholder {
