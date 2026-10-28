@@ -110,18 +110,21 @@ describe('VersionsPanel.vue', () => {
 	})
 
 	it('shows the read-only text of an older version and no editor', async () => {
+		// Changed for #180: the preview shows rows only, so the version must be OPML (plain text is not shown).
+		readVersion.mockResolvedValue('<opml><body><outline text="old text of the outline"/></body></opml>')
 		await open()
 
 		await click(button('Preview', row(2)))
 
 		expect(readVersion).toHaveBeenCalledWith(FILE_ID, '100')
-		const preview = document.body.querySelector('pre')
-		expect(preview.textContent).toBe('old text of the outline')
+		const preview = document.body.querySelector('.version-preview')
+		expect(preview.querySelector('li').textContent.trim()).toBe('old text of the outline')
+		expect(document.body.querySelector('pre')).toBeNull()
 		expect(document.body.querySelector('textarea, [contenteditable], [contenteditable="true"]')).toBeNull()
 		expect(restoreVersion).not.toHaveBeenCalled()
 
 		await click(button('Close preview'))
-		expect(document.body.querySelector('pre')).toBeNull()
+		expect(document.body.querySelector('.version-preview')).toBeNull()
 	})
 
 	it('flushes before restoring, then reloads the outline, then offers to name the new top entry', async () => {
@@ -351,5 +354,75 @@ describe('VersionsPanel.vue', () => {
 			expect(document.body.textContent).toContain('could not be found')
 			expect(nameVersion).not.toHaveBeenCalled()
 		})
+	})
+})
+
+describe('VersionsPanel.vue: the preview of a saved version (#180)', () => {
+	// A file the app's PHP OpmlCodec wrote: nco: namespace, _note, nested rows, an escaped "&".
+	const REAL_SAVED = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0" xmlns:nco="https://github.com/iannitram/nc-outliner/ns/1">
+  <head>
+    <title>Plan</title>
+  </head>
+  <body>
+    <outline xmlns:nco="https://github.com/iannitram/nc-outliner/ns/1" text="A" _note="a note" nco:id="r1" nco:collapsed="true">
+      <outline text="A1" nco:id="r2"/>
+    </outline>
+    <outline xmlns:nco="https://github.com/iannitram/nc-outliner/ns/1" text="B &amp; c" nco:id="r3"/>
+  </body>
+</opml>
+`
+	const ROWS = [
+		{ depth: 0, text: 'A' },
+		{ depth: 1, text: 'A1' },
+		{ depth: 0, text: 'B & c' },
+	]
+
+	/** Mount with `text` as the older version's file, open its preview, and return the rendered rows. */
+	async function previewRows(text) {
+		readVersion.mockResolvedValue(text)
+		await open()
+		await click(button('Preview', row(2)))
+		return Array.from(document.body.querySelectorAll('.version-preview li')).map((el) => ({
+			depth: Math.round(parseFloat(el.style.paddingInlineStart || '0') / 20),
+			text: el.textContent.trim(),
+		}))
+	}
+
+	it('shows a real saved file as indented rows', async () => {
+		expect(await previewRows(REAL_SAVED)).toEqual(ROWS)
+	})
+
+	it('shows the same rows when the file starts with a BOM', async () => {
+		expect(await previewRows('﻿' + REAL_SAVED)).toEqual(ROWS)
+	})
+
+	it('shows the same rows when the file starts with a newline', async () => {
+		expect(await previewRows('\n' + REAL_SAVED)).toEqual(ROWS)
+	})
+
+	it.each([
+		['truncated XML', '<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><body><outline text="A"'],
+		['an empty string', ''],
+		['whitespace only', ' \n\t '],
+		['not xml at all', 'not xml at all'],
+		['an opml with no body', '<?xml version="1.0"?><opml version="2.0"><head><title>Plan</title></head></opml>'],
+		['an HTML page', '<!DOCTYPE html><html><body>Login</body></html>'],
+	])('says the version cannot be opened for %s, and shows none of its text', async (_label, input) => {
+		readVersion.mockResolvedValue(input)
+		await open()
+
+		await click(button('Preview', row(2)))
+
+		const preview = document.body.querySelector('.version-preview')
+		expect(preview.textContent).toContain("This version can't be opened")
+		expect(preview.querySelector('li')).toBeNull()
+		expect(preview.querySelector('pre')).toBeNull()
+		const html = document.body.innerHTML
+		expect(html).not.toContain('<opml')
+		expect(html).not.toContain('&lt;opml')
+		expect(html).not.toContain('Login')
+		expect(html).not.toContain('not xml at all')
+		expect(button('Close preview', preview)).toBeTruthy()
 	})
 })
