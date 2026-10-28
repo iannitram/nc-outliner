@@ -2,10 +2,17 @@ name: check
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
   contents: read
+
+concurrency:
+  # Branches run once, through their PR; a newer run of the same PR or branch cancels the older one.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -13,13 +20,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Self-hosted runners (the pipeline repo's R29). macOS is left out until the
-        # Mac mini runner exists: GitHub-hosted runners are stopped for private repos.
+        # GitHub-hosted runners: this repo is public, and a public repo never runs on
+        # self-hosted machines (the pipeline repo's R29).
         include:
           - os: linux
-            runner: [self-hosted, linux]
+            runner: ubuntu-latest
           - os: windows
-            runner: [self-hosted, windows]
+            runner: windows-latest
     runs-on: ${{ matrix.runner }}
     defaults:
       run:

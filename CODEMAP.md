@@ -2,6 +2,8 @@
 
 Every module 1.0 needs: where it lives, what it owns, what it exports, which issue fills it, and who calls whom. Vue 3 on Nextcloud's own stack (ADR 0001), started fresh (ADR 0002). The spec is [SPEC.md](SPEC.md); tickets and order are in [docs/plan/1.0-work.md](docs/plan/1.0-work.md).
 
+Describes commit: 0b8d9e4 (2026-10-28)
+
 **Status** on each module: **present** (on main and working), **stub** (on main with its signatures, body throws "not implemented"; the issue fills it in), or **planned** (not on main yet; the issue creates the file at the path given). Move a module's status in the PR that changes it.
 
 ## Contents
@@ -22,8 +24,8 @@ Merged in #84.
 | Path | What it is |
 |---|---|
 | `appinfo/info.xml` | App id `nc_outliner`, name "Outliner", Nextcloud 33 only, the navigation entry (route `nc_outliner.page.index`) |
-| `appinfo/routes.php` | Routes. Today one: `GET /` (page#index). The API routes below are added here |
-| `lib/AppInfo/Application.php` | App bootstrap; holds `APP_ID` |
+| `appinfo/routes.php` | Routes: `GET /` (page#index), the five outline routes and the two settings routes (see [API](#api)). Later routes are added here |
+| `lib/AppInfo/Application.php` | App bootstrap; holds `APP_ID`; registers `IOutlineStore` as an alias of `OutlineStore` |
 | `lib/Controller/PageController.php` | `index()` returns the `main` template |
 | `templates/main.php` | Loads the built script `js/nc_outliner-main.mjs` and stylesheet `css/nc_outliner-style.css`; has the mount div `#nc_outliner` |
 | `src/main.js` | Creates the Vue app and mounts it on `#nc_outliner` |
@@ -31,10 +33,11 @@ Merged in #84.
 | `js/`, `css/` | Build output of `npm run build` (generated, not edited) |
 | `img/app.svg` | App icon |
 | `vite.config.mjs` | `@nextcloud/vite-config`; entry `src/main.js`, output `js/` (script) and `css/` (one stylesheet) |
-| `vitest.config.mjs` | jsdom environment for the JavaScript tests |
+| `vitest.config.mjs` | jsdom environment for the JavaScript tests; `maxWorkers: 2` when `CI` is set, to bound worker startup on the shared runners |
 | `eslint.config.mjs` | `@nextcloud/eslint-config` (recommended) |
 | `composer.json` | PHP autoload (`OCA\NcOutliner\` to `lib/`), phpunit and `nextcloud/ocp` for tests |
 | `tests/tools/php.mjs` | Runs `php -l` or phpunit with a local PHP 8.4+, else a throwaway `nextcloud:33.0.10-apache` container |
+| `.github/workflows/check.yml` | CI: lint, JavaScript tests, build (Linux only), PHP lint and PHP tests; see [Mac, PC and Linux](#mac-pc-and-linux) |
 
 ## How the parts fit
 
@@ -62,7 +65,8 @@ flowchart LR
         List --> Client
     end
     subgraph Server
-        OC[OutlineController] --> Store[Service/OutlineStore]
+        OC[OutlineController] --> IStore[Service/IOutlineStore]
+        IStore -.-> Store[Service/OutlineStore]
         Store --> Codec[Opml/OpmlCodec]
         Store --> Files[(user's Files: Outlines/)]
         PC[PublishController] --> PS[Service/PublishService]
@@ -178,17 +182,18 @@ final class OdtPackage { public function build(string $contentXml): string; }
 
 | | |
 |---|---|
-| File | `lib/Service/OutlineStore.php`, `lib/Service/ConflictException.php`, `lib/Service/NotFoundException.php` (present) |
-| Tests | `tests/php/Service/OutlineStoreTest.php` (present; mocks `IRootFolder`) |
+| Files | `lib/Service/OutlineStore.php`, `lib/Service/IOutlineStore.php` (the interface the controller depends on), `lib/Service/ConflictException.php`, `lib/Service/NotFoundException.php`, `lib/Service/FolderConflictException.php` (present) |
+| Tests | `tests/php/Service/OutlineStoreTest.php`, `OutlineStoreFolderTest.php`, `OutlineStoreFolderEdgeTest.php` (present; mock `IRootFolder`) |
 | Owns | The user's `Outlines/` folder and the `.opml` files in it, through Nextcloud's file API (`OCP\Files\IRootFolder::getUserFolder($uid)`), never direct disk writes. The etag check on save |
-| Issue | #88 (merged) |
-| Called by | API, Publish, Versions, Import |
+| Issues | #88 (merged); first-open folder races and the path conflict (#147, merged); #135 (make the etag check and write atomic) is open |
+| Called by | API (through `IOutlineStore`), Publish, Versions, Import |
 
 ```php
 namespace OCA\NcOutliner\Service;
-final class OutlineStore {
+final class OutlineStore implements IOutlineStore {
     public function __construct(IRootFolder $rootFolder, OpmlCodec $codec);
-    public function ensureFolder(string $uid): Folder;                       // creates Outlines/ on first use
+    /** @throws FolderConflictException when a file named Outlines already exists */
+    public function ensureFolder(string $uid): Folder;                       // creates Outlines/ on first use; survives a concurrent first create
     /** @return list<array{fileId: int, name: string, mtime: int}> */
     public function list(string $uid): array;                                 // .opml files only, newest first
     /** @return array{fileId: int, name: string, etag: string} */
@@ -202,10 +207,13 @@ final class OutlineStore {
 }
 final class ConflictException extends \RuntimeException { public function __construct(public string $currentEtag); }
 final class NotFoundException extends \RuntimeException {}
+final class FolderConflictException extends \RuntimeException {}   // "Outlines" exists but is not a folder
 ```
 
+`IOutlineStore` declares `list`, `create`, `read`, `save` and `saveCopy` (not `ensureFolder`); `Application::register()` aliases it to `OutlineStore`, and the controller tests mock the interface.
+
 - A file id is looked up only inside that user's `Outlines/` folder, so another user's id is "not found", never readable.
-- Names: `.opml` added if missing; the characters `\ / : * ? " < > |` and trailing dots or spaces are refused, and a name that differs from an existing one only by case gets " (2)" ([Mac, PC and Linux](#mac-pc-and-linux)).
+- Names: an invalid name throws `\InvalidArgumentException` (the API answers 400); `.opml` added if missing; the characters `\ / : * ? " < > |` and trailing dots or spaces are refused, and a name that differs from an existing one only by case gets " (2)" ([Mac, PC and Linux](#mac-pc-and-linux)).
 - Etag: the Nextcloud file etag (`Node::getEtag()`), compared just before `putContent`.
 
 ### API
@@ -213,22 +221,22 @@ final class NotFoundException extends \RuntimeException {}
 | | |
 |---|---|
 | Files | `lib/Controller/OutlineController.php` (present), routes in `appinfo/routes.php` |
-| Tests | `tests/php/Controller/OutlineControllerTest.php` (present) |
+| Tests | `tests/php/Controller/OutlineControllerTest.php`, `OutlineControllerBodyTest.php`, `OutlineControllerNameTest.php`, `OutlineControllerParseTest.php` (present) |
 | Owns | The JSON routes for outlines; the signed-in user from `IUserSession` |
-| Issue | #108 (outline routes). Other routes come with their own issues, listed below |
+| Issues | #108 (outline routes; merged), with the review fixes #134, #137, #138. Other routes come with their own issues, listed below |
 | Called by | Browser API client |
 
 All routes are under `/apps/nc_outliner/api`, take and return JSON, and are `#[NoAdminRequired]` (CSRF checked; the browser client sends the request token).
 
 | Verb and path | Body | Answer | Issue |
 |---|---|---|---|
-| `GET /outlines` | | `200 [{fileId, name, mtime}]` | #108 |
-| `POST /outlines` | `{name}` | `201 {fileId, name, etag}` | #108 |
-| `GET /outlines/{fileId}` | | `200 {fileId, name, etag, outline}` · `404` | #108 |
-| `PUT /outlines/{fileId}` | `{outline}`, header `If-Match: <etag>` | `200 {etag}` · `412 {etag}` (changed elsewhere) · `404` | #108 |
-| `POST /outlines/{fileId}/copy` | `{outline}` | `201 {fileId, name, etag}` | #108 |
+| `GET /outlines` | | `200 [{fileId, name, mtime}]` · `409 {message}` when a file named `Outlines` is in the way | #108 |
+| `POST /outlines` | `{name}` | `201 {fileId, name, etag}` · `400 {message}` for a bad name · `409 {message}` as above | #108 |
+| `GET /outlines/{fileId}` | | `200 {fileId, name, etag, outline}` · `404` · `422 {message}` when the file is not a readable outline | #108 |
+| `PUT /outlines/{fileId}` | `{outline}`, header `If-Match: <etag>` | `200 {etag}` · `412 {etag}` (changed elsewhere) · `404` · `400 {message}` without the header or without an `outline` with a `rows` array | #108 |
+| `POST /outlines/{fileId}/copy` | `{outline}` | `201 {fileId, name, etag}` · `404` · `400 {message}` as for `PUT` | #108 |
 | `POST /outlines/import` | multipart `file` | `201 {fileId, name, etag}` · `422 {message}` | #27 |
-| `GET /settings` · `PUT /settings` | `{theme}` | `200 {theme}` | #109 |
+| `GET /settings` · `PUT /settings` | `{theme}` (`PUT` only) | `200 {theme}` · `400 {message}` for a value other than `auto`, `light` or `dark` | #109 (merged in #151) |
 | `GET /outlines/{fileId}/versions` | | `200 [{versionId, mtime, size, label}]` | #4 |
 | `GET /outlines/{fileId}/versions/{versionId}` | | `200 {outline}` (read-only) | #4 |
 | `POST /outlines/{fileId}/versions/{versionId}/restore` | | `200 {etag}` | #4 |
@@ -239,9 +247,10 @@ All routes are under `/apps/nc_outliner/api`, take and return JSON, and are `#[N
 
 | | |
 |---|---|
-| File | `lib/Controller/SettingsController.php` (planned) |
-| Owns | The per-user theme override, `auto` (default), `light` or `dark`, in user config (`IConfig::getUserValue($uid, 'nc_outliner', 'theme', 'auto')`) |
-| Issue | #109 (server), #96 (browser) |
+| File | `lib/Controller/SettingsController.php` (present), routes `GET` and `PUT /api/settings` |
+| Tests | `tests/php/Controller/SettingsControllerTest.php` (present) |
+| Owns | The per-user theme override, `auto` (default), `light` or `dark`, in user config (`IConfig::getUserValue($uid, 'nc_outliner', 'theme', 'auto')`). A stored value outside the three reads back as `auto` |
+| Issue | #109 (server; merged in #151), #96 (browser) |
 
 ### Versions
 
@@ -336,7 +345,7 @@ Trees are immutable, so an entry is the tree before the change. Typing uses `mer
 | File | `src/api/outlines.js` (present) |
 | Tests | `tests/js/api/outlines.test.js` (present; mocks axios) |
 | Owns | The HTTP calls to [the API](#api), with `@nextcloud/axios` (adds the request token) and `@nextcloud/router` `generateUrl('/apps/nc_outliner/api/...')` |
-| Issue | #106 (outline calls; merged). #109, #4, #27 and #113's browser side add their own calls here |
+| Issue | #106 (outline calls; merged). #96 (settings calls), #4, #27 and #113's browser side add their own calls here |
 | Called by | OutlineList, OutlineView, Saver |
 
 ```js
@@ -420,7 +429,7 @@ Colours come only from Nextcloud's theme variables (`--color-main-background`, `
 
 ## Mac, PC and Linux
 
-The app runs on a Nextcloud server and is used in a desktop browser, so "Mac, PC and Linux" means two things: the browser side works in desktop browsers on all three, and the code builds and its tests pass on all three, which CI checks on every push.
+The app runs on a Nextcloud server and is used in a desktop browser, so "Mac, PC and Linux" means two things: the browser side works in desktop browsers on all three, and the code builds and its tests pass on all three. CI checks Linux and Windows on every push; the Mac check is not wired up yet (see CI below).
 
 - **Browsers.** Current Firefox and Chromium browsers (Chrome, Edge) on all three, and Safari on the Mac. Use only standard DOM APIs; no browser-specific code.
 - **Keys.** The primary modifier is Cmd on a Mac and Ctrl elsewhere (`modKey` in `src/editor/keymap.js`); Option on a Mac is Alt. Ctrl+Y as redo is Windows and Linux only. Every key test runs once with `isMac: true` and once with `false`.
@@ -429,7 +438,7 @@ The app runs on a Nextcloud server and is used in a desktop browser, so "Mac, PC
 - **Server paths.** PHP never builds a disk path: files go through Nextcloud's `Folder` and `File` API (always `/`). Temp files (the `.odt` zip) use `sys_get_temp_dir()` and `tempnam()`, removed in a `finally`.
 - **Line endings.** `.gitattributes` keeps LF in every checkout; generated XML uses `"\n"`. Tests compare XML by parsing it, not by bytes, except where a test says byte-for-byte.
 - **Locale and time.** Tests never depend on the machine's locale or time zone: names sort with `localeCompare(b, 'en')` where order matters, times are compared as integers (Unix seconds).
-- **CI.** `.github/workflows/check.yml` runs lint, JavaScript tests, PHP lint and PHP tests on `ubuntu-latest`, `macos-latest` and `windows-latest`; the build runs once, on Linux.
+- **CI.** `.github/workflows/check.yml` runs lint, JavaScript tests, PHP lint and PHP tests on self-hosted Linux and Windows runners; the build runs once, on Linux. **There is no macOS job yet**: it waits for a Mac runner (GitHub-hosted runners are not used for this private repo), so Mac coverage today is the `isMac: true` key tests running on the other two. PHP comes from `setup-php` on Linux and from the runner's own install on Windows. Runs for one branch cancel each other (newest wins), and `vitest.config.mjs` caps test workers at 2 when `CI` is set. Issue #144 tracks the Windows worker start-up timeouts.
 
 ## Open-source pieces
 
@@ -441,7 +450,7 @@ What we bring in rather than write, and where it fits. New npm packages are adde
 | `@nextcloud/vite-config`, `@nextcloud/eslint-config` | Build and lint | in `package.json` |
 | `@nextcloud/dialogs` | The Publish folder picker (`getFilePickerBuilder`) and toasts (`showError`, `showSuccess`) | in `package.json` |
 | `@nextcloud/files` | File info and the WebDAV root, if versions go through WebDAV (#4) | in `package.json` |
-| `@nextcloud/axios`, `@nextcloud/router` | The browser API client (#106): request token and app URLs | add in #106 |
+| `@nextcloud/axios`, `@nextcloud/router` | The browser API client (#106): request token and app URLs | in `package.json` |
 | PHP `DOMDocument` (ext-dom), `XMLWriter`, `ZipArchive` (ext-zip) | OPML parse, `content.xml`, the `.odt` zip. Nextcloud already requires these extensions | built in |
 | Files Versions app | Versions and version labels (#4) | ships with Nextcloud |
 | Nextcloud Office (richdocuments) | Opens the published `.odt` (#9): open the file through the Files app with `openfile=true`; check the exact URL on Nextcloud 33 | installed on the server |
