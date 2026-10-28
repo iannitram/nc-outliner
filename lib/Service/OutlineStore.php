@@ -12,6 +12,8 @@ use OCP\Files\IRootFolder;
 use OCP\Files\NotFoundException as OcpNotFoundException;
 use OCP\Files\NotPermittedException;
 use OCP\Files\AlreadyExistsException;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 
 /**
  * OutlineStore service: manages the user's Outlines/ folder and .opml outline files.
@@ -21,6 +23,7 @@ final class OutlineStore implements IOutlineStore {
 	public function __construct(
 		private readonly IRootFolder $rootFolder,
 		private readonly OpmlCodec $codec,
+		private readonly ILockingProvider $lockingProvider,
 	) {
 	}
 
@@ -141,21 +144,55 @@ final class OutlineStore implements IOutlineStore {
 	/**
 	 * Saves the outline with an etag guard.
 	 *
-	 * @throws ConflictException when $ifMatch does not match current etag
+	 * The etag check and the write run under an app-level exclusive lock on a key
+	 * separate from the file's own lock, so two saves with the same If-Match cannot
+	 * both pass the check, and putContent() can still take Nextcloud's own file lock.
+	 * A save that finds the outline busy is refused as a conflict with the current etag.
+	 *
+	 * @throws ConflictException when $ifMatch does not match current etag, or the outline is locked by another write
 	 * @throws NotFoundException when fileId is not found or not an outline
 	 */
 	public function save(string $uid, int $fileId, Outline $outline, string $ifMatch): string {
+		// Resolved before the lock only to check the file exists and to name the
+		// lock; its etag may already be stale once we hold the lock.
 		$file = $this->getOutlineFile($uid, $fileId);
-		$currentEtag = $file->getEtag();
+		$key = 'nc_outliner/save/' . $fileId;
 
-		if ($currentEtag !== $ifMatch) {
-			throw new ConflictException($currentEtag);
+		try {
+			$this->lockingProvider->acquireLock($key, ILockingProvider::LOCK_EXCLUSIVE, $file->getPath());
+		} catch (LockedException) {
+			throw new ConflictException($this->freshEtagOr($uid, $fileId, $ifMatch));
 		}
 
-		$xml = $this->codec->write($outline);
-		$file->putContent($xml);
+		try {
+			// A node's etag comes from the FileInfo loaded when it was resolved, so
+			// look the file up again now that no other save can write in between.
+			$current = $this->getOutlineFile($uid, $fileId);
+			$currentEtag = $current->getEtag();
 
-		return $file->getEtag();
+			if ($currentEtag !== $ifMatch) {
+				throw new ConflictException($currentEtag);
+			}
+
+			$xml = $this->codec->write($outline);
+			$current->putContent($xml);
+
+			// The written node may keep its old FileInfo; read the new etag fresh.
+			return $this->getOutlineFile($uid, $fileId)->getEtag();
+		} catch (LockedException) {
+			// Locked by something else, e.g. the sync client or Files.
+			throw new ConflictException($this->freshEtagOr($uid, $fileId, $ifMatch));
+		} finally {
+			$this->lockingProvider->releaseLock($key, ILockingProvider::LOCK_EXCLUSIVE);
+		}
+	}
+
+	private function freshEtagOr(string $uid, int $fileId, string $fallback): string {
+		try {
+			return $this->getOutlineFile($uid, $fileId)->getEtag();
+		} catch (\Throwable) {
+			return $fallback;
+		}
 	}
 
 	/**
