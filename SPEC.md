@@ -1,14 +1,14 @@
 # nc-outliner: spec for 1.0
 
-**Approval:** 2026-10-25, in a session with the coordinator.
+**Approval:** 2026-10-25, in a planning session.
 
-Must M14 added 2026-10-26 by the owner: "Yes, a 1.0 Must (Recommended)" (the request: "New feature request for both apps - bug logging button with the same pathway as the launcher bug submission pathway"; details "Launcher set, browser version (Recommended)", "Same File Drop (Recommended)", "One shared module repo (Recommended)").
+Must M14 added 2026-10-26 by the owner: a bug-report button, using the same submission pathway as the owner's other apps.
 
-Must M15 added 2026-10-26 by the owner: "Private app store feed (Recommended)", "Yes, a 1.0 Must (Recommended)" (the requirement: "One feature that needs to work….once installed our plugins should update from the nextcloud admin panel, pulling updates automatically.").
+Must M15 added 2026-10-26 by the owner: once installed, the app updates from the Nextcloud admin panel through a private app-store feed.
 
 ## 1.0 means
 
-In Nextcloud on a desktop browser, I can write a nested outline with notes, and **Publish to Doc** gives me a headed document open in Nextcloud Office; and I have used it on my production Nextcloud for a week of real school and work notes without losing anything.
+In Nextcloud on a desktop browser, I can write a nested outline with notes, and **Publish to Doc** gives me a headed document open in Nextcloud Office; and I have used it on a real Nextcloud server for a week of real notes without losing anything.
 
 ## Musts
 
@@ -29,8 +29,8 @@ Each Must has a "done looks like" line and a check someone else can repeat. Feat
 | M11 (F25) | WHEN I import an OPML file, including an OmniOutliner OPML export, THE APP SHALL open it as a new outline with its tree, notes and checkbox state. | My own OmniOutliner exports open. | Import a real OmniOutliner export and compare by hand. |
 | M12 (F71) | WHEN Nextcloud is in dark or light mode, THE APP SHALL follow it, and SHALL let me override it (Auto, Light, Dark). Published docs always come out light. | Switching Nextcloud's theme switches the app. | Toggle each setting and look. |
 | M13 (F72) | WHEN I stop typing or leave the page, THE APP SHALL **autosave** and show Saved, Saving or Can't save (retrying); and WHEN the file changed elsewhere, it SHALL never overwrite it silently, offering to reload or keep mine as a copy. | No Save button; no lost edits. | Test: edit the same outline in two tabs; the second save offers reload or copy. |
-| M14 | WHEN I choose **Report a bug**, THE APP SHALL open the shared report form (craft-bugreport-web): what happened, what I expected, the app's recent errors, an optional screenshot and, only if I tick it that time, the open outline as `.opml`; it SHALL show me every file and send the report to the bug File Drop only after I press Send. | A report sent from the app lands in the File Drop with the desktop launcher's layout, and the morning bug intake reads it unchanged. | In the test container with the drop config set: make a report, check the consent screen lists every file, press Send, see the zip in the drop. |
-| M15 | WHEN a new signed release of the app is published to our merged app-store feed (craft-nc-appstore), THE NEXTCLOUD ADMIN PANEL SHALL offer it on the Apps page and the scheduled job SHALL install it automatically. | Publishing a new version makes the Apps page offer it, and within the hour the server runs it; nothing is copied by hand, and the official apps still update. | On the test Nextcloud (nc-projects-test, never the live server) with craft-nc-appstore's merged feed: publish a test release, see it offered on the Apps page, wait for the scheduled job, and check `occ app:list` shows the new version; then the same with a second version. |
+| M14 | WHEN I choose **Report a bug**, THE APP SHALL open the shared report form (the shared bug-report module): what happened, what I expected, the app's recent errors, an optional screenshot and, only if I tick it that time, the open outline as `.opml`; it SHALL show me every file and send the report to the bug-report drop only after I press Send. | A report sent from the app lands in the drop with the same layout as the owner's other apps, and the bug intake reads it unchanged. | In the test container with the drop config set: make a report, check the consent screen lists every file, press Send, see the zip in the drop. |
+| M15 | WHEN a new signed release of the app is published to our private app-store feed, THE NEXTCLOUD ADMIN PANEL SHALL offer it on the Apps page and the scheduled job SHALL install it automatically. | Publishing a new version makes the Apps page offer it, and within the hour the server runs it; nothing is copied by hand, and the official apps still update. | On a test Nextcloud (never a live server) with the private app-store feed: publish a test release, see it offered on the Apps page, wait for the scheduled job, and check `occ app:list` shows the new version; then the same with a second version. |
 
 ## Won'ts (not in 1.0)
 
@@ -43,7 +43,7 @@ Everything else on the project roadmap comes after 1.0, in its rank order.
 
 ## Problem
 
-I plan school and work in outlines, the way OmniOutliner works, but I need the result as a normal document in Nextcloud, where everything else of mine lives. No Nextcloud app does this (551 store apps checked, 2026-10-22).
+I plan in outlines, the way OmniOutliner works, but I need the result as a normal document in Nextcloud. No Nextcloud app does this (551 store apps checked, 2026-10-22).
 
 ## Solution
 
@@ -74,8 +74,8 @@ A per-user Nextcloud app: a keyboard-first outline editor whose files are OPML i
 ## Testing decisions
 
 - Every Must's check above is the test of record.
-- Automated tests run against a throwaway test Nextcloud, never production.
-- The 1.0 dogfood week runs on my production Nextcloud (2026-10-25). Each deploy to production still needs my yes. "Without losing anything" means: every outline reopens as I left it, and no Can't save is left unresolved.
+- Automated tests run against a throwaway test Nextcloud, never a live server.
+- The 1.0 dogfood week runs on a real Nextcloud server (2026-10-25). Each deploy to it needs the maintainer's approval. "Without losing anything" means: every outline reopens as I left it, and no Can't save is left unresolved.
 
 ## Further notes
 
