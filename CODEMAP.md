@@ -353,7 +353,7 @@ Trees are immutable, so an entry is the tree before the change. Typing uses `mer
 | Tests | `tests/js/api/outlines.test.js` (present; mocks axios) |
 | Owns | The HTTP calls to [the API](#api), with `@nextcloud/axios` (adds the request token) and `@nextcloud/router` `generateUrl('/apps/nc_outliner/api/...')` |
 | Issue | #106 (outline calls; merged). #96 (settings calls), #4, #27 and #113's browser side add their own calls here |
-| Called by | OutlineList, OutlineView, Saver |
+| Called by | OutlineList, OutlineView, PublishButton, Saver |
 
 ```js
 listOutlines(): Promise<OutlineEntry[]>
@@ -361,6 +361,7 @@ createOutline(name): Promise<{ fileId, name, etag }>
 readOutline(fileId): Promise<{ fileId, name, etag, outline }>
 saveOutline(fileId, outline, etag): Promise<{ ok: true, etag } | { conflict: true, etag }>   // 412 is an answer, not an error
 saveCopy(fileId, outline): Promise<{ fileId, name, etag }>
+publish(fileId, folder, name): Promise<{ fileId, path, openUrl }>
 ```
 
 ### Keyboard
@@ -427,7 +428,7 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | `src/components/SaveStatus.vue` | Saved / Saving / Can't save (retrying) | #97 | planned |
 | `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | planned |
 | `src/components/VersionsPanel.vue` | Versions list, read-only preview, Restore, Name this version | #111 | planned |
-| `src/components/PublishButton.vue` | Publish to Doc: folder picker, then open in Nextcloud Office | #9 | planned |
+| `src/components/PublishButton.vue` | Publish to Doc: folder picker, then open in Nextcloud Office | #9 | present |
 | `src/components/ThemeSetting.vue` | Auto / Light / Dark | #96 | present |
 | `src/main.js` + `src/App.vue` (Report a bug) | `installErrorBuffer()` at startup; craft-bugreport-web's `ReportButton` in the app navigation, given `{ app, version, commit, ncVersion, dropBase, dropToken, userName }` from initial state and `getWorkingFile()` returning the open outline as `.opml`; the drop base and token come from an admin setting stored server-side (`lib/Settings/`, IConfig app value) and are never committed | #124, #125 | planned |
 | `appinfo/info.xml` + `.github/workflows/release.yml` (updates from the admin panel) | The release fields the merged feed reads (id, a.b.c version, Nextcloud 33 range, PHP minimum; guarded by `tests/js/release/infoxml.test.js`) and the tag workflow that calls craft-nc-appstore's `build-app.yml@v1`; signing and publishing happen on the release-key machine (R35), never in CI | #128, #129, #130 | planned |

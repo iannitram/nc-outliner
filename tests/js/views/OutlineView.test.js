@@ -27,6 +27,15 @@ vi.mock('../../../src/components/OutlineEditor.vue', () => ({
 	},
 }))
 
+vi.mock('../../../src/components/PublishButton.vue', () => ({
+	default: {
+		name: 'PublishButton',
+		props: ['fileId', 'publishPath', 'name', 'title'],
+		emits: ['publish', 'published'],
+		template: '<div class="publish-button-stub" />',
+	},
+}))
+
 const initialOutline = {
 	title: 'Plan',
 	rows: [{ id: 'r1', text: 'First', note: '', collapsed: false, children: [] }],
@@ -129,6 +138,18 @@ describe('OutlineView autosave conflict flow', () => {
 		await flushPromises()
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
 			rows: [expect.objectContaining({ text: 'Edited' })],
+		}), 'etag-1')
+	})
+
+	it('saves outline when PublishButton emits a new publishPath', async () => {
+		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-2' })
+		wrapper = mount(OutlineView, { props: { fileId: 3 } })
+		await flushPromises()
+		const publishBtn = wrapper.findComponent({ name: 'PublishButton' })
+		publishBtn.vm.$emit('published', '/Documents/Plan.odt')
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
+			publishPath: '/Documents/Plan.odt',
 		}), 'etag-1')
 	})
 })

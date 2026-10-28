@@ -74,3 +74,23 @@ export async function setSettings(theme) {
 	const response = await axios.put(settingsUrl, { theme })
 	return response.data
 }
+
+/**
+ * Publish an outline to an .odt file in Nextcloud Files.
+ *
+ * @param {number} fileId outline file id
+ * @param {string} folder destination folder path
+ * @param {string} name document name without extension
+ * @return {Promise<{fileId: number, path: string, openUrl: string}>} published document info
+ */
+export async function publish(fileId, folder, name) {
+	try {
+		const response = await axios.post(`${outlinesUrl}/${fileId}/publish`, { folder, name })
+		return response.data
+	} catch (error) {
+		const message = error.response?.data?.message || (error.response?.status === 404 ? 'Outline not found' : error.message)
+		const err = new Error(message)
+		err.response = error.response
+		throw err
+	}
+}

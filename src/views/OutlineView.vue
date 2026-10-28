@@ -3,6 +3,7 @@ import { showSuccess } from '@nextcloud/dialogs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConflictDialog from '../components/ConflictDialog.vue'
 import OutlineEditor from '../components/OutlineEditor.vue'
+import PublishButton from '../components/PublishButton.vue'
 import SaveStatus from '../components/SaveStatus.vue'
 import { readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
@@ -152,6 +153,19 @@ async function beforeLeave() {
 	return !saver?.isDirty()
 }
 
+/**
+ * Update the publish path and trigger autosave.
+ *
+ * @param {string} newPath published document path
+ */
+function onPublished(newPath) {
+	if (currentDocument) {
+		currentDocument = { ...currentDocument, publishPath: newPath }
+		document.value = currentDocument
+		saver?.schedule(currentDocument)
+	}
+}
+
 /** Create the first root row for a valid empty outline. */
 function addFirstRow() {
 	history.value?.execute((rows) => [...rows, newRow()], [])
@@ -185,8 +199,17 @@ watch(() => props.fileId, load)
 			{{ error }}
 		</p>
 		<template v-if="!loading && history">
-			<h2>{{ title }}</h2>
-			<SaveStatus :status="saveStatus" />
+			<div class="outline-header">
+				<h2>{{ title }}</h2>
+				<SaveStatus :status="saveStatus" />
+				<PublishButton
+					:fileId="props.fileId"
+					:publishPath="document?.publishPath ?? null"
+					:name="name"
+					:title="title"
+					@publish="onPublished"
+					@published="onPublished" />
+			</div>
 			<button v-if="history.current().length === 0" type="button" @click="addFirstRow">
 				Add first row
 			</button>
@@ -202,4 +225,9 @@ watch(() => props.fileId, load)
 
 <style scoped>
 .outline-view { width: 100%; }
+.outline-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
 </style>
