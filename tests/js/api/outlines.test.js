@@ -15,14 +15,17 @@ vi.mock('@nextcloud/router', () => ({
 
 import {
 	createOutline,
+	getSettings,
 	listOutlines,
 	readOutline,
 	saveCopy,
 	saveOutline,
+	setSettings,
 } from '../../../src/api/outlines.js'
 
 const outlinesUrl = '/index.php/apps/nc_outliner/api/outlines'
 const outline = { title: 'Plan', rows: [], publishPath: null }
+const settingsUrl = '/index.php/apps/nc_outliner/api/settings'
 
 describe('outlines API client', () => {
 	beforeEach(() => {
@@ -35,6 +38,15 @@ describe('outlines API client', () => {
 
 		await expect(listOutlines()).resolves.toEqual(outlines)
 		expect(axios.get).toHaveBeenCalledWith(outlinesUrl)
+	})
+
+	it('reads and saves the per-user theme setting', async () => {
+		axios.get.mockResolvedValue({ data: { theme: 'auto' } })
+		axios.put.mockResolvedValue({ data: { theme: 'dark' } })
+		await expect(getSettings()).resolves.toEqual({ theme: 'auto' })
+		await expect(setSettings('dark')).resolves.toEqual({ theme: 'dark' })
+		expect(axios.get).toHaveBeenCalledWith(settingsUrl)
+		expect(axios.put).toHaveBeenCalledWith(settingsUrl, { theme: 'dark' })
 	})
 
 	it('creates an outline', async () => {
