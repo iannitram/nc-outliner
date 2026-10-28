@@ -45,15 +45,36 @@ function isCurrent(version) {
  * @return {{depth: number, text: string}[]|null} the rows
  */
 function parseRows(text) {
-	const doc = new DOMParser().parseFromString(text, 'application/xml')
-	const body = doc.querySelector('body')
-	if (doc.querySelector('parsererror') || !body) {
+	if (typeof text !== 'string') {
+		return null
+	}
+	// A saved file may start with a BOM or whitespace, which makes DOMParser fail on the XML declaration.
+	const clean = text.replace(/^\uFEFF/, '').replace(/^\s+/, '')
+	if (clean === '') {
+		return null
+	}
+	let doc
+	try {
+		doc = new DOMParser().parseFromString(clean, 'application/xml')
+	} catch {
+		return null
+	}
+	if (doc.getElementsByTagName('parsererror').length > 0) {
+		return null
+	}
+	const root = doc.documentElement
+	if (!root || root.localName !== 'opml') {
+		return null
+	}
+	// Match by local name, so the namespace prefixes (nco:, or none) never matter.
+	const body = Array.from(root.children).find((child) => child.localName === 'body')
+	if (!body) {
 		return null
 	}
 	const out = []
 	const walk = (node, depth) => {
 		for (const child of node.children) {
-			if (child.tagName === 'outline') {
+			if (child.localName === 'outline') {
 				out.push({ depth, text: child.getAttribute('text') ?? '' })
 				walk(child, depth + 1)
 			}
@@ -113,7 +134,7 @@ async function showPreview(id) {
 	error.value = ''
 	try {
 		const text = await readVersion(props.fileId, id)
-		preview.value = { id, text, rows: parseRows(text) }
+		preview.value = { id, rows: parseRows(text) }
 	} catch {
 		preview.value = null
 		unreadable.value = new Set([...unreadable.value, id])
@@ -209,7 +230,7 @@ function startRename(version) {
 	<NcDialog
 		v-if="open"
 		name="Versions"
-		:container="null"
+		container="#nc-outliner-dialogs"
 		size="large"
 		@closing="emit('close')">
 		<p v-if="loading" role="status">
@@ -266,7 +287,9 @@ function startRename(version) {
 					{{ item.text }}
 				</li>
 			</ul>
-			<pre v-else tabindex="0">{{ preview.text }}</pre>
+			<p v-else class="version-unreadable" role="status">
+				{{ UNREADABLE }}
+			</p>
 			<NcButton @click="preview = null">
 				Close preview
 			</NcButton>
@@ -291,11 +314,4 @@ function startRename(version) {
 .version-rows { list-style: none; padding: 0; margin: 0 0 8px; }
 .version-unreadable { color: var(--color-error-text); margin: 4px 0 0; }
 .version-name { font-style: italic; }
-.version-preview pre {
-	max-height: 40vh;
-	overflow: auto;
-	white-space: pre-wrap;
-	padding: 8px;
-	background: var(--color-background-hover);
-}
 </style>

@@ -23,10 +23,14 @@ afterEach(() => {
 
 describe('ConflictDialog', () => {
 	it.each(['dark', 'light'])('keeps the open dialog inside the forced %s theme', async (theme) => {
+		// The setup host sits earlier in body than the provider's host; drop it so the
+		// dialog can only teleport into the host inside the provider.
+		document.getElementById('nc-outliner-dialogs')?.remove()
 		wrapper = mount({
 			components: { NcThemeProvider, ConflictDialog },
 			props: ['theme', 'open'],
 			template: `<NcThemeProvider :dark="theme === 'dark'" :light="theme === 'light'">
+				<div id="nc-outliner-dialogs" />
 				<ConflictDialog :open="open" name="Trip plan" />
 			</NcThemeProvider>`,
 		}, { props: { theme, open: false }, attachTo: document.body })
@@ -60,6 +64,14 @@ describe('ConflictDialog', () => {
 		await wrapper.vm.$nextTick()
 		expect(wrapper.emitted('keepCopy')).toHaveLength(1)
 		expect(wrapper.emitted('reload')).toHaveLength(1)
+	})
+
+	it('renders at page level in the dialog host, outside the component root', async () => {
+		show({ open: true, name: 'Trip plan' })
+
+		const dialog = document.querySelector('#nc-outliner-dialogs [role="dialog"]')
+		expect(dialog).not.toBeNull()
+		expect(wrapper.element.contains(dialog)).toBe(false)
 	})
 
 	it('3. with open false, nothing is rendered', () => {
