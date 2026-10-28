@@ -1,27 +1,33 @@
 <script setup>
-import { NcButton, NcDialog, NcTextField } from '@nextcloud/vue'
-import { ref, watch } from 'vue'
+import { NcActionButton, NcActions, NcAppSidebar, NcButton, NcIconSvgWrapper, NcNoteCard, NcTextField } from '@nextcloud/vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { listOutlines } from '../api/outlines.js'
 import { listVersions, nameVersion, readVersion, restoreVersion } from '../api/versions.js'
+import { mdiAlertOutline, mdiTagOutline } from '../icons.js'
+import { parseVersionTree } from '../model/versionTree.js'
 
 /**
- * The outline's versions (ADR 0004). Read-only preview, restore, and naming, through the WebDAV
- * client. The view supplies `flush` (saves pending edits; resolves false if something is still
- * unsaved) and `reload` (reloads the outline and its etag through the view's own load path).
+ * The outline's versions (ADR 0004) in the right-hand sidebar: a list grouped by day, restore, and
+ * naming in place, through the WebDAV client. Picking a version asks the view (`preview`) to show it
+ * read-only in the main area. The view supplies `flush` (saves pending edits; resolves false if
+ * something is still unsaved) and `reload` (reloads the outline and its etag through its own load path).
  */
 const props = defineProps({
 	fileId: { type: Number, required: true },
 	open: { type: Boolean, required: true },
 	flush: { type: Function, required: true },
 	reload: { type: Function, required: true },
+	/** The outline's title, shown under "Versions". */
+	outlineName: { type: String, default: '' },
+	/** The id of the version the main area is showing, or null for the current outline. */
+	selectedId: { type: String, default: null },
 })
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'preview', 'restored'])
 
 const versions = ref([])
 const loading = ref(false)
 const busy = ref(false)
 const error = ref('')
-const preview = ref(null)
 const renaming = ref(null)
 const offer = ref(null)
 const liveTime = ref(null)
@@ -39,49 +45,64 @@ function isCurrent(version) {
 }
 
 /**
- * The OPML text as a flat list of row texts with their depth, or null if it is not OPML.
+ * The calendar day of a time, in local time, as a number that compares for equality.
  *
- * @param {string} text the version's file text
- * @return {{depth: number, text: string}[]|null} the rows
+ * @param {Date} date the date
+ * @return {number} the local day
  */
-function parseRows(text) {
-	if (typeof text !== 'string') {
-		return null
+function dayOf(date) {
+	return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+}
+
+/**
+ * Which group a version belongs to, by its local date.
+ *
+ * @param {number} time milliseconds since 1970
+ * @return {'Today'|'Yesterday'|'Earlier'} the group
+ */
+function groupOf(time) {
+	const now = new Date()
+	const day = dayOf(new Date(time))
+	if (day === dayOf(now)) {
+		return 'Today'
 	}
-	// A saved file may start with a BOM or whitespace, which makes DOMParser fail on the XML declaration.
-	const clean = text.replace(/^\uFEFF/, '').replace(/^\s+/, '')
-	if (clean === '') {
-		return null
+	if (day === dayOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))) {
+		return 'Yesterday'
 	}
-	let doc
-	try {
-		doc = new DOMParser().parseFromString(clean, 'application/xml')
-	} catch {
-		return null
-	}
-	if (doc.getElementsByTagName('parsererror').length > 0) {
-		return null
-	}
-	const root = doc.documentElement
-	if (!root || root.localName !== 'opml') {
-		return null
-	}
-	// Match by local name, so the namespace prefixes (nco:, or none) never matter.
-	const body = Array.from(root.children).find((child) => child.localName === 'body')
-	if (!body) {
-		return null
-	}
-	const out = []
-	const walk = (node, depth) => {
-		for (const child of node.children) {
-			if (child.localName === 'outline') {
-				out.push({ depth, text: child.getAttribute('text') ?? '' })
-				walk(child, depth + 1)
-			}
-		}
-	}
-	walk(body, 0)
-	return out
+	return 'Earlier'
+}
+
+const currentVersion = computed(() => versions.value.find(isCurrent) ?? null)
+const groups = computed(() => ['Today', 'Yesterday', 'Earlier']
+	.map((name) => ({
+		name,
+		items: versions.value.filter((v) => v !== currentVersion.value && groupOf(v.time) === name),
+	}))
+	.filter((group) => group.items.length > 0))
+// Current first (no heading), then the day groups.
+const sections = computed(() => [...(currentVersion.value ? [{ name: '', items: [currentVersion.value] }] : []), ...groups.value])
+
+/**
+ * Whether the main area is showing this entry (the live file when no older version is picked).
+ *
+ * @param {{id: string}} version the entry
+ * @return {boolean} true when shown
+ */
+function isShown(version) {
+	return props.selectedId === version.id || (props.selectedId === null && isCurrent(version))
+}
+
+/**
+ * The time shown on a row: just the clock time for today and yesterday, the date as well for older ones.
+ *
+ * @param {{time: number}} version the entry
+ * @return {string} the label
+ */
+function rowTime(version) {
+	const date = new Date(version.time)
+	return groupOf(version.time) === 'Earlier'
+		? date.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+		: date.toLocaleTimeString(undefined, { timeStyle: 'short' })
 }
 
 /**
@@ -117,7 +138,6 @@ watch(() => props.open, async (isOpen) => {
 		return
 	}
 	error.value = ''
-	preview.value = null
 	renaming.value = null
 	unreadable.value = new Set()
 	loading.value = true
@@ -126,19 +146,27 @@ watch(() => props.open, async (isOpen) => {
 }, { immediate: true })
 
 /**
- * Show one older version's text, read-only.
+ * Pick a version: the main area shows it read-only (or the current outline again for the live file).
+ * A version that cannot be read or is not OPML is marked, and loses its Restore.
  *
- * @param {string} id version id
+ * @param {{id: string, time: number}} version the version
  */
-async function showPreview(id) {
+async function select(version) {
 	error.value = ''
-	try {
-		const text = await readVersion(props.fileId, id)
-		preview.value = { id, rows: parseRows(text) }
-	} catch {
-		preview.value = null
-		unreadable.value = new Set([...unreadable.value, id])
+	if (isCurrent(version)) {
+		emit('preview', null)
+		return
 	}
+	let tree
+	try {
+		tree = parseVersionTree(await readVersion(props.fileId, version.id))
+	} catch {
+		tree = null
+	}
+	if (tree === null) {
+		unreadable.value = new Set([...unreadable.value, version.id])
+	}
+	emit('preview', { id: version.id, time: version.time, tree })
 }
 
 /**
@@ -166,8 +194,8 @@ async function restore(id) {
 	} finally {
 		busy.value = false
 	}
-	preview.value = null
 	renaming.value = null
+	emit('restored')
 	await props.reload()
 	await loadList()
 	const kept = beforeId === null ? undefined : versions.value.find((v) => Math.floor(v.time / 1000) === beforeId)
@@ -224,94 +252,162 @@ async function saveName(id, label) {
 function startRename(version) {
 	renaming.value = { id: version.id, label: version.label }
 }
+
+defineExpose({ restore })
+
+/**
+ * Escape closes the sidebar from anywhere inside it (NcAppSidebar only does this on a phone).
+ *
+ * @param {KeyboardEvent} event the keydown
+ */
+function onEscape(event) {
+	if (event.key !== 'Escape' || event.defaultPrevented || !props.open) {
+		return
+	}
+	const target = event.target
+	if (target === document.body || target === document || target.closest?.('#app-sidebar-vue')) {
+		emit('close')
+	}
+}
+
+onMounted(() => document.addEventListener('keydown', onEscape))
+onBeforeUnmount(() => document.removeEventListener('keydown', onEscape))
 </script>
 
 <template>
-	<NcDialog
+	<NcAppSidebar
 		v-if="open"
+		class="versions-sidebar"
 		name="Versions"
-		container="#nc-outliner-dialogs"
-		size="large"
-		@closing="emit('close')">
-		<p v-if="loading" role="status">
-			Loading versions…
-		</p>
-		<p v-if="error" role="alert">
-			{{ error }}
-		</p>
-		<div v-if="offer" class="version-offer">
-			<p>Keep the state from before this restore ({{ offer.time }})? A named version is never removed.</p>
-			<NcTextField v-model="offer.label" label="Name for the state before the restore" />
-			<NcButton variant="primary" :disabled="busy" @click="saveName(offer.id, offer.label)">
-				Save name
-			</NcButton>
-			<NcButton :disabled="busy" @click="offer = null">
-				Dismiss
-			</NcButton>
-		</div>
-		<ol v-if="versions.length" class="version-list">
-			<li v-for="version in versions" :key="version.id" class="version-row">
-				<div class="version-info">
-					<time :datetime="new Date(version.time).toISOString()">{{ formatTime(version.time) }}</time>
-					<strong v-if="isCurrent(version)">Current</strong>
-					<span v-if="version.label" class="version-name">{{ version.label }}</span>
-				</div>
-				<div v-if="!isCurrent(version)" class="version-actions">
-					<NcButton :disabled="busy" @click="showPreview(version.id)">
-						Preview
-					</NcButton>
-					<NcButton :disabled="busy || unreadable.has(version.id)" :title="unreadable.has(version.id) ? UNREADABLE : undefined" @click="restore(version.id)">
-						Restore
-					</NcButton>
-					<NcButton :disabled="busy" @click="startRename(version)">
-						Name
-					</NcButton>
-				</div>
-				<p v-if="unreadable.has(version.id)" class="version-unreadable" role="status">
-					{{ UNREADABLE }}
-				</p>
-				<div v-if="renaming?.id === version.id" class="version-rename">
-					<NcTextField v-model="renaming.label" label="Version name" />
-					<NcButton variant="primary" :disabled="busy" @click="saveName(version.id, renaming.label)">
-						Save name
-					</NcButton>
-					<NcButton :disabled="busy" @click="renaming = null">
-						Cancel
-					</NcButton>
-				</div>
-			</li>
-		</ol>
-		<section v-if="preview" class="version-preview" aria-label="Preview of an older version">
-			<ul v-if="preview.rows" class="version-rows">
-				<li v-for="(item, i) in preview.rows" :key="i" :style="{ paddingInlineStart: `${item.depth * 20}px` }">
-					{{ item.text }}
-				</li>
-			</ul>
-			<p v-else class="version-unreadable" role="status">
-				{{ UNREADABLE }}
+		:subname="outlineName"
+		:open="true"
+		noToggle
+		@close="emit('close')">
+		<div class="versions-body">
+			<p v-if="loading" role="status">
+				Loading versions…
 			</p>
-			<NcButton @click="preview = null">
-				Close preview
-			</NcButton>
-		</section>
-		<template #actions>
-			<NcButton @click="emit('close')">
-				Close
-			</NcButton>
-		</template>
-	</NcDialog>
+			<p v-if="error" role="alert" class="version-error">
+				{{ error }}
+			</p>
+			<NcNoteCard v-if="offer" type="success">
+				<div class="version-offer">
+					<p>Keep the state from before this restore ({{ offer.time }})? A named version is never removed.</p>
+					<NcTextField v-model="offer.label" label="Name for the state before the restore" />
+					<div class="version-buttons">
+						<NcButton variant="primary" :disabled="busy" @click="saveName(offer.id, offer.label)">
+							Save name
+						</NcButton>
+						<NcButton variant="tertiary" :disabled="busy" @click="offer = null">
+							Dismiss
+						</NcButton>
+					</div>
+				</div>
+			</NcNoteCard>
+			<ol v-if="versions.length" class="version-list">
+				<template v-for="entry in sections" :key="entry.name">
+					<li v-if="entry.name" class="version-group" role="presentation">
+						{{ entry.name }}
+					</li>
+					<li
+						v-for="version in entry.items"
+						:key="version.id"
+						class="version-row"
+						:class="{ 'version-row--on': isShown(version), 'version-row--bad': unreadable.has(version.id) }">
+						<div class="version-line">
+							<button
+								type="button"
+								class="version-select"
+								:aria-current="isShown(version) ? 'true' : undefined"
+								@click="select(version)">
+								<span class="version-text">
+									<time :datetime="new Date(version.time).toISOString()">{{ isCurrent(version) ? 'Current version' : rowTime(version) }}</time>
+									<span v-if="isCurrent(version)" class="version-sub">Saved {{ formatTime(version.time) }}</span>
+									<span v-else-if="unreadable.has(version.id)" class="version-sub version-unreadable" role="status">
+										<NcIconSvgWrapper :path="mdiAlertOutline" :size="14" />{{ UNREADABLE }}
+									</span>
+									<span v-else-if="version.label" class="version-sub version-name">
+										<NcIconSvgWrapper :path="mdiTagOutline" :size="14" />{{ version.label }}
+									</span>
+									<span v-else-if="isShown(version)" class="version-sub">Showing</span>
+								</span>
+								<strong v-if="isCurrent(version)" class="version-badge">Current</strong>
+							</button>
+							<NcActions
+								v-if="!isCurrent(version)"
+								forceMenu
+								:disabled="busy"
+								:ariaLabel="`Actions for the version from ${formatTime(version.time)}`">
+								<NcActionButton v-if="!unreadable.has(version.id)" @click="restore(version.id)">
+									Restore
+								</NcActionButton>
+								<NcActionButton @click="startRename(version)">
+									Name this version
+								</NcActionButton>
+							</NcActions>
+						</div>
+						<div v-if="renaming?.id === version.id" class="version-rename">
+							<NcTextField
+								v-model="renaming.label"
+								label="Version name"
+								@keydown.enter.prevent="saveName(version.id, renaming.label)"
+								@keydown.esc.stop.prevent="renaming = null" />
+							<NcButton variant="primary" :disabled="busy" @click="saveName(version.id, renaming.label)">
+								Save name
+							</NcButton>
+							<NcButton variant="tertiary" :disabled="busy" @click="renaming = null">
+								Cancel
+							</NcButton>
+						</div>
+					</li>
+				</template>
+			</ol>
+		</div>
+	</NcAppSidebar>
 </template>
 
 <style scoped>
+.versions-body { padding: 0 8px 16px; }
 .version-list { list-style: none; padding: 0; margin: 0; }
-.version-row { padding: 8px 0; border-bottom: 1px solid var(--color-border); }
-.version-info, .version-actions, .version-rename, .version-offer {
+.version-group {
+	padding: 14px 8px 4px;
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--color-text-maxcontrast);
+}
+.version-row { border-radius: var(--border-radius-large, 8px); }
+.version-row--on { background: var(--color-background-hover); }
+.version-line { display: flex; align-items: center; gap: 4px; }
+.version-select {
+	flex: 1;
 	display: flex;
 	align-items: center;
-	flex-wrap: wrap;
 	gap: 8px;
+	min-width: 0;
+	padding: 8px;
+	border: 0;
+	border-radius: var(--border-radius-element, 8px);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
 }
-.version-rows { list-style: none; padding: 0; margin: 0 0 8px; }
-.version-unreadable { color: var(--color-error-text); margin: 4px 0 0; }
-.version-name { font-style: italic; }
+.version-select:hover { background: var(--color-background-hover); }
+.version-select:focus-visible { outline: 2px solid var(--color-main-text); outline-offset: -2px; box-shadow: 0 0 0 4px var(--color-main-background); }
+.version-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.version-sub { font-size: 12.5px; color: var(--color-text-maxcontrast); }
+.version-badge {
+	padding: 2px 8px;
+	border-radius: 10px;
+	font-size: 12px;
+	background: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
+}
+.version-name { display: flex; align-items: center; gap: 4px; }
+.version-unreadable { display: flex; align-items: center; gap: 4px; color: var(--color-error-text); }
+.version-rename { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 4px 8px 8px; }
+.version-offer { display: flex; flex-direction: column; gap: 8px; }
+.version-buttons { display: flex; gap: 8px; }
+.version-error { color: var(--color-error-text); }
 </style>

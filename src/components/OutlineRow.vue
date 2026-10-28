@@ -25,6 +25,7 @@ const noteRef = ref(null)
 const addingNote = ref(false)
 const instance = getCurrentInstance()
 const editor = inject('outlineEditor', null)
+const readonly = Boolean(editor?.readonly)
 
 const hasChildren = computed(() => Boolean(props.row.children && props.row.children.length > 0))
 
@@ -60,6 +61,7 @@ const foldedLabel = computed(() => {
 })
 
 const noteShown = computed(() => !props.row.noteHidden && (addingNote.value || props.row.note !== ''))
+const noteToggleShown = !readonly
 // A row whose note is hidden keeps its note toggle visible, so the note can be shown again.
 const noteToggleAlwaysShown = computed(() => Boolean(props.row.noteHidden && props.row.note !== ''))
 const noteToggleLabel = computed(() => {
@@ -294,7 +296,7 @@ defineExpose({
 			}"
 			@dragover="handleDragOver"
 			@drop="handleDrop">
-			<slot name="handle" :row="row">
+			<slot v-if="!readonly" name="handle" :row="row">
 				<button
 					type="button"
 					class="outline-row__handle"
@@ -330,12 +332,14 @@ defineExpose({
 				:style="foldedLabel ? { '--title-ch': Math.max(row.text.length, 1) } : undefined"
 				:data-row-id="row.id"
 				:value="row.text"
+				:readonly="readonly"
 				:aria-label="row.text || 'Row text'"
 				@input="handleInput"
 				@keydown="handleKeydown"
 				@focus="handleFocus">
 			<span v-if="foldedLabel" class="outline-row__more">{{ foldedLabel }}</span>
 			<button
+				v-if="noteToggleShown"
 				type="button"
 				class="outline-row__note-toggle"
 				:class="{ 'outline-row__note-toggle--always': noteToggleAlwaysShown }"
@@ -352,6 +356,7 @@ defineExpose({
 				class="outline-row__note"
 				:data-note-id="row.id"
 				:value="row.note"
+				:readonly="readonly"
 				aria-label="Row note"
 				@input="handleNoteInput" />
 		</div>

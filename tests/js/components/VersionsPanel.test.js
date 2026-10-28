@@ -37,6 +37,22 @@ function rows() {
 function row(index) {
 	return rows()[index]
 }
+/** Open a row's ... menu and return the menu item with this text (or undefined when the menu has none). */
+async function menuItem(rowIndex, text) {
+	const trigger = row(rowIndex).querySelector('button[aria-haspopup]')
+	if (trigger.getAttribute('aria-expanded') !== 'true') {
+		trigger.click()
+	}
+	// The menu opens on a later tick; wait until this trigger's menu has items.
+	await vi.waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('true'))
+	await vi.waitFor(() => expect(document.body.querySelector('[role="menuitem"]')).not.toBeNull())
+	await new Promise((resolve) => setTimeout(resolve, 30))
+	await flushPromises()
+	return Array.from(document.body.querySelectorAll('[role="menuitem"]')).find((el) => el.textContent.trim() === text)
+}
+async function restoreVia(rowIndex) {
+	await click(await menuItem(rowIndex, 'Restore'))
+}
 function button(text, scope = document.body) {
 	return Array.from(scope.querySelectorAll('button'))
 		.find((el) => el.textContent.trim() === text)
@@ -89,8 +105,10 @@ afterEach(() => {
 	document.body.innerHTML = ''
 })
 
+const OPML = '<opml><body><outline text="old text of the outline"/></body></opml>'
+
 describe('VersionsPanel.vue', () => {
-	it('lists names and times newest first and marks the current entry', async () => {
+	it('lists names and times newest first and marks the current entry first', async () => {
 		await open()
 
 		expect(listVersions).toHaveBeenCalledWith(FILE_ID)
@@ -102,29 +120,77 @@ describe('VersionsPanel.vue', () => {
 		expect(row(0).textContent).not.toContain('Before rewrite')
 		expect(row(1).textContent).toContain('Before rewrite')
 		expect(row(1).textContent).not.toContain('Current')
-		// The current file cannot be previewed or restored; older entries can.
-		expect(button('Preview', row(0))).toBeUndefined()
-		expect(button('Restore', row(0))).toBeUndefined()
-		expect(button('Preview', row(1))).toBeTruthy()
-		expect(button('Restore', row(2))).toBeTruthy()
+		// The current file has no menu (nothing to restore); older entries have Restore and Name this version.
+		expect(row(0).querySelector('button[aria-haspopup]')).toBeNull()
+		expect(await menuItem(1, 'Restore')).toBeTruthy()
+		expect(await menuItem(1, 'Name this version')).toBeTruthy()
 	})
 
-	it('shows the read-only text of an older version and no editor', async () => {
-		// Changed for #180: the preview shows rows only, so the version must be OPML (plain text is not shown).
-		readVersion.mockResolvedValue('<opml><body><outline text="old text of the outline"/></body></opml>')
+	it('puts Current first and groups the rest Today / Yesterday / Earlier by local date', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] })
+		vi.setSystemTime(new Date(2026, 9, 28, 15, 0, 0))
+		const local = (...args) => new Date(...args).getTime()
+		const list = [
+			{ id: '50', time: local(2026, 9, 28, 14, 2), label: '', size: 3 },
+			{ id: '40', time: local(2026, 9, 28, 9, 15), label: '', size: 3 },
+			{ id: '30', time: local(2026, 9, 27, 17, 40), label: 'Before restructure', size: 3 },
+			{ id: '20', time: local(2026, 9, 21, 16, 30), label: '', size: 3 },
+			{ id: '10', time: local(2026, 9, 20, 10, 12), label: 'First draft', size: 3 },
+		]
+		listVersions.mockImplementation(async () => list)
+		// The 09:15 entry is the live file, though it is not the newest: Current is still listed first.
+		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: list[1].time / 1000 }])
+		try {
+			await open()
+
+			const items = Array.from(document.body.querySelectorAll('ol.version-list > li'))
+			const kinds = items.map((el) => (el.classList.contains('version-group') ? `# ${el.textContent.trim()}` : el.querySelector('time').getAttribute('datetime')))
+			expect(kinds).toEqual([
+				new Date(list[1].time).toISOString(),
+				'# Today',
+				new Date(list[0].time).toISOString(),
+				'# Yesterday',
+				new Date(list[2].time).toISOString(),
+				'# Earlier',
+				new Date(list[3].time).toISOString(),
+				new Date(list[4].time).toISOString(),
+			])
+			expect(items[0].textContent).toContain('Current')
+		} finally {
+			vi.useRealTimers()
+		}
+	})
+
+	it('shows a named version\'s name as a tag, and nothing for an unnamed one', async () => {
 		await open()
 
-		await click(button('Preview', row(2)))
+		expect(row(1).querySelector('.version-name').textContent.trim()).toBe('Before rewrite')
+		expect(row(1).querySelector('.version-name svg')).not.toBeNull()
+		expect(row(2).querySelector('.version-name')).toBeNull()
+	})
+
+	it('asks the view to show a version read-only when its row is clicked, and Current when the live row is', async () => {
+		readVersion.mockResolvedValue(OPML)
+		await open()
+
+		await click(row(2).querySelector('.version-select'))
 
 		expect(readVersion).toHaveBeenCalledWith(FILE_ID, '100')
-		const preview = document.body.querySelector('.version-preview')
-		expect(preview.querySelector('li').textContent.trim()).toBe('old text of the outline')
-		expect(document.body.querySelector('pre')).toBeNull()
-		expect(document.body.querySelector('textarea, [contenteditable], [contenteditable="true"]')).toBeNull()
+		const [payload] = wrapper.emitted('preview')[0]
+		expect(payload).toMatchObject({ id: '100', time: older.time })
+		expect(payload.tree).toEqual([expect.objectContaining({ text: 'old text of the outline', children: [] })])
 		expect(restoreVersion).not.toHaveBeenCalled()
 
-		await click(button('Close preview'))
-		expect(document.body.querySelector('.version-preview')).toBeNull()
+		await click(row(0).querySelector('.version-select'))
+		expect(wrapper.emitted('preview')[1]).toEqual([null])
+	})
+
+	it('marks the selected version', async () => {
+		await open({ selectedId: '100' })
+
+		expect(row(2).querySelector('.version-select').getAttribute('aria-current')).toBe('true')
+		expect(row(2).textContent).toContain('Showing')
+		expect(row(0).querySelector('.version-select').getAttribute('aria-current')).toBeNull()
 	})
 
 	it('flushes before restoring, then reloads the outline, then offers to name the new top entry', async () => {
@@ -137,21 +203,23 @@ describe('VersionsPanel.vue', () => {
 		})
 		await open({ flush, reload })
 
-		await click(button('Restore', row(2)))
+		await restoreVia(2)
 
 		expect(restoreVersion).toHaveBeenCalledWith(FILE_ID, '100')
 		expect(flush).toHaveBeenCalledTimes(1)
 		expect(reload).toHaveBeenCalledTimes(1)
 		expect(calls).toEqual(['list', 'flush', 'restore', 'reload', 'list'])
+		expect(wrapper.emitted('restored')).toHaveLength(1)
 
 		const offer = document.body.querySelector('.version-offer')
 		expect(offer).not.toBeNull()
+		expect(offer.closest('.notecard--success')).not.toBeNull()
 		expect(field('Name for the state before the restore', offer).value).toMatch(/^Before restore .+/)
 	})
 
 	it('names the new top entry when the naming offer is accepted', async () => {
 		await open()
-		await click(button('Restore', row(2)))
+		await restoreVia(2)
 		const offer = document.body.querySelector('.version-offer')
 		const defaultLabel = field('Name for the state before the restore', offer).value
 
@@ -164,7 +232,7 @@ describe('VersionsPanel.vue', () => {
 
 	it('removes the naming offer when it is dismissed, without naming anything', async () => {
 		await open()
-		await click(button('Restore', row(2)))
+		await restoreVia(2)
 
 		await click(button('Dismiss', document.body.querySelector('.version-offer')))
 
@@ -172,28 +240,48 @@ describe('VersionsPanel.vue', () => {
 		expect(document.body.querySelector('.version-offer')).toBeNull()
 	})
 
-	it('names an older entry with a label typed into the row field', async () => {
+	it('names an older entry in place: a field in its row, Enter saves', async () => {
 		await open()
 
-		await click(button('Name', row(2)))
+		await click(await menuItem(2, 'Name this version'))
 		const input = field('Version name', row(2))
 		input.value = 'Before rewrite'
 		input.dispatchEvent(new Event('input'))
 		await flushPromises()
-		await click(button('Save name', row(2)))
+		input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+		await flushPromises()
 
 		expect(nameVersion).toHaveBeenCalledWith(FILE_ID, '100', 'Before rewrite')
 		expect(listVersions).toHaveBeenCalledTimes(2)
+		expect(row(2).querySelector('.version-rename')).toBeNull()
+	})
+
+	it('names with the Save name button too, and Escape in the field cancels without closing the sidebar', async () => {
+		await open()
+		await click(await menuItem(2, 'Name this version'))
+		const input = field('Version name', row(2))
+
+		input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+		await flushPromises()
+
+		expect(row(2).querySelector('.version-rename')).toBeNull()
+		expect(nameVersion).not.toHaveBeenCalled()
+		expect(wrapper.emitted('close')).toBeUndefined()
+
+		await click(await menuItem(2, 'Name this version'))
+		await click(button('Save name', row(2)))
+		expect(nameVersion).toHaveBeenCalledWith(FILE_ID, '100', '')
 	})
 
 	it('does not restore and says so when the outline could not be saved first', async () => {
 		const flush = vi.fn(async () => false)
 		await open({ flush })
 
-		await click(button('Restore', row(2)))
+		await restoreVia(2)
 
 		expect(flush).toHaveBeenCalledTimes(1)
 		expect(restoreVersion).not.toHaveBeenCalled()
+		expect(wrapper.emitted('restored')).toBeUndefined()
 		expect(document.body.querySelector('[role="alert"]').textContent).toContain('not saved')
 	})
 
@@ -202,7 +290,7 @@ describe('VersionsPanel.vue', () => {
 		const reload = vi.fn(async () => {})
 		await open({ flush, reload })
 
-		await click(button('Restore', row(2)))
+		await restoreVia(2)
 
 		expect(restoreVersion).not.toHaveBeenCalled()
 		expect(reload).not.toHaveBeenCalled()
@@ -214,6 +302,23 @@ describe('VersionsPanel.vue', () => {
 
 		document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
 		await flushPromises()
+
+		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+
+	it('asks the parent to close when Escape is pressed inside the sidebar', async () => {
+		await open()
+
+		row(1).querySelector('.version-select').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+		await flushPromises()
+
+		expect(wrapper.emitted('close')).toHaveLength(1)
+	})
+
+	it('asks the parent to close from the sidebar close button', async () => {
+		await open()
+
+		await click(document.body.querySelector('.app-sidebar-header__close, button[aria-label="Close sidebar"]'))
 
 		expect(wrapper.emitted('close')).toHaveLength(1)
 	})
@@ -231,7 +336,7 @@ describe('VersionsPanel.vue', () => {
 		const reload = vi.fn(async () => {})
 		await open({ reload })
 
-		await click(button('Restore', row(2)))
+		await restoreVia(2)
 
 		expect(document.body.querySelector('[role="alert"]').textContent).toBe('Could not restore this version.')
 		expect(reload).not.toHaveBeenCalled()
@@ -240,22 +345,14 @@ describe('VersionsPanel.vue', () => {
 	it('shows a message when a name cannot be saved', async () => {
 		nameVersion.mockRejectedValue(new Error('forbidden'))
 		await open()
-		await click(button('Name', row(2)))
+		await click(await menuItem(2, 'Name this version'))
 
 		await click(button('Save name', row(2)))
 
 		expect(document.body.querySelector('[role="alert"]').textContent).toBe('Could not name this version.')
 	})
 
-	it('renders at page level in the dialog host, outside the component root', async () => {
-		await open()
-
-		const dialog = document.querySelector('#nc-outliner-dialogs [role="dialog"]')
-		expect(dialog).not.toBeNull()
-		expect(wrapper.element.contains(dialog)).toBe(false)
-	})
-
-	it('renders nothing while closed and asks the parent to close from the Close button', async () => {
+	it('renders nothing while closed, and loads the list when it opens', async () => {
 		wrapper = mount(VersionsPanel, {
 			props: { fileId: FILE_ID, open: false, flush: vi.fn(), reload: vi.fn() },
 			attachTo: document.body,
@@ -263,58 +360,57 @@ describe('VersionsPanel.vue', () => {
 		await flushPromises()
 		expect(listVersions).not.toHaveBeenCalled()
 		expect(document.body.querySelector('li.version-row')).toBeNull()
+		expect(document.body.querySelector('aside')).toBeNull()
 
 		await wrapper.setProps({ open: true })
 		await flushPromises()
-		await click(button('Close'))
 
-		expect(wrapper.emitted('close')).toHaveLength(1)
+		expect(document.body.querySelector('aside')).not.toBeNull()
+		expect(rows()).toHaveLength(3)
 	})
 
-	it('after a restore, labels Current by the file mtime, not the newest entry, and keeps its buttons', async () => {
+	it('after a restore, labels Current by the file mtime, not the newest entry, and keeps its menu', async () => {
 		// The restored-from version (100) is now the live file; the pre-restore state is newest and readable.
 		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: older.time / 1000 }])
-		listVersions.mockImplementation(async () => [current, named, older])
 		await open()
 
-		expect(row(0).textContent).not.toContain('Current')
-		expect(button('Preview', row(0))).toBeTruthy()
-		expect(button('Restore', row(0))).toBeTruthy()
-		expect(row(2).textContent).toContain('Current')
+		// Current is listed first, whichever entry it is.
+		expect(row(0).textContent).toContain('Current')
+		expect(row(0).querySelector('time').getAttribute('datetime')).toBe(new Date(older.time).toISOString())
+		expect(row(1).textContent).not.toContain('Current')
+		expect(await menuItem(1, 'Restore')).toBeTruthy()
 	})
 
-	it('puts Current on the entry that matches the file mtime, and on none if nothing matches', async () => {
-		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: named.time / 1000 }])
-		await open()
-
-		expect(rows().map((el) => el.textContent.includes('Current'))).toEqual([false, true, false])
-		wrapper.unmount()
-
+	it('puts Current on none if no entry matches the file mtime', async () => {
 		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: 12345 }])
 		await open()
+
 		expect(rows().map((el) => el.textContent.includes('Current'))).toEqual([false, false, false])
 	})
 
-	it('says a version cannot be opened when its read fails, and disables its Restore', async () => {
+	it('marks a version whose read fails as unreadable, and gives it no Restore', async () => {
 		readVersion.mockRejectedValue(Object.assign(new Error('Request failed with status code 500'), { response: { status: 500 } }))
 		await open()
 
-		await click(button('Preview', row(1)))
+		await click(row(1).querySelector('.version-select'))
 
-		expect(document.body.textContent).toContain("This version can't be opened")
-		expect(button('Restore', row(1)).disabled).toBe(true)
-		expect(button('Restore', row(2)).disabled).toBe(false)
+		expect(row(1).textContent).toContain("This version can't be opened")
+		expect(await menuItem(1, 'Restore')).toBeUndefined()
+		expect(await menuItem(1, 'Name this version')).toBeTruthy()
+		expect(await menuItem(2, 'Restore')).toBeTruthy()
+		expect(wrapper.emitted('preview')[0][0]).toMatchObject({ id: '200', tree: null })
 		expect(restoreVersion).not.toHaveBeenCalled()
 	})
 
-	it('shows an outline preview as a list of row texts', async () => {
-		readVersion.mockResolvedValue('<opml><body><outline text="alpha"><outline text="child"/></outline><outline text="beta"/></body></opml>')
+	it('marks a version that is not OPML as unreadable, and sends no text', async () => {
+		readVersion.mockResolvedValue('<!DOCTYPE html><html><body>Login</body></html>')
 		await open()
 
-		await click(button('Preview', row(2)))
+		await click(row(2).querySelector('.version-select'))
 
-		const items = Array.from(document.body.querySelectorAll('.version-preview li')).map((el) => el.textContent.trim())
-		expect(items).toEqual(['alpha', 'child', 'beta'])
+		expect(row(2).textContent).toContain("This version can't be opened")
+		expect(wrapper.emitted('preview')[0][0].tree).toBeNull()
+		expect(document.body.innerHTML).not.toContain('Login')
 	})
 
 	describe('naming the state from before a restore (NC 33: its id is the file mtime before the restore)', () => {
@@ -325,9 +421,9 @@ describe('VersionsPanel.vue', () => {
 			liveMtime = 1793211107
 			listVersions.mockImplementation(async () => [ABG, A])
 			await open()
-			expect(row(1).textContent).toContain('Current')
+			expect(row(0).textContent).toContain('Current')
 
-			await click(button('Restore', row(0)))
+			await restoreVia(1)
 
 			expect(restoreVersion).toHaveBeenCalledWith(FILE_ID, '1793211135')
 			const offer = document.body.querySelector('.version-offer')
@@ -343,7 +439,7 @@ describe('VersionsPanel.vue', () => {
 			listVersions.mockImplementation(async () => [ABG, A])
 			await open()
 
-			await click(button('Restore', row(1)))
+			await restoreVia(1)
 
 			expect(restoreVersion).toHaveBeenCalledWith(FILE_ID, '1793211107')
 			await click(button('Save name', document.body.querySelector('.version-offer')))
@@ -355,81 +451,11 @@ describe('VersionsPanel.vue', () => {
 			listVersions.mockImplementation(async () => [ABG, A])
 			await open()
 
-			await click(button('Restore', row(0)))
+			await restoreVia(1)
 
 			expect(document.body.querySelector('.version-offer')).toBeNull()
 			expect(document.body.textContent).toContain('could not be found')
 			expect(nameVersion).not.toHaveBeenCalled()
 		})
-	})
-})
-
-describe('VersionsPanel.vue: the preview of a saved version (#180)', () => {
-	// A file the app's PHP OpmlCodec wrote: nco: namespace, _note, nested rows, an escaped "&".
-	const REAL_SAVED = `<?xml version="1.0" encoding="UTF-8"?>
-<opml version="2.0" xmlns:nco="https://github.com/iannitram/nc-outliner/ns/1">
-  <head>
-    <title>Plan</title>
-  </head>
-  <body>
-    <outline xmlns:nco="https://github.com/iannitram/nc-outliner/ns/1" text="A" _note="a note" nco:id="r1" nco:collapsed="true">
-      <outline text="A1" nco:id="r2"/>
-    </outline>
-    <outline xmlns:nco="https://github.com/iannitram/nc-outliner/ns/1" text="B &amp; c" nco:id="r3"/>
-  </body>
-</opml>
-`
-	const ROWS = [
-		{ depth: 0, text: 'A' },
-		{ depth: 1, text: 'A1' },
-		{ depth: 0, text: 'B & c' },
-	]
-
-	/** Mount with `text` as the older version's file, open its preview, and return the rendered rows. */
-	async function previewRows(text) {
-		readVersion.mockResolvedValue(text)
-		await open()
-		await click(button('Preview', row(2)))
-		return Array.from(document.body.querySelectorAll('.version-preview li')).map((el) => ({
-			depth: Math.round(parseFloat(el.style.paddingInlineStart || '0') / 20),
-			text: el.textContent.trim(),
-		}))
-	}
-
-	it('shows a real saved file as indented rows', async () => {
-		expect(await previewRows(REAL_SAVED)).toEqual(ROWS)
-	})
-
-	it('shows the same rows when the file starts with a BOM', async () => {
-		expect(await previewRows('﻿' + REAL_SAVED)).toEqual(ROWS)
-	})
-
-	it('shows the same rows when the file starts with a newline', async () => {
-		expect(await previewRows('\n' + REAL_SAVED)).toEqual(ROWS)
-	})
-
-	it.each([
-		['truncated XML', '<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><body><outline text="A"'],
-		['an empty string', ''],
-		['whitespace only', ' \n\t '],
-		['not xml at all', 'not xml at all'],
-		['an opml with no body', '<?xml version="1.0"?><opml version="2.0"><head><title>Plan</title></head></opml>'],
-		['an HTML page', '<!DOCTYPE html><html><body>Login</body></html>'],
-	])('says the version cannot be opened for %s, and shows none of its text', async (_label, input) => {
-		readVersion.mockResolvedValue(input)
-		await open()
-
-		await click(button('Preview', row(2)))
-
-		const preview = document.body.querySelector('.version-preview')
-		expect(preview.textContent).toContain("This version can't be opened")
-		expect(preview.querySelector('li')).toBeNull()
-		expect(preview.querySelector('pre')).toBeNull()
-		const html = document.body.innerHTML
-		expect(html).not.toContain('<opml')
-		expect(html).not.toContain('&lt;opml')
-		expect(html).not.toContain('Login')
-		expect(html).not.toContain('not xml at all')
-		expect(button('Close preview', preview)).toBeTruthy()
 	})
 })

@@ -9,3 +9,10 @@ beforeEach(() => {
 		document.body.append(host)
 	}
 })
+
+// jsdom has no ResizeObserver, which NcActions' popover (floating-vue) and NcAppSidebar use.
+globalThis.ResizeObserver ??= class {
+	observe() {}
+	unobserve() {}
+	disconnect() {}
+}

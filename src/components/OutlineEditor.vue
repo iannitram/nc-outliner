@@ -9,6 +9,11 @@ const props = defineProps({
 		type: Object,
 		required: true,
 	},
+	/** Show the rows without any way to change them (a version preview): no inputs, drag, add, delete or sort. */
+	readonly: {
+		type: Boolean,
+		default: false,
+	},
 })
 
 const rootRef = ref(null)
@@ -309,10 +314,16 @@ function dropOnRow(row, event) {
 	endDrag()
 }
 
+/**
+ *
+ */
+function noop() {}
+
 provide('outlineEditor', {
-	onInput: handleInput,
+	readonly: props.readonly,
+	onInput: props.readonly ? noop : handleInput,
 	toggleCollapsed,
-	onKeydown: handleKeydown,
+	onKeydown: props.readonly ? noop : handleKeydown,
 	onFocus: handleFocus,
 	isDragging,
 	dropTarget,
@@ -341,8 +352,13 @@ defineExpose({
 	<div
 		ref="rootRef"
 		class="outline-editor"
+		:class="{ 'outline-editor--readonly': readonly }"
 		role="tree">
-		<div class="outline-sort" role="group" aria-label="Sort outline rows">
+		<div
+			v-if="!readonly"
+			class="outline-sort"
+			role="group"
+			aria-label="Sort outline rows">
 			<label>
 				Sort rows by
 				<select v-model="sortBy" aria-label="Sort rows by">

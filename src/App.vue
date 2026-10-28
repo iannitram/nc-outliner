@@ -2,6 +2,7 @@
 import { NcAppContent, NcAppNavigation, NcButton, NcContent, NcThemeProvider } from '@nextcloud/vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import ThemeSetting from './components/ThemeSetting.vue'
+import VersionsSidebar from './components/VersionsSidebar.vue'
 import OutlineList from './views/OutlineList.vue'
 import OutlineView from './views/OutlineView.vue'
 import { getSettings } from './api/outlines.js'
@@ -87,6 +88,7 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 				<OutlineView v-if="fileId !== null" ref="outlineView" :fileId="fileId" />
 				<OutlineList v-else @open="openOutline" />
 			</NcAppContent>
+			<VersionsSidebar />
 		</NcContent>
 		<Teleport to="body">
 			<NcThemeProvider :dark="theme === 'dark'" :light="theme === 'light'">
