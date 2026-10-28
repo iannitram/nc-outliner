@@ -47,11 +47,19 @@ export const commands = {
 	},
 	moveUp(ctx) {
 		ctx.history.execute(moveUp, [ctx.rowId])
-		ctx.focus(ctx.rowId)
+		if (ctx.caret === undefined) {
+			ctx.focus(ctx.rowId)
+		} else {
+			ctx.focus(ctx.rowId, ctx.caret)
+		}
 	},
 	moveDown(ctx) {
 		ctx.history.execute(moveDown, [ctx.rowId])
-		ctx.focus(ctx.rowId)
+		if (ctx.caret === undefined) {
+			ctx.focus(ctx.rowId)
+		} else {
+			ctx.focus(ctx.rowId, ctx.caret)
+		}
 	},
 }
 
