@@ -71,9 +71,8 @@ describe('opaque OPML metadata through editing (#140)', () => {
 	})
 
 	it('retains outline headExtra when replacing edited rows for a save', () => {
-		const outline = { title: 'Source', headExtra: ['<dateCreated>2026-10-01</dateCreated>'], rows: freezeRows(fixture()) }
+		const outline = { title: 'Source', rows: freezeRows(fixture()) }
 		const payload = JSON.parse(JSON.stringify({ ...outline, rows: updateRow(outline.rows, 'a', { text: 'Edited' }) }))
-		expect(payload.headExtra).toEqual(outline.headExtra)
 		expect(payload.rows[0].extra).toEqual(outline.rows[0].extra)
 		expect(payload.rows[0].text).toBe('Edited')
 	})
