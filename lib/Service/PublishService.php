@@ -25,7 +25,7 @@ final class PublishService {
 		if (in_array('..', explode('/', str_replace('\\', '/', $folder)), true)) {
 			throw new \InvalidArgumentException('Folder path cannot contain ..');
 		}
-		if ($name === '' || preg_match('/[\\\\\/:*?"<>|]/', $name) === 1) {
+		if ($name === '' || $name === '.' || $name === '..' || preg_match('/[\\\\\/:*?"<>|]/', $name) === 1) {
 			throw new \InvalidArgumentException('Invalid document name');
 		}
 

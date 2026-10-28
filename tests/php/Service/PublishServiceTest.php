@@ -78,4 +78,38 @@ final class PublishServiceTest extends TestCase {
 		$this->expectException(\InvalidArgumentException::class);
 		$this->service($user, $this->createMock(IOutlineStore::class))->publish('alice', 7, '', $name);
 	}
+
+	/** @return array<string, array{string}> */
+	public static function dotNames(): array {
+		return ['single dot' => ['.'], 'double dot' => ['..']];
+	}
+
+	#[DataProvider('dotNames')]
+	public function testRejectsDotAndDoubleDotAsWholeName(string $name): void {
+		$user = $this->createMock(Folder::class);
+		$user->method('get')->willReturn($this->createMock(Folder::class));
+		$user->expects($this->never())->method('getRelativePath');
+		$this->expectException(\InvalidArgumentException::class);
+		$this->expectExceptionMessage('Invalid document name');
+		$this->service($user, $this->createMock(IOutlineStore::class))->publish('alice', 7, '', $name);
+	}
+
+	/** @return array<string, array{string}> */
+	public static function namesWithDots(): array {
+		return ['notes.v2' => ['notes.v2'], 'a..b' => ['a..b'], 'three dots' => ['...']];
+	}
+
+	#[DataProvider('namesWithDots')]
+	public function testLegitimateNamesContainingDotsStillPublish(string $name): void {
+		$user = $this->createMock(Folder::class);
+		$destination = $this->createMock(Folder::class);
+		$user->method('get')->willReturn($destination);
+		$user->method('getRelativePath')->willReturn('/' . $name . '.odt');
+		$destination->method('nodeExists')->willReturn(false);
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(5);
+		$file->method('getPath')->willReturn('/alice/files/' . $name . '.odt');
+		$destination->expects($this->once())->method('newFile')->with($name . '.odt', $this->isType('string'))->willReturn($file);
+		$this->assertSame(['fileId' => 5, 'path' => '/' . $name . '.odt'], $this->service($user, $this->createMock(IOutlineStore::class))->publish('alice', 7, '', $name));
+	}
 }
