@@ -15,5 +15,6 @@ return [
 		['name' => 'publish#publish', 'url' => '/api/outlines/{fileId}/publish', 'verb' => 'POST'],
 		['name' => 'settings#get', 'url' => '/api/settings', 'verb' => 'GET'],
 		['name' => 'settings#set', 'url' => '/api/settings', 'verb' => 'PUT'],
+		['name' => 'client_log#receive', 'url' => '/api/clientlog', 'verb' => 'POST'],  // TEMPORARY: remove after the crash-rate review (owner, 2026-10-28)
 	],
 ];
