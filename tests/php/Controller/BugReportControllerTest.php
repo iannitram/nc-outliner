@@ -9,6 +9,10 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
 use OCP\AppFramework\Http\Attribute\PublicPage;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\Constants;
+use OCP\Files\File;
+use OCP\Files\Folder;
+use OCP\Files\NotPermittedException;
 use OCP\Http\Client\IClient;
 use OCP\Http\Client\IClientService;
 use OCP\Http\Client\IResponse;
@@ -17,8 +21,12 @@ use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserSession;
+use OCP\Share\Exceptions\ShareNotFound;
+use OCP\Share\IManager as IShareManager;
+use OCP\Share\IShare;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 final class BugReportControllerTest extends TestCase {
 	private const BASE = 'https://drop.example.invalid';
@@ -34,6 +42,10 @@ final class BugReportControllerTest extends TestCase {
 	private array $upload;
 	private array $settings;
 	private array $times = [];
+	private IShareManager $shares;
+	private LoggerInterface $logger;
+	/** @var list<string> */
+	private array $logged = [];
 	private BugReportController $controller;
 
 	protected function setUp(): void {
@@ -54,7 +66,172 @@ final class BugReportControllerTest extends TestCase {
 			$this->times = json_decode($value, true);
 		});
 		$this->session = $this->createMock(IUserSession::class);
-		$this->controller = new BugReportController($this->request, $this->clients, $this->appConfig, $this->config, $this->session);
+		// By default the token is not a share on this server, so the relay falls back to HTTP.
+		$this->shares = $this->createMock(IShareManager::class);
+		$this->shares->method('getShareByToken')->willReturnCallback(fn () => throw new ShareNotFound());
+		$this->logger = $this->createMock(LoggerInterface::class);
+		$this->logger->method('error')->willReturnCallback(function (string $message): void {
+			$this->logged[] = $message;
+		});
+		$this->controller = $this->controllerWith($this->shares);
+	}
+
+	private function controllerWith(IShareManager $shares): BugReportController {
+		return new BugReportController($this->request, $this->clients, $this->appConfig, $this->config, $this->session, $shares, $this->logger);
+	}
+
+	/** A share manager that resolves TOKEN to a local share (an open link folder share by default). */
+	private function localShare(int $permissions, mixed $node, int $type = IShare::TYPE_LINK, ?string $password = null, ?\DateTimeInterface $expires = null): IShareManager {
+		$share = $this->createMock(IShare::class);
+		$share->method('getPermissions')->willReturn($permissions);
+		$share->method('getNode')->willReturn($node);
+		$share->method('getShareType')->willReturn($type);
+		$share->method('getPassword')->willReturn($password);
+		$share->method('getExpirationDate')->willReturn($expires);
+		$shares = $this->createMock(IShareManager::class);
+		$shares->expects($this->once())->method('getShareByToken')->with(self::TOKEN)->willReturn($share);
+		return $shares;
+	}
+
+	private function assertLogsAreClean(): void {
+		foreach ($this->logged as $line) {
+			$this->assertStringNotContainsString(self::TOKEN, $line);
+			$this->assertStringNotContainsString(self::BASE, $line);
+		}
+	}
+
+	public function testLocalDropShareGetsTheZipWithoutHttp(): void {
+		$this->signedIn();
+		$this->upload();
+		$folder = $this->createMock(Folder::class);
+		$folder->expects($this->once())->method('newFile')->with(self::NAME, "PK\x03\x04zip bytes\x00")->willReturn($this->createMock(File::class));
+		$this->clients->expects($this->never())->method('newClient');
+		$this->controller = $this->controllerWith($this->localShare(Constants::PERMISSION_CREATE, $folder));
+		$this->check($this->controller->relay(), 201, ['sent' => true]);
+		$this->assertCount(1, $this->times);
+		$this->assertSame([], $this->logged);
+	}
+
+	public function testLocalDropShareWorksWithoutABaseUrl(): void {
+		$this->signedIn();
+		$this->upload();
+		$this->settings['bug_drop_base'] = '';
+		$folder = $this->createMock(Folder::class);
+		$folder->expects($this->once())->method('newFile')->willReturn($this->createMock(File::class));
+		$this->controller = $this->controllerWith($this->localShare(Constants::PERMISSION_CREATE, $folder));
+		$this->check($this->controller->relay(), 201, ['sent' => true]);
+	}
+
+	public function testLocalShareWithoutCreatePermissionIsRefusedAndLogged(): void {
+		$this->signedIn();
+		$this->upload();
+		$folder = $this->createMock(Folder::class);
+		$folder->expects($this->never())->method('newFile');
+		$this->clients->expects($this->never())->method('newClient');
+		$this->controller = $this->controllerWith($this->localShare(Constants::PERMISSION_READ, $folder));
+		$this->check($this->controller->relay(), 502, ['message' => 'The bug drop refused the report.']);
+		$this->assertCount(1, $this->logged);
+		$this->assertStringContainsString('does not allow creating files', $this->logged[0]);
+		$this->assertLogsAreClean();
+	}
+
+	public function testLocalShareThatIsNotAFolderIsRefusedAndLogged(): void {
+		$this->signedIn();
+		$this->upload();
+		$this->controller = $this->controllerWith($this->localShare(Constants::PERMISSION_ALL, $this->createMock(File::class)));
+		$this->check($this->controller->relay(), 502);
+		$this->assertStringContainsString('not a folder', $this->logged[0] ?? '');
+		$this->assertSame([], $this->times);
+		$this->assertLogsAreClean();
+	}
+
+	public function testLocalWriteFailureIsLoggedWithoutSecrets(): void {
+		$this->signedIn();
+		$this->upload();
+		$folder = $this->createMock(Folder::class);
+		$folder->method('newFile')->willThrowException(new NotPermittedException('no space at ' . self::BASE . '/' . self::TOKEN));
+		$this->controller = $this->controllerWith($this->localShare(Constants::PERMISSION_CREATE, $folder));
+		$this->check($this->controller->relay(), 502);
+		$this->assertStringContainsString('NotPermittedException', $this->logged[0] ?? '');
+		$this->assertLogsAreClean();
+	}
+
+	public static function refusedLocalShares(): array {
+		$past = new \DateTimeImmutable('-1 hour');
+		return [
+			'password protected' => [IShare::TYPE_LINK, 'hash-of-a-password', null, 'password protected'],
+			'expired' => [IShare::TYPE_LINK, null, $past, 'expired'],
+			'user share' => [IShare::TYPE_USER, null, null, 'not a link or email share'],
+			'federated share' => [IShare::TYPE_REMOTE, null, null, 'not a link or email share'],
+		];
+	}
+
+	#[DataProvider('refusedLocalShares')]
+	public function testRefusedLocalShareIsLoggedAndNeverFallsBackToHttp(int $type, ?string $password, ?\DateTimeInterface $expires, string $reason): void {
+		$this->signedIn();
+		$this->upload();
+		$folder = $this->createMock(Folder::class);
+		$folder->expects($this->never())->method('newFile');
+		$this->clients->expects($this->never())->method('newClient');
+		$this->controller = $this->controllerWith($this->localShare(Constants::PERMISSION_CREATE, $folder, $type, $password, $expires));
+		$this->check($this->controller->relay(), 502, ['message' => 'The bug drop refused the report.']);
+		$this->assertCount(1, $this->logged);
+		$this->assertStringContainsString($reason, $this->logged[0]);
+		$this->assertLogsAreClean();
+		$this->assertSame([], $this->times);
+	}
+
+	public function testEmailShareAndFutureExpiryAreAccepted(): void {
+		$this->signedIn();
+		$this->upload();
+		$folder = $this->createMock(Folder::class);
+		$folder->expects($this->once())->method('newFile')->willReturn($this->createMock(File::class));
+		$this->controller = $this->controllerWith($this->localShare(Constants::PERMISSION_CREATE, $folder, IShare::TYPE_EMAIL, '', new \DateTimeImmutable('+1 day')));
+		$this->check($this->controller->relay(), 201, ['sent' => true]);
+		$this->assertCount(1, $this->times);
+	}
+
+	public function testShareLookupFailureOtherThanNotFoundGives502WithoutHttp(): void {
+		$this->signedIn();
+		$this->upload();
+		$shares = $this->createMock(IShareManager::class);
+		$shares->method('getShareByToken')->willThrowException(new \RuntimeException('database down at ' . self::TOKEN));
+		$this->clients->expects($this->never())->method('newClient');
+		$this->controller = $this->controllerWith($shares);
+		$this->check($this->controller->relay(), 502, ['message' => 'The bug drop refused the report.']);
+		$this->assertSame([], $this->times);
+		$this->assertLogsAreClean();
+	}
+
+	public function testNonShareTokenWithoutABaseUrlGives503AndIsLogged(): void {
+		$this->signedIn();
+		$this->upload();
+		$this->settings['bug_drop_base'] = '';
+		$this->clients->expects($this->never())->method('newClient');
+		$this->check($this->controller->relay(), 503, ['message' => 'Bug reports are not set up for this app.']);
+		$this->assertCount(1, $this->logged);
+		$this->assertStringContainsString('no drop base URL', $this->logged[0]);
+		$this->assertSame([], $this->times);
+		$this->assertLogsAreClean();
+	}
+
+	public function testFailedLocalWritesDoNotUseRateLimitSlots(): void {
+		$this->signedIn();
+		$this->upload();
+		$folder = $this->createMock(Folder::class);
+		$folder->method('newFile')->willThrowException(new NotPermittedException('full'));
+		$this->controller = $this->controllerWith($this->localShare(Constants::PERMISSION_CREATE, $folder));
+		$this->check($this->controller->relay(), 502);
+		$this->assertSame([], $this->times);
+	}
+
+	public function testHttpFallbackFailureIsLoggedWithoutSecrets(): void {
+		$this->signedIn();
+		$this->upload();
+		$this->client->method('put')->willThrowException(new \RuntimeException('cURL error for ' . self::BASE . '/public.php/dav/files/' . self::TOKEN));
+		$this->check($this->controller->relay(), 502);
+		$this->assertStringContainsString('HTTP upload to the drop failed', $this->logged[0] ?? '');
+		$this->assertLogsAreClean();
 	}
 
 	protected function tearDown(): void {
@@ -146,7 +323,7 @@ final class BugReportControllerTest extends TestCase {
 	public function testForwardedBytesAndGenericResponse(int $dropStatus, int $status): void {
 		$this->signedIn();
 		$this->upload();
-		$this->times = [time() - 3601];
+		$this->times = [];
 		$drop = $this->createMock(IResponse::class);
 		$drop->method('getStatusCode')->willReturn($dropStatus);
 		$this->client->expects($this->once())->method('put')->with(
@@ -154,7 +331,8 @@ final class BugReportControllerTest extends TestCase {
 			['body' => file_get_contents($this->temp), 'headers' => ['Content-Type' => 'application/zip'], 'allow_redirects' => false],
 		)->willReturn($drop);
 		$this->check($this->controller->relay(), $status, $status === 201 ? ['sent' => true] : ['message' => 'The bug drop refused the report.']);
-		$this->assertCount(1, $this->times);
+		// Only a report the drop accepted uses a rate-limit slot.
+		$this->assertCount($status === 201 ? 1 : 0, $this->times);
 	}
 
 	public function testClientExceptionDoesNotLeakSecrets(): void {
@@ -162,6 +340,7 @@ final class BugReportControllerTest extends TestCase {
 		$this->upload();
 		$this->client->expects($this->once())->method('put')->willThrowException(new \RuntimeException(self::BASE . '/' . self::TOKEN));
 		$this->check($this->controller->relay(), 502, ['message' => 'The bug drop refused the report.']);
+		$this->assertSame([], $this->times);
 	}
 
 	public function testSixSequentialAttemptsOnlyForwardFiveReports(): void {
