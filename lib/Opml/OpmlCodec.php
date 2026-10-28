@@ -143,7 +143,7 @@ final class OpmlCodec {
 				libxml_use_internal_errors($previous);
 			}
 			$element = $extraDocument->documentElement;
-			if (!$loaded || $element === null || ($element->namespaceURI === null && $element->localName === 'title') || ($element->namespaceURI === self::NS && $element->localName === 'publishPath')) {
+			if (!$loaded || $extraDocument->doctype !== null || $element === null || ($element->namespaceURI === null && $element->localName === 'title') || ($element->namespaceURI === self::NS && $element->localName === 'publishPath')) {
 				continue;
 			}
 			$head->appendChild($document->importNode($element, true));
@@ -152,16 +152,17 @@ final class OpmlCodec {
 		$opml->appendChild($head);
 		
 		$body = $document->createElement('body');
+		$opml->appendChild($body);
 		foreach ($outline->rows as $row) {
 			$this->writeRow($document, $body, $row, $opml);
 		}
-		$opml->appendChild($body);
 		
 		return $document->saveXML();
 	}
 
 	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row, \DOMElement $root): void {
 		$outline = $document->createElement('outline');
+		$parent->appendChild($outline);
 		// Let DOM handle escaping properly
 		$outline->setAttribute('text', $row->text);
 		if ($row->note !== '') {
@@ -171,29 +172,27 @@ final class OpmlCodec {
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
 		}
-		$localNamespaces = [];
+		// Namespace declarations belong to each row: siblings can bind the same
+		// prefix to different URIs without changing the imported attribute names.
 		foreach ($row->extra as $name => $value) {
-			if (str_starts_with($name, 'xmlns:')) {
-				$prefix = substr($name, 6);
-				if ($prefix === 'nco' || $prefix === 'xml') {
-					continue;
-				}
-				if ($root->hasAttribute($name) && $root->getAttribute($name) !== $value) {
-					$outline->setAttribute($name, $value);
-					$localNamespaces[$prefix] = $value;
-				} elseif (!$root->hasAttribute($name)) {
-					$root->setAttribute($name, $value);
-				}
-			} elseif (str_contains($name, ':')) {
-				[$prefix] = explode(':', $name, 2);
-				$uri = $prefix === 'xml' ? 'http://www.w3.org/XML/1998/namespace' : ($prefix === 'nco' ? self::NS : ($localNamespaces[$prefix] ?? $row->extra['xmlns:' . $prefix] ?? null));
-				if ($uri === self::NS && in_array(substr(strstr($name, ':'), 1), ['id', 'collapsed'], true)) {
+			if (str_starts_with($name, 'xmlns:') && !in_array(substr($name, 6), ['nco', 'xml'], true)) {
+				$outline->setAttributeNS('http://www.w3.org/2000/xmlns/', $name, $value);
+			}
+		}
+		foreach ($row->extra as $name => $value) {
+			if (str_starts_with($name, 'xmlns')) {
+				continue;
+			}
+			if (str_contains($name, ':')) {
+				[$prefix, $localName] = explode(':', $name, 2);
+				$uri = $prefix === 'xml' ? 'http://www.w3.org/XML/1998/namespace' : ($prefix === 'nco' ? self::NS : ($row->extra['xmlns:' . $prefix] ?? null));
+				if ($uri === self::NS && in_array($localName, ['id', 'collapsed'], true)) {
 					continue;
 				}
 				if ($uri !== null) {
 					$outline->setAttributeNS($uri, $name, $value);
 				}
-			} elseif (!in_array($name, ['text', '_note'], true) && !str_starts_with($name, 'xmlns')) {
+			} elseif (!in_array($name, ['text', '_note'], true)) {
 				$outline->setAttribute($name, $value);
 			}
 		}
@@ -202,6 +201,5 @@ final class OpmlCodec {
 			$this->writeRow($document, $outline, $child, $root);
 		}
 		
-		$parent->appendChild($outline);
 	}
 }

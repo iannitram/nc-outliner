@@ -52,6 +52,20 @@ final class OutlineControllerTest extends TestCase {
 		$this->assertSame($result, $response->getData());
 	}
 
+	public function testReadEditSaveCarriesOpaqueMetadataThroughTheApi(): void {
+		$row = new Row('r1', 'Original', extra: ['_status' => 'checked', 'created' => '2026-10-01']);
+		$outline = new Outline('Imported', [$row], headExtra: ['<ownerName>Source author</ownerName>']);
+		$this->store->method('read')->willReturn(['fileId' => 7, 'name' => 'Imported.opml', 'etag' => 'e1', 'outline' => $outline]);
+		$payload = $this->controller->show(7)->getData()['outline'];
+		$payload['rows'][0]['text'] = 'Edited';
+		$this->request->method('getHeader')->with('If-Match')->willReturn('e1');
+		$this->request->method('getParams')->willReturn(['outline' => $payload]);
+		$this->store->expects($this->once())->method('save')->with('alice', 7,
+			$this->callback(static fn (Outline $saved): bool => $saved->rows[0]->text === 'Edited'
+				&& $saved->rows[0]->extra === $row->extra && $saved->headExtra === $outline->headExtra), 'e1')->willReturn('e2');
+		$this->assertSame(200, $this->controller->update(7)->getStatus());
+	}
+
 	public function testReadReturnsOutlineRowsAsJsonArraysAndUnknownIs404(): void {
 		$outline = new Outline('Plan', [new Row('r1', 'First')], null);
 		$this->store->expects($this->exactly(2))->method('read')->with('alice', 7)
@@ -67,8 +81,8 @@ final class OutlineControllerTest extends TestCase {
 			'name' => 'Plan.opml',
 			'etag' => 'e1',
 			'outline' => ['title' => 'Plan', 'rows' => [
-				['id' => 'r1', 'text' => 'First', 'note' => '', 'collapsed' => false, 'children' => []],
-			], 'publishPath' => null],
+				['id' => 'r1', 'text' => 'First', 'note' => '', 'collapsed' => false, 'children' => [], 'extra' => []],
+			], 'publishPath' => null, 'headExtra' => []],
 		], $response->getData());
 		$this->assertSame(Http::STATUS_NOT_FOUND, $this->controller->show(7)->getStatus());
 	}
