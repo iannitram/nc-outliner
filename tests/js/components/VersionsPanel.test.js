@@ -21,12 +21,16 @@ const at = (iso) => Date.parse(iso)
 const current = { id: '300', time: at('2026-10-28T17:51:38Z'), label: '', size: 3 }
 const named = { id: '200', time: at('2026-10-28T17:51:20Z'), label: 'Before rewrite', size: 3 }
 const older = { id: '100', time: at('2026-10-28T17:51:02Z'), label: '', size: 3 }
-// After a restore the state from before it is the new top entry (ADR 0004 spike).
-const preRestore = { id: '400', time: at('2026-10-28T17:52:00Z'), label: '', size: 3 }
+// Restoring `older` (100) from the live file (300): the pre-restore state stays as version 300, and the file's
+// mtime becomes 100's id (NC 33).
 
 let wrapper
 let calls
+let liveMtime
 
+function formatted(ms) {
+	return new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
 function rows() {
 	return Array.from(document.body.querySelectorAll('li.version-row'))
 }
@@ -68,10 +72,13 @@ beforeEach(() => {
 		return [current, named, older]
 	})
 	// The live file's mtime (seconds), as the outline list reports it.
-	listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: current.time / 1000 }])
+	liveMtime = current.time / 1000
+	listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: liveMtime }])
 	readVersion.mockResolvedValue('old text of the outline')
-	restoreVersion.mockImplementation(async () => {
+	restoreVersion.mockImplementation(async (fileId, id) => {
 		calls.push('restore')
+		// NC 33: the file's mtime becomes the restored version's id.
+		liveMtime = Number(id)
 	})
 	nameVersion.mockResolvedValue()
 })
@@ -125,10 +132,6 @@ describe('VersionsPanel.vue', () => {
 		const reload = vi.fn(async () => {
 			calls.push('reload')
 		})
-		listVersions.mockImplementation(async () => {
-			calls.push('list')
-			return calls.includes('restore') ? [preRestore, named, older] : [current, named, older]
-		})
 		await open({ flush, reload })
 
 		await click(button('Restore', row(2)))
@@ -144,7 +147,6 @@ describe('VersionsPanel.vue', () => {
 	})
 
 	it('names the new top entry when the naming offer is accepted', async () => {
-		listVersions.mockImplementation(async () => (calls.includes('restore') ? [preRestore, named, older] : [current, named, older]))
 		await open()
 		await click(button('Restore', row(2)))
 		const offer = document.body.querySelector('.version-offer')
@@ -153,12 +155,11 @@ describe('VersionsPanel.vue', () => {
 		await click(button('Save name', offer))
 
 		expect(nameVersion).toHaveBeenCalledTimes(1)
-		expect(nameVersion).toHaveBeenCalledWith(FILE_ID, '400', defaultLabel)
+		expect(nameVersion).toHaveBeenCalledWith(FILE_ID, '300', defaultLabel)
 		expect(document.body.querySelector('.version-offer')).toBeNull()
 	})
 
 	it('removes the naming offer when it is dismissed, without naming anything', async () => {
-		listVersions.mockImplementation(async () => (calls.includes('restore') ? [preRestore, named, older] : [current, named, older]))
 		await open()
 		await click(button('Restore', row(2)))
 
@@ -241,7 +242,7 @@ describe('VersionsPanel.vue', () => {
 	it('after a restore, labels Current by the file mtime, not the newest entry, and keeps its buttons', async () => {
 		// The restored-from version (100) is now the live file; the pre-restore state is newest and readable.
 		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: older.time / 1000 }])
-		listVersions.mockImplementation(async () => [preRestore, named, older])
+		listVersions.mockImplementation(async () => [current, named, older])
 		await open()
 
 		expect(row(0).textContent).not.toContain('Current')
@@ -283,5 +284,51 @@ describe('VersionsPanel.vue', () => {
 
 		const items = Array.from(document.body.querySelectorAll('.version-preview li')).map((el) => el.textContent.trim())
 		expect(items).toEqual(['alpha', 'child', 'beta'])
+	})
+
+	describe('naming the state from before a restore (NC 33: its id is the file mtime before the restore)', () => {
+		const A = { id: '1793211107', time: 1793211107000, label: '', size: 3 } // alpha / "alpha one"
+		const ABG = { id: '1793211135', time: 1793211135000, label: '', size: 3 } // alpha, beta, gamma
+
+		it('restore #2: names 1793211107, the file mtime before, not the newest or the live id', async () => {
+			liveMtime = 1793211107
+			listVersions.mockImplementation(async () => [ABG, A])
+			await open()
+			expect(row(1).textContent).toContain('Current')
+
+			await click(button('Restore', row(0)))
+
+			expect(restoreVersion).toHaveBeenCalledWith(FILE_ID, '1793211135')
+			const offer = document.body.querySelector('.version-offer')
+			expect(offer.textContent).toContain(formatted(A.time))
+			await click(button('Save name', offer))
+			expect(nameVersion).toHaveBeenCalledTimes(1)
+			expect(nameVersion).toHaveBeenCalledWith(FILE_ID, 1793211107 + '', expect.stringMatching(/^Before restore /))
+			expect(nameVersion).not.toHaveBeenCalledWith(FILE_ID, '1793211135', expect.anything())
+		})
+
+		it('restore #1: names 1793211135, the file mtime before', async () => {
+			liveMtime = 1793211135
+			listVersions.mockImplementation(async () => [ABG, A])
+			await open()
+
+			await click(button('Restore', row(1)))
+
+			expect(restoreVersion).toHaveBeenCalledWith(FILE_ID, '1793211107')
+			await click(button('Save name', document.body.querySelector('.version-offer')))
+			expect(nameVersion).toHaveBeenCalledWith(FILE_ID, '1793211135', expect.any(String))
+		})
+
+		it('says so, and offers nothing to name, when the pre-restore id is not in the refreshed list', async () => {
+			liveMtime = 1793211000
+			listVersions.mockImplementation(async () => [ABG, A])
+			await open()
+
+			await click(button('Restore', row(0)))
+
+			expect(document.body.querySelector('.version-offer')).toBeNull()
+			expect(document.body.textContent).toContain('could not be found')
+			expect(nameVersion).not.toHaveBeenCalled()
+		})
 	})
 })

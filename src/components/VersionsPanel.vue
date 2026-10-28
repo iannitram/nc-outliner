@@ -121,19 +121,23 @@ async function showPreview(id) {
 }
 
 /**
- * Save pending edits, restore one older version, reload the outline, and offer to name the
- * state from before the restore (now the new top entry).
+ * Save pending edits, note the live file's mtime (the id its state is kept under), restore one
+ * older version, reload the outline, and offer to name the state from before the restore.
  *
  * @param {string} id version id to restore
  */
 async function restore(id) {
 	error.value = ''
+	offer.value = null
+	let beforeId = null
 	busy.value = true
 	try {
 		if (!await props.flush()) {
 			error.value = 'Some changes are not saved yet, so nothing was restored. Try again once the outline is saved.'
 			return
 		}
+		// NC keeps the state from before the restore as the version whose id is the file's mtime NOW.
+		beforeId = await liveFileId()
 		await restoreVersion(props.fileId, id)
 	} catch {
 		error.value = 'Could not restore this version.'
@@ -145,9 +149,26 @@ async function restore(id) {
 	renaming.value = null
 	await props.reload()
 	await loadList()
-	const [newest] = versions.value
-	if (newest) {
-		offer.value = { id: newest.id, label: `Before restore ${formatTime(newest.time)}` }
+	const kept = beforeId === null ? undefined : versions.value.find((v) => Math.floor(v.time / 1000) === beforeId)
+	if (kept) {
+		offer.value = { id: kept.id, label: `Before restore ${formatTime(kept.time)}`, time: formatTime(kept.time) }
+	} else {
+		error.value = 'Restored. The state from before the restore could not be found in the list, so it cannot be named.'
+	}
+}
+
+/**
+ * The live file's modified time now (whole seconds), which is the id its state gets as a version
+ * once it is restored over. Null if it cannot be read.
+ *
+ * @return {Promise<number|null>} seconds since 1970
+ */
+async function liveFileId() {
+	try {
+		const entry = (await listOutlines()).find((item) => item.fileId === props.fileId)
+		return entry ? entry.mtime : null
+	} catch {
+		return null
 	}
 }
 
@@ -198,7 +219,7 @@ function startRename(version) {
 			{{ error }}
 		</p>
 		<div v-if="offer" class="version-offer">
-			<p>Keep the state from before this restore? A named version is never removed.</p>
+			<p>Keep the state from before this restore ({{ offer.time }})? A named version is never removed.</p>
 			<NcTextField v-model="offer.label" label="Name for the state before the restore" />
 			<NcButton variant="primary" :disabled="busy" @click="saveName(offer.id, offer.label)">
 				Save name
