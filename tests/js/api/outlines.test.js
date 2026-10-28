@@ -17,6 +17,7 @@ import {
 	createOutline,
 	getSettings,
 	listOutlines,
+	publish,
 	readOutline,
 	saveCopy,
 	saveOutline,
@@ -88,5 +89,29 @@ describe('outlines API client', () => {
 		await expect(saveOutline(7, outline, 'e1')).rejects.toBe(error)
 		await saveCopy(7, outline)
 		expect(axios.post).toHaveBeenCalledWith(`${outlinesUrl}/7/copy`, { outline })
+	})
+
+	it('publishes an outline to an odt doc with folder and name', async () => {
+		const published = { fileId: 99, path: '/Documents/Plan.odt', openUrl: '/apps/files/?openfile=true&fileid=99' }
+		axios.post.mockResolvedValue({ data: published })
+
+		await expect(publish(7, 'Documents', 'Plan')).resolves.toEqual(published)
+		expect(axios.post).toHaveBeenCalledWith(`${outlinesUrl}/7/publish`, { folder: 'Documents', name: 'Plan' })
+	})
+
+	it('surfaces server error message when publish returns 400', async () => {
+		axios.post.mockRejectedValue({
+			response: { status: 400, data: { message: 'Destination folder does not exist' } },
+		})
+
+		await expect(publish(7, 'InvalidFolder', 'Plan')).rejects.toThrow('Destination folder does not exist')
+	})
+
+	it('surfaces outline not found when publish returns 404', async () => {
+		axios.post.mockRejectedValue({
+			response: { status: 404, data: {} },
+		})
+
+		await expect(publish(7, 'Documents', 'Plan')).rejects.toThrow('Outline not found')
 	})
 })
