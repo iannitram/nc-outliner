@@ -23,7 +23,7 @@ Stage and status: [PIPELINE.md](PIPELINE.md); history: [CHANGELOG.md](CHANGELOG.
 | 2026-10-22 | v1 is the nested outline only. Columns (checkboxes, dates, numbers) come later, and the file layout must leave room for them | The owner |
 | 2026-10-22 | Main use is planning and notes, so publishing uses the headings + bullets layout | The owner |
 | 2026-10-22 | Nothing suitable in the Nextcloud app store to fork (551 apps checked; nearest are MeeTree, a tree of note pages, and files_mindmap) | The assistant |
-| 2026-10-22 | Repo visibility: public | The owner |
+| 2026-10-22 | Private repo | The owner |
 | 2026-10-22 | Per-user app; one fixed `Outlines/` folder in each user's Files | The owner |
 | 2026-10-22 | Publish copies: the outline stays the source, and re-publishing overwrites the doc (Nextcloud keeps the old versions) | The owner |
 | 2026-10-22 | Desktop browser only for v1; phone comes later | The owner |

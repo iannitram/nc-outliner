@@ -4,4 +4,4 @@ Closes #<issue>
 **Built on:** <OS>   **Model:** <model>
 **Builds:** <yes; command run>
 
-Labels: `model:<model>`
+Labels: `by:<machine>`, `model:<model>`
