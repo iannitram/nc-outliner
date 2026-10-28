@@ -1,69 +1,91 @@
 <script setup>
-import { NcButton, NcListItem } from '@nextcloud/vue'
-import { onMounted, ref } from 'vue'
-import { createOutline, listOutlines } from '../api/outlines.js'
+import { NcButton, NcEmptyContent } from '@nextcloud/vue'
+import { ref } from 'vue'
+import { createOutline } from '../api/outlines.js'
 
-const emit = defineEmits(['open'])
-const entries = ref([])
-const loading = ref(true)
-const error = ref('')
+defineProps({
+	error: {
+		type: String,
+		default: '',
+	},
+})
 
-/**
- *
- */
-async function refresh() {
-	loading.value = true
-	error.value = ''
-	try {
-		entries.value = await listOutlines()
-	} catch {
-		error.value = 'Could not load your outlines.'
-	} finally {
-		loading.value = false
-	}
-}
+const emit = defineEmits(['open', 'create'])
+const creating = ref(false)
+const localError = ref('')
 
 /**
- *
+ * Create a new outline when the empty-state button is clicked.
  */
 async function create() {
+	creating.value = true
+	localError.value = ''
 	try {
 		const outline = await createOutline('')
+		emit('create', outline.fileId)
 		emit('open', outline.fileId)
 	} catch {
-		error.value = 'Could not create an outline.'
+		localError.value = 'Could not create an outline.'
+	} finally {
+		creating.value = false
 	}
 }
-
-onMounted(refresh)
 </script>
 
 <template>
-	<section aria-label="My outlines">
-		<div class="list-heading">
-			<h2>My outlines</h2>
-			<NcButton variant="primary" @click="create">
-				New outline
-			</NcButton>
-		</div>
-		<p v-if="loading" role="status">
-			Loading outlines…
+	<section class="outline-list-empty" aria-label="No outlines">
+		<NcEmptyContent
+			name="No outlines yet"
+			description="Outlines are saved as .opml files in the Outlines folder of your Files, so they sync and keep versions like any other file.">
+			<template #icon>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 16 16"
+					class="empty-outline-icon"
+					aria-hidden="true">
+					<path d="M2 3h12v2H2V3Zm2 4h10v2H4V7Zm2 4h8v2H6v-2Z" fill="currentColor" />
+				</svg>
+			</template>
+			<template #action>
+				<div class="empty-actions">
+					<NcButton variant="primary" :disabled="creating" @click="create">
+						New outline
+					</NcButton>
+					<!-- "Import OPML..." is hidden until #27 merges -->
+				</div>
+			</template>
+		</NcEmptyContent>
+		<p v-if="error || localError" role="alert" class="outline-list-error">
+			{{ error || localError }}
 		</p>
-		<p v-else-if="error" role="alert">
-			{{ error }}
-		</p>
-		<p v-else-if="entries.length === 0">
-			No outlines yet.
-		</p>
-		<ul v-else>
-			<li v-for="entry in entries" :key="entry.fileId">
-				<NcListItem :name="entry.name" :details="new Date(entry.mtime * 1000).toLocaleString()" @click="emit('open', entry.fileId)" />
-			</li>
-		</ul>
 	</section>
 </template>
 
 <style scoped>
-.list-heading { display: flex; align-items: center; justify-content: space-between; }
-ul { list-style: none; padding: 0; }
+.outline-list-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	height: 100%;
+	width: 100%;
+}
+
+.empty-outline-icon {
+	width: 64px;
+	height: 64px;
+	color: var(--color-text-maxcontrast);
+}
+
+.empty-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	justify-content: center;
+}
+
+.outline-list-error {
+	color: var(--color-error, var(--color-text-maxcontrast));
+	margin-top: 16px;
+}
 </style>

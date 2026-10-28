@@ -3,8 +3,16 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import VersionsSidebar from '../../../src/components/VersionsSidebar.vue'
 import OutlineView from '../../../src/views/OutlineView.vue'
-import { listOutlines, readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
+import { exportOpml, listOutlines, readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
 import { listVersions, restoreVersion } from '../../../src/api/versions.js'
+
+if (typeof globalThis.ResizeObserver === 'undefined') {
+	globalThis.ResizeObserver = class {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	}
+}
 
 vi.mock('@nextcloud/dialogs', () => ({
 	showSuccess: vi.fn(),
@@ -12,6 +20,7 @@ vi.mock('@nextcloud/dialogs', () => ({
 }))
 
 vi.mock('../../../src/api/outlines.js', () => ({
+	exportOpml: vi.fn(),
 	listOutlines: vi.fn(),
 	readOutline: vi.fn(),
 	saveCopy: vi.fn(),
@@ -31,7 +40,7 @@ vi.mock('../../../src/api/versions.js', () => ({
  * @return {import('@vue/test-utils').DOMWrapper} the button
  */
 function buttonLabelled(wrapper, text) {
-	return wrapper.findAll('button').find((button) => button.text() === text)
+	return wrapper.findAll('button').find((button) => button.text() === text || button.attributes('aria-label') === text)
 }
 
 const scheduleSpy = vi.fn()
@@ -53,13 +62,14 @@ vi.mock('../../../src/editor/saver.js', async (importOriginal) => {
 
 vi.mock('../../../src/components/OutlineEditor.vue', () => ({
 	default: {
+		name: 'OutlineEditor',
 		props: ['history'],
 		methods: {
 			edit() {
 				this.history.execute((rows) => [{ ...rows[0], text: 'Edited' }], [])
 			},
 		},
-		template: '<button @click="edit">Edit outline</button>',
+		template: '<div class="outline-editor"><button @click="edit">Edit outline</button></div>',
 	},
 }))
 
@@ -79,6 +89,18 @@ const initialOutline = {
 }
 
 describe('OutlineView autosave conflict flow', () => {
+	it('exports the current unsaved outline through the OPML writer', async () => {
+		exportOpml.mockResolvedValue('<opml>current edits</opml>')
+		const wrapper = mount(OutlineView, { props: { fileId: 42 } })
+		expect(await wrapper.vm.getWorkingFile()).toBeNull()
+		await flushPromises()
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
+		await flushPromises()
+		const file = await wrapper.vm.getWorkingFile()
+		expect(file).toEqual({ name: 'outline.opml', type: 'text/x-opml', data: '<opml>current edits</opml>' })
+		expect(exportOpml).toHaveBeenCalledWith(expect.objectContaining({ rows: [expect.objectContaining({ text: 'Edited' })] }))
+		wrapper.unmount()
+	})
 	let wrapper
 
 	beforeEach(() => {
@@ -131,11 +153,61 @@ describe('OutlineView autosave conflict flow', () => {
 		})
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })
 		await flushPromises()
-		await buttonLabelled(wrapper, 'Add first row').trigger('click')
+		expect(wrapper.text()).not.toContain('Add first row')
+		expect(buttonLabelled(wrapper, 'Add first row')).toBeUndefined()
+		// The editor (stubbed here) gets the empty History and owns the placeholder row.
+		const history = wrapper.findComponent({ name: 'OutlineEditor' }).props('history')
+		expect(history.current()).toEqual([])
+		history.execute((rows) => [...rows, { id: 'n1', text: 'H', note: '', collapsed: false, children: [] }], [])
 		await vi.advanceTimersByTimeAsync(1500)
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
-			rows: [expect.objectContaining({ text: '', children: [] })],
+			rows: [expect.objectContaining({ text: 'H', children: [] })],
 		}), 'etag-1')
+	})
+
+	it('sorts through the dialog as one undoable History step', async () => {
+		readOutline.mockResolvedValue({
+			fileId: 3,
+			name: 'Plan.opml',
+			etag: 'etag-1',
+			outline: {
+				title: 'Plan',
+				rows: [
+					{ id: 'b', text: 'Beta', note: '', collapsed: false, children: [] },
+					{ id: 'a', text: 'Alpha', note: '', collapsed: false, children: [] },
+				],
+				publishPath: null,
+			},
+		})
+		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
+		await flushPromises()
+		expect(document.body.textContent).not.toContain('Sort rows')
+
+		wrapper.findComponent({ name: 'OutlineTopBar' }).vm.$emit('openSort')
+		await flushPromises()
+		const sortButton = Array.from(document.body.querySelectorAll('button')).find((el) => el.textContent.trim() === 'Sort')
+		sortButton.click()
+		await flushPromises()
+
+		const history = wrapper.findComponent({ name: 'OutlineEditor' }).props('history')
+		expect(history.current().map((row) => row.id)).toEqual(['a', 'b'])
+		history.undo()
+		expect(history.current().map((row) => row.id)).toEqual(['b', 'a'])
+		expect(history.canUndo()).toBe(false)
+	})
+
+	it('closes Sort rows when the open outline changes and keeps it closed after loading', async () => {
+		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
+		await flushPromises()
+		wrapper.findComponent({ name: 'OutlineTopBar' }).vm.$emit('openSort')
+		await flushPromises()
+		expect(document.body.querySelector('input[name="sort-by"]')).not.toBeNull()
+		readOutline.mockResolvedValueOnce({ fileId: 4, name: 'Other.opml', etag: 'etag-4', outline: { ...initialOutline, title: 'Other' } })
+		await wrapper.setProps({ fileId: 4 })
+		await flushPromises()
+		expect(readOutline).toHaveBeenLastCalledWith(4)
+		expect(wrapper.findComponent({ name: 'SortDialog' }).props('open')).toBe(false)
+		expect(document.body.querySelector('input[name="sort-by"]')).toBeNull()
 	})
 
 	it('shows a success toast after keepCopy succeeds', async () => {
@@ -210,8 +282,9 @@ describe('OutlineView autosave conflict flow', () => {
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })
 		await flushPromises()
 		const publishBtn = wrapper.findComponent({ name: 'PublishButton' })
-		publishBtn.vm.$emit('published', '/Documents/Plan.odt')
+		publishBtn.vm.$emit('published', '/Documents/Plan.odt', '/open/44')
 		await vi.advanceTimersByTimeAsync(1500)
+		expect(wrapper.get('.published-link').attributes('href')).toBe('/open/44')
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
 			publishPath: '/Documents/Plan.odt',
 		}), 'etag-1')
@@ -227,5 +300,29 @@ describe('OutlineView autosave conflict flow', () => {
 		await flushPromises()
 		expect(scheduleSpy).toHaveBeenCalledTimes(1)
 		expect(scheduleSpy).toHaveBeenCalledWith(expect.objectContaining({ publishPath: '/Documents/Plan.odt' }))
+	})
+
+	it('pins the status line as the last child of the flex column view and positions the editor area as the scroll container', async () => {
+		wrapper = mount(OutlineView, { props: { fileId: 3 } })
+		await flushPromises()
+
+		const view = wrapper.find('.outline-view')
+		expect(view.exists()).toBe(true)
+
+		const children = Array.from(view.element.children)
+		const topBar = wrapper.find('.outline-top-bar')
+		const editor = wrapper.find('.outline-editor')
+		const statusLine = wrapper.find('.status-line')
+
+		expect(topBar.exists()).toBe(true)
+		expect(editor.exists()).toBe(true)
+		expect(statusLine.exists()).toBe(true)
+
+		expect(children[0]).toBe(topBar.element)
+		expect(children.indexOf(editor.element)).toBeGreaterThan(0)
+		expect(children.indexOf(editor.element)).toBeLessThan(children.length - 1)
+		expect(children[children.length - 1]).toBe(statusLine.element)
+		expect(view.element.lastElementChild).toBe(statusLine.element)
+		expect(editor.classes()).toContain('outline-editor')
 	})
 })

@@ -64,7 +64,7 @@ describe('OutlineEditor', () => {
 			attachTo: document.body,
 		})
 
-		const inputs = wrapper.findAll('input')
+		const inputs = wrapper.findAll('.outline-row__input')
 		expect(inputs).toHaveLength(3)
 		expect(inputs[0].element.value).toBe('First row')
 
@@ -91,7 +91,7 @@ describe('OutlineEditor', () => {
 			attachTo: document.body,
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		const runCommandSpy = vi.spyOn(keymap, 'runCommand').mockImplementation(() => {})
 		vi.spyOn(keymap, 'commandForKey').mockReturnValue('newRowBelow')
 
@@ -120,7 +120,7 @@ describe('OutlineEditor', () => {
 			attachTo: document.body,
 		})
 
-		const input = wrapper.find('input')
+		const input = wrapper.find('.outline-row__input')
 		const runCommandSpy = vi.spyOn(keymap, 'runCommand').mockImplementation(() => {})
 		vi.spyOn(keymap, 'commandForKey').mockReturnValue(null)
 
@@ -154,7 +154,7 @@ describe('OutlineEditor', () => {
 		})
 
 		const commandForKeySpy = vi.spyOn(keymap, 'commandForKey').mockReturnValue(null)
-		const input = wrapper.find('[data-row-id="r1"] input')
+		const input = wrapper.find('[data-row-id="r1"] .outline-row__input')
 
 		input.element.setSelectionRange(0, 0)
 		input.element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
@@ -184,7 +184,7 @@ describe('OutlineEditor', () => {
 			attachTo: document.body,
 		})
 
-		const r2Input = wrapper.find('[data-row-id="r2"] input')
+		const r2Input = wrapper.find('[data-row-id="r2"] .outline-row__input')
 
 		wrapper.vm.focus('r2', 'start')
 		expect(document.activeElement).toBe(r2Input.element)
@@ -257,13 +257,13 @@ describe('OutlineEditor', () => {
 			children: [{ id: 'r2', text: 'Child', note: '', collapsed: false, children: [] }],
 		}])
 		wrapper = mount(OutlineEditor, { props: { history }, attachTo: document.body })
-		const childInput = wrapper.find('[data-row-id="r2"] input').element
+		const childInput = wrapper.find('[data-row-id="r2"] .outline-row__input').element
 		childInput.focus()
 		childInput.setSelectionRange(2, 2)
 
 		await wrapper.find('button[aria-expanded="true"]').trigger('click')
 
-		const parentInput = wrapper.find('[data-row-id="r1"] input').element
+		const parentInput = wrapper.find('[data-row-id="r1"] .outline-row__input').element
 		expect(document.activeElement).toBe(parentInput)
 	})
 
@@ -276,7 +276,7 @@ describe('OutlineEditor', () => {
 			children: [{ id: 'r2', text: 'Child', note: '', collapsed: false, children: [] }],
 		}])
 		wrapper = mount(OutlineEditor, { props: { history }, attachTo: document.body })
-		const parentInput = wrapper.find('[data-row-id="r1"] input').element
+		const parentInput = wrapper.find('[data-row-id="r1"] .outline-row__input').element
 		parentInput.focus()
 		parentInput.setSelectionRange(0, 0)
 
@@ -305,7 +305,7 @@ describe('OutlineEditor', () => {
 			},
 		])
 		wrapper = mount(OutlineEditor, { props: { history }, attachTo: document.body })
-		const focusedInput = wrapper.find('[data-row-id="r3"] input').element
+		const focusedInput = wrapper.find('[data-row-id="r3"] .outline-row__input').element
 		focusedInput.focus()
 
 		await wrapper.find('button[aria-expanded="true"]').trigger('click')
@@ -333,21 +333,16 @@ describe('OutlineEditor', () => {
 		expect(wrapper.find('.slot-note').text()).toBe('my note')
 	})
 
-	it('sorts rows through shared history so the change can be undone', async () => {
+	it('shows no sort controls (sorting lives in the ... menu)', () => {
 		const history = createHistory([
 			{ id: 'b', text: 'Beta', note: '', collapsed: false, children: [] },
 			{ id: 'a', text: 'Alpha', note: '', collapsed: false, children: [] },
 		])
 		wrapper = mount(OutlineEditor, { props: { history } })
 
-		await wrapper.get('button:last-child').trigger('click')
-		expect(history.current().map((row) => row.id)).toEqual(['a', 'b'])
-		history.undo()
-		expect(history.current().map((row) => row.id)).toEqual(['b', 'a'])
-
-		await wrapper.get('select').setValue('note')
-		await wrapper.findAll('button')[0].trigger('click')
-		expect(wrapper.findAll('button')[0].text()).toContain('Descending')
+		expect(wrapper.find('.outline-sort').exists()).toBe(false)
+		expect(wrapper.find('select').exists()).toBe(false)
+		expect(wrapper.text()).not.toContain('Sort rows')
 	})
 
 	it('drops a row before another row as one undoable move', async () => {
@@ -447,5 +442,51 @@ describe('OutlineEditor', () => {
 		await wrapper.get('.outline-row__note-toggle').trigger('click')
 		expect(history.current()[0].noteHidden).toBe(false)
 		expect(wrapper.get('textarea[data-note-id="r1"]').element.value).toBe('My note')
+	})
+
+	it('renders as a scroll container (.outline-editor) containing the rows tree and no sort bar', () => {
+		const history = createHistory([
+			{ id: 'r1', text: 'First row', note: '', collapsed: false, children: [] },
+		])
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		expect(wrapper.classes()).toContain('outline-editor')
+		expect(wrapper.find('.outline-sort').exists()).toBe(false)
+		expect(wrapper.find('[role="tree"]').exists()).toBe(true)
+	})
+
+	describe('empty outline', () => {
+		const placeholderSelector = 'input[placeholder="Type your first heading"]'
+
+		it('shows one focused placeholder row and no real rows', async () => {
+			wrapper = mount(OutlineEditor, { props: { history: createHistory([]) }, attachTo: document.body })
+			await wrapper.vm.$nextTick()
+
+			expect(wrapper.findAll(placeholderSelector)).toHaveLength(1)
+			expect(wrapper.findAll('[data-row-id]')).toHaveLength(0)
+			expect(document.activeElement).toBe(wrapper.get(placeholderSelector).element)
+		})
+
+		it('creates a real row on the first keystroke, focuses its input, and one undo removes it', async () => {
+			const history = createHistory([])
+			wrapper = mount(OutlineEditor, { props: { history }, attachTo: document.body })
+			await wrapper.vm.$nextTick()
+
+			await wrapper.get(placeholderSelector).setValue('H')
+			await wrapper.vm.$nextTick()
+
+			const rows = history.current()
+			expect(rows).toHaveLength(1)
+			expect(rows[0].text).toBe('H')
+			expect(wrapper.find(placeholderSelector).exists()).toBe(false)
+			const input = wrapper.get(`textarea[data-row-id="${rows[0].id}"]`)
+			expect(document.activeElement).toBe(input.element)
+
+			history.undo()
+			await wrapper.vm.$nextTick()
+			expect(history.current()).toEqual([])
+			expect(wrapper.find(placeholderSelector).exists()).toBe(true)
+			expect(document.activeElement).toBe(wrapper.get(placeholderSelector).element)
+		})
 	})
 })

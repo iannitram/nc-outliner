@@ -1,5 +1,5 @@
 <script setup>
-import { computed, getCurrentInstance, inject, nextTick, onUnmounted, ref, watch } from 'vue'
+import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { updateRow } from '../model/outline.js'
 
 const props = defineProps({
@@ -22,6 +22,32 @@ const emit = defineEmits(['input-text', 'row-keydown', 'row-focus'])
 
 const inputRef = ref(null)
 const noteRef = ref(null)
+let textObserver
+let textWidth
+
+/** Resize wrapped text after edits, undo, and changes to the available width. */
+function fitText() {
+	const el = inputRef.value
+	if (el) {
+		el.style.height = 'auto'
+		el.style.height = `${el.scrollHeight + 2}px`
+	}
+}
+
+watch(() => props.row.text, fitText, { flush: 'post' })
+onMounted(() => {
+	fitText()
+	if (typeof ResizeObserver !== 'undefined') {
+		textObserver = new ResizeObserver(([entry]) => {
+			if (entry && entry.contentRect.width !== textWidth) {
+				textWidth = entry.contentRect.width
+				fitText()
+			}
+		})
+		textObserver.observe(inputRef.value)
+	}
+})
+onUnmounted(() => textObserver?.disconnect())
 const addingNote = ref(false)
 const instance = getCurrentInstance()
 const editor = inject('outlineEditor', null)
@@ -133,7 +159,7 @@ function toggleNote() {
 
 /**
  *
- * @param {HTMLInputElement|null} el the row input element
+ * @param {HTMLTextAreaElement|null} el the row input element
  */
 function onInputRef(el) {
 	inputRef.value = el
@@ -167,6 +193,14 @@ watch(
  * @param {InputEvent} event the input event
  */
 function handleInput(event) {
+	// A row is one line: pasted line breaks become spaces, as the old single-line input did.
+	const el = event.target
+	if (/[\r\n]/.test(el.value)) {
+		const caret = el.value.slice(0, el.selectionStart ?? el.value.length).replace(/\r\n|\r|\n/g, ' ').length
+		el.value = el.value.replace(/\r\n|\r|\n/g, ' ')
+		el.setSelectionRange?.(caret, caret)
+	}
+	fitText()
 	if (editor) {
 		editor.onInput(props.row, event)
 	}
@@ -184,6 +218,10 @@ function handleKeydown(event) {
 	}
 	// eslint-disable-next-line vue/custom-event-name-casing
 	emit('row-keydown', props.row.id, event)
+	// Enter remains an outline command; modified Enter must not insert a hard break.
+	if (event.key === 'Enter' && !event.isComposing) {
+		event.preventDefault()
+	}
 }
 
 /**
@@ -324,9 +362,9 @@ defineExpose({
 					<span class="outline-row__bullet" aria-hidden="true">•</span>
 				</slot>
 			</slot>
-			<input
+			<textarea
 				:ref="onInputRef"
-				type="text"
+				rows="1"
 				class="outline-row__input"
 				:class="{ 'outline-row__input--folded': foldedLabel }"
 				:style="foldedLabel ? { '--title-ch': Math.max(row.text.length, 1) } : undefined"
@@ -336,7 +374,7 @@ defineExpose({
 				:aria-label="row.text || 'Row text'"
 				@input="handleInput"
 				@keydown="handleKeydown"
-				@focus="handleFocus">
+				@focus="handleFocus" />
 			<span v-if="foldedLabel" class="outline-row__more">{{ foldedLabel }}</span>
 			<button
 				v-if="noteToggleShown"
@@ -344,8 +382,22 @@ defineExpose({
 				class="outline-row__note-toggle"
 				:class="{ 'outline-row__note-toggle--always': noteToggleAlwaysShown }"
 				:aria-expanded="noteShown"
+				:aria-label="noteToggleLabel"
+				:title="noteToggleLabel"
 				@click="toggleNote">
-				{{ noteToggleLabel }}
+				<svg
+					viewBox="0 0 24 24"
+					width="16"
+					height="16"
+					aria-hidden="true">
+					<path
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M5 4.5h14v11l-4.5 4.5H5z M14.5 20v-4.5H19 M8.5 9h7 M8.5 12.5h4" />
+				</svg>
 			</button>
 		</div>
 		<slot name="note" :row="row" />
@@ -357,6 +409,7 @@ defineExpose({
 				:data-note-id="row.id"
 				:value="row.note"
 				:readonly="readonly"
+				rows="1"
 				aria-label="Row note"
 				@input="handleNoteInput" />
 		</div>
@@ -382,11 +435,12 @@ defineExpose({
 	display: flex;
 	flex-direction: column;
 	width: 100%;
+	min-width: 0;
 }
 
 .outline-row__line {
 	display: flex;
-	align-items: center;
+	align-items: flex-start;
 	min-height: 32px;
 	gap: 4px;
 }
@@ -400,6 +454,11 @@ defineExpose({
 }
 
 .outline-row__input {
+	box-sizing: border-box;
+	resize: none;
+	overflow: hidden;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
 	flex: 1;
 	min-width: 0;
 	background: transparent;
@@ -489,6 +548,10 @@ defineExpose({
 
 .outline-row__more {
 	flex: none;
+	/* Same height as the input's first line, centred on it, so the label sits on the title's text. */
+	display: inline-flex;
+	align-items: center;
+	height: 34px;
 	margin-left: 8px;
 	margin-right: 4px;
 	font-size: 12.5px;
@@ -525,8 +588,12 @@ defineExpose({
 }
 
 .outline-row__bullet {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	width: 24px;
 	min-width: 24px;
+	height: 34px;
 	text-align: center;
 }
 
@@ -535,27 +602,33 @@ defineExpose({
 }
 
 .outline-row__children {
-	margin-left: 24px;
+	margin-left: var(--outline-indent, 24px);
+	min-width: 0;
 }
 
 .outline-row__note-area {
 	display: flex;
 	flex-direction: column;
-	align-items: flex-start;
-	gap: 4px;
-	padding-left: 28px;
+	align-items: stretch;
+	/* Handle 16 + gap 4 + gutter 24 + gap 4: the note's text lines up with the row text. */
+	padding-left: 48px;
+	padding-right: 12px;
 }
 
 .outline-row__note-toggle {
 	flex: none;
 	margin-left: auto;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
 	background: transparent;
 	border: none;
+	border-radius: var(--border-radius-element, 3px);
 	color: var(--color-text-maxcontrast, var(--color-main-text));
 	cursor: pointer;
-	font: inherit;
-	font-size: 0.85em;
-	padding: 2px 4px;
 	/* Shown on hover or focus inside the row, or always while a note is hidden. Still focusable when hidden. */
 	opacity: 0;
 	pointer-events: none;
@@ -564,6 +637,7 @@ defineExpose({
 
 .outline-row__line:hover .outline-row__note-toggle,
 .outline-row__line:focus-within .outline-row__note-toggle,
+.outline-row__note-toggle:focus-visible,
 .outline-row__note-toggle--always {
 	opacity: 1;
 	pointer-events: auto;
@@ -571,24 +645,53 @@ defineExpose({
 
 .outline-row__note-toggle:hover {
 	color: var(--color-main-text);
-	text-decoration: underline;
 }
 
+/* A note is muted text under its row; it only gets a border while it has focus. */
 .outline-row__note {
 	box-sizing: border-box;
 	width: 100%;
 	background: transparent;
-	color: var(--color-main-text);
+	color: var(--color-text-maxcontrast, var(--color-main-text));
 	border: 1px solid transparent;
 	border-radius: var(--border-radius-element, 3px);
-	padding: 6px 8px;
+	padding: 0 8px 6px;
 	font: inherit;
+	font-size: 13.5px;
 	line-height: 1.5;
-	resize: vertical;
+	resize: none;
+	overflow: hidden;
 	outline: none;
+}
+
+@supports (field-sizing: content) {
+	.outline-row__note {
+		field-sizing: content;
+	}
 }
 
 .outline-row__note:focus {
 	border-color: var(--color-primary-element, var(--color-border));
+	color: var(--color-main-text);
+}
+@container outline-editor (max-width: 599px) {
+	.outline-row {
+		--outline-indent: 16px;
+	}
+
+	.outline-row.level-1 > .outline-row__line .outline-row__input {
+		font-size: 18px;
+	}
+}
+
+@media (hover: none) {
+	.outline-row__handle {
+		display: none;
+	}
+
+	.outline-row__note-area {
+		/* The hidden handle and its gap no longer occupy the text gutter. */
+		padding-left: 28px;
+	}
 }
 </style>

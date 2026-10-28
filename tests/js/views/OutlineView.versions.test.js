@@ -77,23 +77,21 @@ afterEach(() => {
 
 describe('OutlineView: versions in the sidebar with a read-only preview (#185)', () => {
 	it('toggles the sidebar with the clock button, which keeps the name "Versions"', async () => {
-		expect(document.body.querySelector('aside')).toBeNull()
-		expect(versionsButton().getAttribute('aria-pressed')).toBe('false')
+		expect(document.body.querySelector('aside.app-sidebar')).toBeNull()
 
 		await openSidebar()
-		expect(document.body.querySelector('aside')).not.toBeNull()
-		expect(document.body.querySelector('aside').textContent).toContain('Versions')
-		expect(versionsButton().getAttribute('aria-pressed')).toBe('true')
+		expect(document.body.querySelector('aside.app-sidebar')).not.toBeNull()
+		expect(document.body.querySelector('aside.app-sidebar').textContent).toContain('Versions')
 		expect(document.body.querySelector('[role="dialog"]')).toBeNull()
 
 		await click(versionsButton())
-		expect(document.body.querySelector('aside')).toBeNull()
+		expect(document.body.querySelector('aside.app-sidebar')).toBeNull()
 	})
 
 	it('renders the sidebar inside NcContent, after NcAppContent, not teleported', async () => {
 		await openSidebar()
 
-		const aside = document.body.querySelector('aside')
+		const aside = document.body.querySelector('aside.app-sidebar')
 		const content = document.body.querySelector('#content-vue')
 		expect(content.contains(aside)).toBe(true)
 		expect(document.body.querySelector('#app-sidebar-vue').closest('#content-vue')).toBe(content)
@@ -105,11 +103,11 @@ describe('OutlineView: versions in the sidebar with a read-only preview (#185)',
 		await preview()
 
 		// Every svg is drawn by NcIconSvgWrapper, which sizes it; none is a raw, unsized svg.
-		const svgs = Array.from(document.body.querySelectorAll('.outline-view .versions-toggle svg, .version-banner svg, .version-text svg'))
+		const svgs = Array.from(document.body.querySelectorAll('.version-banner svg, .version-text svg'))
 		expect(svgs.length).toBeGreaterThan(0)
 		svgs.forEach((svg) => expect(svg.closest('.icon-vue')).not.toBeNull())
 		const icons = wrapper.findAllComponents(NcIconSvgWrapper)
-		expect(icons.length).toBeGreaterThan(1)
+		expect(icons.length).toBeGreaterThan(0)
 		icons.forEach((icon) => expect(icon.props('size')).toBeLessThanOrEqual(20))
 		expect(versionsButton().querySelector('svg')).not.toBeNull()
 	})
@@ -122,9 +120,9 @@ describe('OutlineView: versions in the sidebar with a read-only preview (#185)',
 		expect(textButton('Restore this version')).toBeTruthy()
 		expect(textButton('Back to current')).toBeTruthy()
 		const rows = Array.from(document.body.querySelectorAll('.outline-row'))
-		expect(rows.map((el) => el.querySelector('input').value)).toEqual(['Old title', 'Old child'])
+		expect(rows.map((el) => el.querySelector('.outline-row__input').value)).toEqual(['Old title', 'Old child'])
 		expect(rows[0].classList.contains('level-1')).toBe(true)
-		expect(rows[0].querySelector('textarea').value).toBe('old note')
+		expect(rows[0].querySelector('.outline-row__note').value).toBe('old note')
 		expect(document.body.textContent).not.toContain('Live row')
 		// Nothing is editable, draggable or addable.
 		document.body.querySelectorAll('.outline-row input, .outline-row textarea').forEach((el) => expect(el.readOnly).toBe(true))
@@ -135,7 +133,7 @@ describe('OutlineView: versions in the sidebar with a read-only preview (#185)',
 
 	it('does not change a read-only row on typing or Enter', async () => {
 		await preview()
-		const input = document.body.querySelector('.outline-row input')
+		const input = document.body.querySelector('.outline-row__input')
 
 		input.value = 'Changed'
 		input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -163,9 +161,9 @@ describe('OutlineView: versions in the sidebar with a read-only preview (#185)',
 		await click(textButton('Back to current'))
 
 		expect(document.body.querySelector('.version-banner')).toBeNull()
-		expect(document.body.querySelector('.outline-row input').value).toBe('Live row')
-		expect(document.body.querySelector('.outline-row input').readOnly).toBe(false)
-		expect(document.body.querySelector('aside')).not.toBeNull()
+		expect(document.body.querySelector('.outline-row__input').value).toBe('Live row')
+		expect(document.body.querySelector('.outline-row__input').readOnly).toBe(false)
+		expect(document.body.querySelector('aside.app-sidebar')).not.toBeNull()
 	})
 
 	it('"Restore this version" saves first, restores, returns to the editor and shows the green naming offer', async () => {
@@ -177,7 +175,7 @@ describe('OutlineView: versions in the sidebar with a read-only preview (#185)',
 
 		expect(restoreVersion).toHaveBeenCalledWith(3, '100')
 		expect(document.body.querySelector('.version-banner')).toBeNull()
-		expect(document.body.querySelector('.outline-row input').value).toBe('Live row')
+		expect(document.body.querySelector('.outline-row__input').value).toBe('Live row')
 		expect(document.body.querySelector('.notecard--success .version-offer')).not.toBeNull()
 	})
 
@@ -187,8 +185,8 @@ describe('OutlineView: versions in the sidebar with a read-only preview (#185)',
 		document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
 		await flushPromises()
 
-		expect(document.body.querySelector('aside')).toBeNull()
+		expect(document.body.querySelector('aside.app-sidebar')).toBeNull()
 		expect(document.body.querySelector('.version-banner')).toBeNull()
-		expect(document.body.querySelector('.outline-row input').value).toBe('Live row')
+		expect(document.body.querySelector('.outline-row__input').value).toBe('Live row')
 	})
 })

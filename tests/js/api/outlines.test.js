@@ -15,6 +15,7 @@ vi.mock('@nextcloud/router', () => ({
 
 import {
 	createOutline,
+	exportOpml,
 	getSettings,
 	listOutlines,
 	publish,
@@ -29,6 +30,11 @@ const outline = { title: 'Plan', rows: [], publishPath: null }
 const settingsUrl = '/index.php/apps/nc_outliner/api/settings'
 
 describe('outlines API client', () => {
+	it('serializes current edits through the server OPML writer', async () => {
+		axios.post.mockResolvedValue({ data: { data: '<opml />' } })
+		await expect(exportOpml(outline)).resolves.toBe('<opml />')
+		expect(axios.post).toHaveBeenCalledWith('/index.php/apps/nc_outliner/api/outline-opml', { outline })
+	})
 	beforeEach(() => {
 		vi.clearAllMocks()
 	})

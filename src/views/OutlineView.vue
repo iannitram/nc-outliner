@@ -4,13 +4,14 @@ import { NcButton, NcIconSvgWrapper } from '@nextcloud/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConflictDialog from '../components/ConflictDialog.vue'
 import OutlineEditor from '../components/OutlineEditor.vue'
-import PublishButton from '../components/PublishButton.vue'
-import SaveStatus from '../components/SaveStatus.vue'
-import { readOutline, saveCopy, saveOutline } from '../api/outlines.js'
+import OutlineTopBar from '../components/OutlineTopBar.vue'
+import SortDialog from '../components/SortDialog.vue'
+import StatusLine from '../components/StatusLine.vue'
+import { exportOpml, readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
-import { mdiClockOutline, mdiEyeOutline } from '../icons.js'
+import { mdiEyeOutline } from '../icons.js'
 import { createHistory } from '../model/history.js'
-import { newRow } from '../model/outline.js'
+import { sortRows } from '../model/outline.js'
 import { resetVersionsSidebar, versionsSidebar } from './versionsSidebarState.js'
 
 const props = defineProps({ fileId: { type: Number, required: true } })
@@ -30,6 +31,8 @@ const previewHistory = computed(() => (preview.value?.tree ? createHistory(previ
 const previewTime = computed(() => (preview.value
 	? new Date(preview.value.time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 	: ''))
+const sortOpen = ref(false)
+const publishedOpenUrl = ref('')
 let saver = null
 let unsubscribe = null
 let currentDocument = null
@@ -60,6 +63,7 @@ async function load({ discardLocal = false, fileId = props.fileId } = {}) {
 			return
 		}
 		conflictOpen.value = false
+		publishedOpenUrl.value = ''
 		name.value = result.name
 		etag.value = result.etag
 		saveStatus.value = 'saved'
@@ -224,21 +228,36 @@ async function beforeLeave() {
  * Update the publish path and trigger autosave.
  *
  * @param {string} newPath published document path
+ * @param {string} openUrl URL to open the published document
  */
-function onPublished(newPath) {
+function onPublished(newPath, openUrl = '') {
 	if (currentDocument) {
+		publishedOpenUrl.value = openUrl
 		currentDocument = { ...currentDocument, publishPath: newPath }
 		document.value = currentDocument
 		saver?.schedule(currentDocument)
 	}
 }
 
-/** Create the first root row for a valid empty outline. */
-function addFirstRow() {
-	history.value?.execute((rows) => [...rows, newRow()], [])
+/**
+ * Sort every level through History, so one undo reverses it.
+ *
+ * @param {{by: 'text'|'status'|'note', direction: 'asc'|'desc'}} choice the dialog's choice
+ */
+function applySort({ by, direction }) {
+	history.value?.execute(sortRows, [by, direction])
+	sortOpen.value = false
 }
 
-defineExpose({ beforeLeave })
+/** @return {Promise<object|null>} OPML including the current unsaved edits */
+async function getWorkingFile() {
+	if (loading.value || !currentDocument || currentSession?.fileId !== props.fileId) {
+		return null
+	}
+	return { name: 'outline.opml', type: 'text/x-opml', data: await exportOpml(currentDocument) }
+}
+
+defineExpose({ beforeLeave, getWorkingFile })
 
 onMounted(() => {
 	Object.assign(versionsSidebar, {
@@ -267,8 +286,9 @@ watch([() => props.fileId, title, versionsOpen, () => preview.value?.id ?? null]
 	Object.assign(versionsSidebar, { fileId, title: outlineTitle, open, selectedId })
 }, { immediate: true })
 watch(() => props.fileId, () => {
+	sortOpen.value = false
 	closeVersions()
-	return load()
+	load()
 })
 </script>
 
@@ -281,29 +301,15 @@ watch(() => props.fileId, () => {
 			{{ error }}
 		</p>
 		<template v-if="!loading && history">
-			<div class="outline-header">
-				<h2>{{ title }}</h2>
-				<SaveStatus :status="saveStatus" />
-				<PublishButton
-					:fileId="props.fileId"
-					:publishPath="document?.publishPath ?? null"
-					:name="name"
-					:title="title"
-					:beforePublish="flushPendingSave"
-					@published="onPublished" />
-				<NcButton
-					variant="tertiary"
-					class="versions-toggle"
-					ariaLabel="Versions"
-					title="Versions"
-					:aria-pressed="versionsOpen ? 'true' : 'false'"
-					:class="{ 'versions-toggle--on': versionsOpen }"
-					@click="toggleVersions">
-					<template #icon>
-						<NcIconSvgWrapper :path="mdiClockOutline" :size="20" />
-					</template>
-				</NcButton>
-			</div>
+			<OutlineTopBar
+				:title="title"
+				:fileId="props.fileId"
+				:publishPath="document?.publishPath ?? null"
+				:name="name"
+				:beforePublish="flushPendingSave"
+				@published="onPublished"
+				@openVersions="toggleVersions"
+				@openSort="sortOpen = true" />
 			<template v-if="preview">
 				<div class="version-banner" role="status">
 					<NcIconSvgWrapper class="version-banner__icon" :path="mdiEyeOutline" :size="20" />
@@ -322,36 +328,59 @@ watch(() => props.fileId, () => {
 					v-if="previewHistory"
 					:key="preview.id"
 					:history="previewHistory"
+					class="outline-editor"
 					readonly />
 				<p v-else class="version-unreadable" role="status">
 					This version can't be opened
 				</p>
 			</template>
-			<template v-else>
-				<button v-if="history.current().length === 0" type="button" @click="addFirstRow">
-					Add first row
-				</button>
-				<OutlineEditor v-if="history" :history="history" />
-			</template>
+			<OutlineEditor v-else-if="history" :history="history" class="outline-editor" />
+			<SortDialog
+				:open="sortOpen"
+				@close="sortOpen = false"
+				@sort="applySort" />
+			<ConflictDialog
+				:open="conflictOpen"
+				:name="name"
+				@reload="reloadAfterConflict"
+				@keepCopy="keepCopy" />
+			<StatusLine
+				:status="saveStatus"
+				:openUrl="publishedOpenUrl"
+				:rows="document?.rows ?? []"
+				:publishPath="document?.publishPath ?? null" />
 		</template>
-		<ConflictDialog
-			:open="conflictOpen"
-			:name="name"
-			@reload="reloadAfterConflict"
-			@keepCopy="keepCopy" />
 	</section>
 </template>
 
 <style scoped>
-.outline-view { width: 100%; }
-.outline-header {
+.outline-view {
+	width: 100%;
+	height: 100%;
 	display: flex;
-	align-items: center;
-	gap: 12px;
+	flex-direction: column;
+	overflow: hidden;
 }
 
-.versions-toggle--on { background: var(--color-primary-element-light); }
+.outline-top-bar,
+:deep(.outline-top-bar) {
+	flex: none;
+}
+
+.outline-editor,
+:deep(.outline-editor) {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+}
+
+.status-line,
+:deep(.status-line) {
+	flex: none;
+}
+
 .version-banner {
+	flex: none;
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
@@ -363,5 +392,5 @@ watch(() => props.fileId, () => {
 	color: var(--color-primary-element-light-text);
 }
 .version-banner__text { flex: 1 1 240px; display: flex; flex-direction: column; }
-.version-unreadable { color: var(--color-error-text); padding: 12px 4px; }
+.version-unreadable { flex: none; color: var(--color-error-text); padding: 12px 4px; }
 </style>
