@@ -222,6 +222,50 @@ describe('PublishButton.vue', () => {
 		expect(button.attributes('disabled')).toBeUndefined()
 	})
 
+	it('saves pending edits after the folder is picked and before publishing', async () => {
+		const calls = []
+		pickMock.mockImplementation(async () => {
+			calls.push('pick')
+			return '/Documents'
+		})
+		const beforePublish = vi.fn(async () => {
+			calls.push('save')
+			return true
+		})
+		publish.mockImplementation(async () => {
+			calls.push('publish')
+			return { fileId: 44, path: '/Documents/Plan.odt', openUrl: '/open' }
+		})
+
+		wrapper = mount(PublishButton, {
+			props: { fileId: 7, publishPath: null, name: 'Plan.opml', title: 'Plan', beforePublish },
+		})
+		await wrapper.get('button').trigger('click')
+		await flushPromises()
+
+		expect(calls).toEqual(['pick', 'save', 'publish'])
+		expect(publish).toHaveBeenCalledWith(7, '/Documents', 'Plan')
+		expect(showError).not.toHaveBeenCalled()
+	})
+
+	it('does not publish and shows an error when pending edits cannot be saved', async () => {
+		pickMock.mockResolvedValue('/Documents')
+		const beforePublish = vi.fn(async () => false)
+
+		wrapper = mount(PublishButton, {
+			props: { fileId: 7, publishPath: null, name: 'Plan.opml', title: 'Plan', beforePublish },
+		})
+		await wrapper.get('button').trigger('click')
+		await flushPromises()
+
+		expect(beforePublish).toHaveBeenCalledTimes(1)
+		expect(publish).not.toHaveBeenCalled()
+		expect(showError).toHaveBeenCalledWith('Could not save your latest changes, so nothing was published. Try again.')
+		expect(showSuccess).not.toHaveBeenCalled()
+		expect(wrapper.emitted('published')).toBeUndefined()
+		expect(wrapper.get('button').attributes('disabled')).toBeUndefined()
+	})
+
 	it('shows error toast when publish fails', async () => {
 		pickMock.mockResolvedValue('/Documents')
 		publish.mockRejectedValue(new Error('Destination folder does not exist'))
