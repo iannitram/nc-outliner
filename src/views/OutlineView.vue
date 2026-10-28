@@ -8,6 +8,7 @@ import OutlineTopBar from '../components/OutlineTopBar.vue'
 import SortDialog from '../components/SortDialog.vue'
 import StatusLine from '../components/StatusLine.vue'
 import { exportOpml, readOutline, saveCopy, saveOutline } from '../api/outlines.js'
+import { commandForKey, isMac } from '../editor/keymap.js'
 import { createSaver } from '../editor/saver.js'
 import { mdiEyeOutline } from '../icons.js'
 import { createHistory } from '../model/history.js'
@@ -269,6 +270,34 @@ async function getWorkingFile() {
 	return { name: 'outline.opml', type: 'text/x-opml', data: await exportOpml(currentDocument) }
 }
 
+/**
+ * Undo and redo when focus is outside the rows: after a dialog such as Sort rows closes, focus
+ * returns to the ⋯ button, and the rows' own key handler never sees the keystroke (#205).
+ * Text fields keep their own handling: rows run History themselves, other inputs keep the browser's.
+ *
+ * @param {KeyboardEvent} event the keydown
+ */
+function undoOutsideRows(event) {
+	if (event.defaultPrevented || preview.value || !history.value) {
+		return
+	}
+	const target = event.target
+	if (target instanceof Element && target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="dialog"]')) {
+		return
+	}
+	if (globalThis.document.querySelector('[role="dialog"]')) {
+		return
+	}
+	const command = commandForKey(event, { isMac: isMac(), rowEmpty: false, caretAtStart: false, caretAtEnd: false, hasChildren: false, collapsed: false })
+	if (command === 'undo') {
+		event.preventDefault()
+		history.value.undo()
+	} else if (command === 'redo') {
+		event.preventDefault()
+		history.value.redo()
+	}
+}
+
 defineExpose({ beforeLeave, getWorkingFile })
 
 onMounted(() => {
@@ -283,6 +312,7 @@ onMounted(() => {
 	load()
 	window.addEventListener('pagehide', flushWhenLeaving)
 	window.addEventListener('beforeunload', warnIfUnsaved)
+	window.addEventListener('keydown', undoOutsideRows)
 	globalThis.document.addEventListener('visibilitychange', onVisibilityChange)
 })
 onUnmounted(() => {
@@ -290,6 +320,7 @@ onUnmounted(() => {
 	loadGeneration++
 	window.removeEventListener('pagehide', flushWhenLeaving)
 	window.removeEventListener('beforeunload', warnIfUnsaved)
+	window.removeEventListener('keydown', undoOutsideRows)
 	globalThis.document.removeEventListener('visibilitychange', onVisibilityChange)
 	unsubscribe?.()
 	void saver?.flush().finally(() => saver?.destroy())
