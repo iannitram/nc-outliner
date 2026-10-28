@@ -4,6 +4,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
 	plugins: [vue()],
 	test: {
+		// Bound worker startup on shared CI runners while retaining file isolation.
+		maxWorkers: process.env.CI ? 2 : undefined,
 		environment: 'jsdom',
 		include: ['tests/js/**/*.test.js'],
 		css: {

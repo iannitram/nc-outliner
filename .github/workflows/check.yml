@@ -7,6 +7,11 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  # A push and its PR check share a branch; keep only the newest run for it.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   check:
     # Lint and tests on all three desktop platforms (R04); the build runs once, on Linux.
