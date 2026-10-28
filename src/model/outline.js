@@ -188,3 +188,54 @@ export function updateRow(tree, id, patch) {
 		return copy
 	})
 }
+
+/**
+ * Issue #31. Sort every sibling list in the outline by its topic, checkbox
+ * status or note. Each level is sorted independently, and children stay with
+ * their row. A new tree is returned only when at least one list changes.
+ * Checkbox state is read from the OPML codec's preserved `extra._status`
+ * attribute; rows with no status sort as unchecked.
+ *
+ * @param {Tree} tree
+ * @param {'text'|'status'|'note'} by
+ * @param {'asc'|'desc'} [direction]
+ * @return {Tree}
+ */
+export function sortRows(tree, by = 'text', direction = 'asc') {
+	if (!['text', 'status', 'note'].includes(by) || !['asc', 'desc'].includes(direction)) {
+		return tree
+	}
+	const sign = direction === 'desc' ? -1 : 1
+	const statusRank = (row) => {
+		const value = row.extra?._status
+		if (value === true || value === 'checked') {
+			return 2
+		}
+		return 0
+	}
+	const compare = (a, b) => {
+		if (by === 'status') {
+			return (statusRank(a) - statusRank(b)) * sign
+		}
+		const aValue = String(a[by] ?? '')
+		const bValue = String(b[by] ?? '')
+		return aValue.localeCompare(bValue, 'en', { sensitivity: 'base' }) * sign
+	}
+	const sortLevel = (rows) => {
+		let changed = false
+		const mapped = rows.map((row) => {
+			const children = sortLevel(row.children)
+			if (children !== row.children) {
+				changed = true
+				return { ...row, children }
+			}
+			return row
+		})
+		const sorted = mapped.slice().sort(compare)
+		if (sorted.some((row, index) => row !== rows[index])) {
+			changed = true
+		}
+		return changed ? sorted : rows
+	}
+	return sortLevel(tree)
+}
