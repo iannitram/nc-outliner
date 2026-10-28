@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace OCA\NcOutliner\Controller;
 
 use OCA\NcOutliner\AppInfo\Application;
-use OCA\NcOutliner\Service\IOutlineStore;
 use OCA\NcOutliner\Service\NotFoundException;
 use OCA\NcOutliner\Service\PublishService;
 use OCP\AppFramework\Controller;
