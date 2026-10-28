@@ -209,7 +209,7 @@ function startRename(version) {
 	<NcDialog
 		v-if="open"
 		name="Versions"
-		:container="null"
+		container="#nc-outliner-dialogs"
 		size="large"
 		@closing="emit('close')">
 		<p v-if="loading" role="status">

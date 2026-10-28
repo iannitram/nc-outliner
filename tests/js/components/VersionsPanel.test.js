@@ -244,6 +244,14 @@ describe('VersionsPanel.vue', () => {
 		expect(document.body.querySelector('[role="alert"]').textContent).toBe('Could not name this version.')
 	})
 
+	it('renders at page level in the dialog host, outside the component root', async () => {
+		await open()
+
+		const dialog = document.querySelector('#nc-outliner-dialogs [role="dialog"]')
+		expect(dialog).not.toBeNull()
+		expect(wrapper.element.contains(dialog)).toBe(false)
+	})
+
 	it('renders nothing while closed and asks the parent to close from the Close button', async () => {
 		wrapper = mount(VersionsPanel, {
 			props: { fileId: FILE_ID, open: false, flush: vi.fn(), reload: vi.fn() },
@@ -278,7 +286,6 @@ describe('VersionsPanel.vue', () => {
 
 		expect(rows().map((el) => el.textContent.includes('Current'))).toEqual([false, true, false])
 		wrapper.unmount()
-		document.body.innerHTML = ''
 
 		listOutlines.mockImplementation(async () => [{ fileId: FILE_ID, name: 'Untitled', mtime: 12345 }])
 		await open()
