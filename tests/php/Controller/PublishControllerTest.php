@@ -14,6 +14,7 @@ use OCA\NcOutliner\Service\PublishService;
 use OCP\AppFramework\Http;
 use OCP\Files\Folder;
 use OCP\Files\File;
+use OCP\Files\NotPermittedException;
 use OCP\Files\IRootFolder;
 use OCP\IRequest;
 use OCP\IURLGenerator;
@@ -81,5 +82,46 @@ final class PublishControllerTest extends TestCase {
 		foreach (str_split('\\/:*?"<>|') as $character) {
 			$this->assertSame(Http::STATUS_BAD_REQUEST, $controller->publish(7, '', 'Plan' . $character)->getStatus());
 		}
+	}
+
+	public function testDotAndDoubleDotNamesReturn400WithNameMessage(): void {
+		$userFolder = $this->createMock(Folder::class);
+		$root = $this->createMock(IRootFolder::class);
+		$root->method('getUserFolder')->willReturn($userFolder);
+		$userFolder->method('get')->willReturn($this->createMock(Folder::class));
+		$store = $this->createMock(IOutlineStore::class);
+		$store->method('read')->willReturn(['fileId' => 7, 'name' => 'x', 'etag' => 'e', 'outline' => new Outline('Plan', [])]);
+		$session = $this->createMock(IUserSession::class);
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$session->method('getUser')->willReturn($user);
+		$controller = new PublishController($this->createMock(IRequest::class), new PublishService($store, $root, new ContentWriter(), new OdtPackage()), $session, $this->createMock(IURLGenerator::class));
+		foreach (['.', '..'] as $name) {
+			$response = $controller->publish(7, '', $name);
+			$this->assertSame(Http::STATUS_BAD_REQUEST, $response->getStatus());
+			$this->assertSame('Invalid document name', $response->getData()['message']);
+		}
+	}
+
+	public function testUnwritableDestinationReturns403WithMessage(): void {
+		$userFolder = $this->createMock(Folder::class);
+		$destination = $this->createMock(Folder::class);
+		$root = $this->createMock(IRootFolder::class);
+		$root->method('getUserFolder')->willReturn($userFolder);
+		$userFolder->method('get')->willReturn($destination);
+		$destination->method('nodeExists')->willReturn(false);
+		$destination->method('newFile')->willThrowException(new NotPermittedException('read-only'));
+		$store = $this->createMock(IOutlineStore::class);
+		$store->method('read')->willReturn(['fileId' => 7, 'name' => 'x', 'etag' => 'e', 'outline' => new Outline('Plan', [])]);
+		$service = new PublishService($store, $root, new ContentWriter(), new OdtPackage());
+		$session = $this->createMock(IUserSession::class);
+		$user = $this->createMock(IUser::class);
+		$user->method('getUID')->willReturn('alice');
+		$session->method('getUser')->willReturn($user);
+		$controller = new PublishController($this->createMock(IRequest::class), $service, $session, $this->createMock(IURLGenerator::class));
+		$response = $controller->publish(7, '', 'Plan');
+		$this->assertSame(Http::STATUS_FORBIDDEN, $response->getStatus());
+		$this->assertIsString($response->getData()['message'] ?? null);
+		$this->assertNotSame('', $response->getData()['message']);
 	}
 }
