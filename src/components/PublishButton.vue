@@ -72,6 +72,10 @@ const props = defineProps({
 		type: Function,
 		default: null,
 	},
+	iconOnly: {
+		type: Boolean,
+		default: false,
+	},
 })
 
 const emit = defineEmits(['published'])
@@ -136,8 +140,29 @@ async function onPublishClick() {
 
 <template>
 	<span class="publish-button">
-		<NcButton :disabled="publishing" @click="onPublishClick">
-			Publish to Doc
+		<NcButton
+			:disabled="publishing"
+			:ariaLabel="iconOnly ? 'Publish to Doc' : undefined"
+			:title="iconOnly ? 'Publish to Doc' : undefined"
+			variant="tertiary"
+			@click="onPublishClick">
+			<template #icon>
+				<svg
+					class="publish-icon"
+					viewBox="0 0 24 24"
+					width="20"
+					height="20"
+					aria-hidden="true">
+					<path
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z M14 3v5h5 M9 14.5l3-3 3 3 M12 11.5V17.5" />
+				</svg>
+			</template>
+			<span v-if="!iconOnly" class="publish-button-text">Publish to Doc</span>
 		</NcButton>
 		<a
 			v-if="openUrl"
@@ -147,3 +172,15 @@ async function onPublishClick() {
 			rel="noopener">Open document</a>
 	</span>
 </template>
+
+<style scoped>
+.publish-icon {
+	flex: none;
+}
+
+@container (max-width: 759px) {
+	.publish-button-text {
+		display: none;
+	}
+}
+</style>

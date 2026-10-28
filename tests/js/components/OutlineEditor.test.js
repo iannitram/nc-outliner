@@ -448,4 +448,18 @@ describe('OutlineEditor', () => {
 		expect(history.current()[0].noteHidden).toBe(false)
 		expect(wrapper.get('textarea[data-note-id="r1"]').element.value).toBe('My note')
 	})
+
+	it('renders as a scroll container (.outline-editor) containing both the sort bar and the rows tree', () => {
+		const history = createHistory([
+			{ id: 'r1', text: 'First row', note: '', collapsed: false, children: [] },
+		])
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		expect(wrapper.classes()).toContain('outline-editor')
+		const sortBar = wrapper.find('.outline-sort')
+		const treeContainer = wrapper.find('[role="tree"]')
+		expect(sortBar.exists()).toBe(true)
+		expect(treeContainer.exists()).toBe(true)
+		expect(wrapper.element.contains(sortBar.element)).toBe(true)
+	})
 })

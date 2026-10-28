@@ -4,6 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OutlineView from '../../../src/views/OutlineView.vue'
 import { publish, readOutline, saveOutline } from '../../../src/api/outlines.js'
 
+if (typeof globalThis.ResizeObserver === 'undefined') {
+	globalThis.ResizeObserver = class {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	}
+}
+
 const pickMock = vi.fn()
 const builderMock = {
 	setMultiSelect: vi.fn().mockReturnThis(),
