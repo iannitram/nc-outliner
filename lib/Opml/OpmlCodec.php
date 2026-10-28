@@ -134,10 +134,19 @@ final class OpmlCodec {
 			$head->appendChild($publishPath);
 		}
 		foreach ($outline->headExtra as $xml) {
-			$fragment = $document->createDocumentFragment();
-			if ($fragment->appendXML($xml)) {
-				$head->appendChild($fragment);
+			$extraDocument = new \DOMDocument();
+			$previous = libxml_use_internal_errors(true);
+			try {
+				$loaded = $extraDocument->loadXML($xml, LIBXML_NONET);
+			} finally {
+				libxml_clear_errors();
+				libxml_use_internal_errors($previous);
 			}
+			$element = $extraDocument->documentElement;
+			if (!$loaded || $element === null || ($element->namespaceURI === null && $element->localName === 'title') || ($element->namespaceURI === self::NS && $element->localName === 'publishPath')) {
+				continue;
+			}
+			$head->appendChild($document->importNode($element, true));
 		}
 		
 		$opml->appendChild($head);
@@ -162,18 +171,29 @@ final class OpmlCodec {
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
 		}
+		$localNamespaces = [];
 		foreach ($row->extra as $name => $value) {
 			if (str_starts_with($name, 'xmlns:')) {
-				if (!$root->hasAttribute($name)) {
+				$prefix = substr($name, 6);
+				if ($prefix === 'nco' || $prefix === 'xml') {
+					continue;
+				}
+				if ($root->hasAttribute($name) && $root->getAttribute($name) !== $value) {
+					$outline->setAttribute($name, $value);
+					$localNamespaces[$prefix] = $value;
+				} elseif (!$root->hasAttribute($name)) {
 					$root->setAttribute($name, $value);
 				}
 			} elseif (str_contains($name, ':')) {
 				[$prefix] = explode(':', $name, 2);
-				$uri = $row->extra['xmlns:' . $prefix] ?? null;
+				$uri = $prefix === 'xml' ? 'http://www.w3.org/XML/1998/namespace' : ($prefix === 'nco' ? self::NS : ($localNamespaces[$prefix] ?? $row->extra['xmlns:' . $prefix] ?? null));
+				if ($uri === self::NS && in_array(substr(strstr($name, ':'), 1), ['id', 'collapsed'], true)) {
+					continue;
+				}
 				if ($uri !== null) {
 					$outline->setAttributeNS($uri, $name, $value);
 				}
-			} elseif (!in_array($name, ['text', '_note'], true)) {
+			} elseif (!in_array($name, ['text', '_note'], true) && !str_starts_with($name, 'xmlns')) {
 				$outline->setAttribute($name, $value);
 			}
 		}
