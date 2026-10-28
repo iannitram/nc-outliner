@@ -58,7 +58,9 @@ flowchart LR
         History --> Model[model/outline.js]
         View --> Saver[editor/saver.js]
         Saver --> Client[api/outlines.js]
-        View --> Status[SaveStatus.vue]
+        View --> TopBar[OutlineTopBar.vue]
+        TopBar --> Publish[PublishButton.vue]
+        View --> Status[StatusLine.vue]
         View --> Conflict[ConflictDialog.vue]
         View --> Versions[VersionsPanel.vue]
         Versions --> VClient[api/versions.js]
@@ -430,7 +432,8 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, versions and publish | #90, #97 | planned |
 | `src/components/OutlineEditor.vue` | Renders the tree from History, caret and focus by row id, keydown to the keymap | #91 | present |
 | `src/components/OutlineRow.vue` | One row: handle, disclosure triangle or bullet, a plain text input (no rich text in 1.0), the note under it | #91, #93, #94, #98 | present |
-| `src/components/SaveStatus.vue` | Saved / Saving / Can't save (retrying) | #97 | planned |
+| `src/components/OutlineTopBar.vue` | Slim top bar: title, Publish, Versions icon button and ⋯ actions | #183 | present |
+| `src/components/StatusLine.vue` | Status line: Saved / Saving / Can't save (retrying), row/word counts, last-published link | #183 | present |
 | `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | planned |
 | `src/components/VersionsPanel.vue` | Versions list, read-only preview, Restore, Name this version | #111 | planned |
 | `src/components/PublishButton.vue` | Publish to Doc: folder picker, then open in Nextcloud Office | #9 | present |

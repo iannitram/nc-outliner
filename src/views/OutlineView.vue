@@ -1,11 +1,10 @@
 <script setup>
 import { showSuccess } from '@nextcloud/dialogs'
-import { NcButton } from '@nextcloud/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConflictDialog from '../components/ConflictDialog.vue'
 import OutlineEditor from '../components/OutlineEditor.vue'
-import PublishButton from '../components/PublishButton.vue'
-import SaveStatus from '../components/SaveStatus.vue'
+import OutlineTopBar from '../components/OutlineTopBar.vue'
+import StatusLine from '../components/StatusLine.vue'
 import VersionsPanel from '../components/VersionsPanel.vue'
 import { readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
@@ -228,24 +227,22 @@ watch(() => props.fileId, load)
 			{{ error }}
 		</p>
 		<template v-if="!loading && history">
-			<div class="outline-header">
-				<h2>{{ title }}</h2>
-				<SaveStatus :status="saveStatus" />
-				<PublishButton
-					:fileId="props.fileId"
-					:publishPath="document?.publishPath ?? null"
-					:name="name"
-					:title="title"
-					:beforePublish="flushPendingSave"
-					@published="onPublished" />
-				<NcButton @click="versionsOpen = true">
-					Versions
-				</NcButton>
-			</div>
+			<OutlineTopBar
+				:title="title"
+				:fileId="props.fileId"
+				:publishPath="document?.publishPath ?? null"
+				:name="name"
+				:beforePublish="flushPendingSave"
+				@published="onPublished"
+				@openVersions="versionsOpen = true" />
 			<button v-if="history.current().length === 0" type="button" @click="addFirstRow">
 				Add first row
 			</button>
 			<OutlineEditor v-if="history" :history="history" />
+			<StatusLine
+				:status="saveStatus"
+				:rows="document?.rows ?? []"
+				:publishPath="document?.publishPath ?? null" />
 		</template>
 		<ConflictDialog
 			:open="conflictOpen"
@@ -262,10 +259,10 @@ watch(() => props.fileId, load)
 </template>
 
 <style scoped>
-.outline-view { width: 100%; }
-.outline-header {
+.outline-view {
+	width: 100%;
 	display: flex;
-	align-items: center;
-	gap: 12px;
+	flex-direction: column;
+	min-height: 100%;
 }
 </style>

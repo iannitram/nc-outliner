@@ -287,4 +287,49 @@ describe('PublishButton.vue', () => {
 		expect(window.open).not.toHaveBeenCalled()
 		expect(wrapper.get('button').attributes('disabled')).toBeUndefined()
 	})
+
+	describe('iconOnly mode', () => {
+		it('renders as icon with tooltip and aria-label without label text when iconOnly is true', async () => {
+			wrapper = mount(PublishButton, {
+				props: {
+					fileId: 7,
+					publishPath: null,
+					name: 'Plan.opml',
+					title: 'Plan',
+					iconOnly: true,
+				},
+			})
+
+			const button = wrapper.get('button')
+			expect(button.attributes('title')).toBe('Publish to Doc')
+			expect(button.attributes('aria-label')).toBe('Publish to Doc')
+			expect(wrapper.find('.publish-button-text').exists()).toBe(false)
+			expect(wrapper.find('.publish-icon').exists()).toBe(true)
+		})
+
+		it('triggers publish normally when clicked in iconOnly mode', async () => {
+			pickMock.mockResolvedValue('/Documents')
+			publish.mockResolvedValue({
+				fileId: 44,
+				path: '/Documents/Plan.odt',
+				openUrl: '/apps/files/?openfile=true&fileid=44',
+			})
+
+			wrapper = mount(PublishButton, {
+				props: {
+					fileId: 7,
+					publishPath: null,
+					name: 'Plan.opml',
+					title: 'Plan',
+					iconOnly: true,
+				},
+			})
+
+			await wrapper.get('button').trigger('click')
+			await flushPromises()
+
+			expect(publish).toHaveBeenCalledWith(7, '/Documents', 'Plan')
+			expect(wrapper.emitted('published')).toEqual([['/Documents/Plan.odt']])
+		})
+	})
 })

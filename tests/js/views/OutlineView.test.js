@@ -5,6 +5,14 @@ import OutlineView from '../../../src/views/OutlineView.vue'
 import { listOutlines, readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
 import { listVersions, restoreVersion } from '../../../src/api/versions.js'
 
+if (typeof globalThis.ResizeObserver === 'undefined') {
+	globalThis.ResizeObserver = class {
+		observe() {}
+		unobserve() {}
+		disconnect() {}
+	}
+}
+
 vi.mock('@nextcloud/dialogs', () => ({
 	showSuccess: vi.fn(),
 	showError: vi.fn(),
@@ -30,7 +38,7 @@ vi.mock('../../../src/api/versions.js', () => ({
  * @return {import('@vue/test-utils').DOMWrapper} the button
  */
 function buttonLabelled(wrapper, text) {
-	return wrapper.findAll('button').find((button) => button.text() === text)
+	return wrapper.findAll('button').find((button) => button.text() === text || button.attributes('aria-label') === text)
 }
 
 const scheduleSpy = vi.fn()
