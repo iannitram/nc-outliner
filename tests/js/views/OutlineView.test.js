@@ -1,6 +1,7 @@
 import { showSuccess } from '@nextcloud/dialogs'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import VersionsSidebar from '../../../src/components/VersionsSidebar.vue'
 import OutlineView from '../../../src/views/OutlineView.vue'
 import { exportOpml, listOutlines, readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
 import { listVersions, restoreVersion } from '../../../src/api/versions.js'
@@ -256,14 +257,17 @@ describe('OutlineView autosave conflict flow', () => {
 		listOutlines.mockResolvedValue([{ fileId: 3, name: 'Untitled', mtime: Date.parse('2026-10-28T17:51:38Z') / 1000 }])
 		restoreVersion.mockResolvedValue()
 		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-4' })
-		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
+		wrapper = mount({
+			components: { OutlineView, VersionsSidebar },
+			template: '<div><OutlineView :fileId="3" /><VersionsSidebar /></div>',
+		}, { attachTo: document.body })
 		await flushPromises()
 		readOutline.mockResolvedValueOnce({ fileId: 3, name: 'Plan.opml', etag: 'etag-3', outline: initialOutline })
 
-		await buttonLabelled(wrapper, 'Versions').trigger('click')
+		await wrapper.find('button[aria-label="Versions"]').trigger('click')
 		await flushPromises()
-		const restore = Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Restore')
-		restore.click()
+		// The row menu is covered by the sidebar tests and OutlineView.versions.test.js; here the view's own wiring.
+		await wrapper.findComponent({ name: 'VersionsPanel' }).vm.restore('100')
 		await flushPromises()
 
 		expect(restoreVersion).toHaveBeenCalledWith(3, '100')

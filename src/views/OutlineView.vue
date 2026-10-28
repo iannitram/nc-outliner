@@ -1,17 +1,19 @@
 <script setup>
 import { showSuccess } from '@nextcloud/dialogs'
+import { NcButton, NcIconSvgWrapper } from '@nextcloud/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ConflictDialog from '../components/ConflictDialog.vue'
 import OutlineEditor from '../components/OutlineEditor.vue'
 import OutlineTopBar from '../components/OutlineTopBar.vue'
 import SortDialog from '../components/SortDialog.vue'
 import StatusLine from '../components/StatusLine.vue'
-import VersionsPanel from '../components/VersionsPanel.vue'
 import { exportOpml, readOutline, saveCopy, saveOutline } from '../api/outlines.js'
 import { createSaver } from '../editor/saver.js'
+import { mdiEyeOutline } from '../icons.js'
 import { createHistory } from '../model/history.js'
 import { sortRows } from '../model/outline.js'
 import { crashLogWarning } from '../services/crashLog.js' // TEMPORARY: remove after the crash-rate review (owner, 2026-10-28)
+import { resetVersionsSidebar, versionsSidebar } from './versionsSidebarState.js'
 
 const props = defineProps({ fileId: { type: Number, required: true } })
 const loading = ref(true)
@@ -24,6 +26,12 @@ const title = computed(() => document.value?.title || name.value)
 const saveStatus = ref('saved')
 const conflictOpen = ref(false)
 const versionsOpen = ref(false)
+// The older version shown read-only in place of the editor: { id, time, tree } (tree is null if unreadable).
+const preview = ref(null)
+const previewHistory = computed(() => (preview.value?.tree ? createHistory(preview.value.tree) : null))
+const previewTime = computed(() => (preview.value
+	? new Date(preview.value.time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+	: ''))
 const sortOpen = ref(false)
 const publishedOpenUrl = ref('')
 let saver = null
@@ -168,6 +176,37 @@ async function reloadAfterRestore() {
 	await load()
 }
 
+/** Close the versions sidebar; the main area goes back to the current outline. */
+function closeVersions() {
+	versionsOpen.value = false
+	preview.value = null
+}
+
+/** The clock button: open the versions sidebar, or close it. */
+function toggleVersions() {
+	if (versionsOpen.value) {
+		closeVersions()
+	} else {
+		versionsOpen.value = true
+	}
+}
+
+/**
+ * Show a version read-only in the main area, or the current outline again for null.
+ *
+ * @param {{id: string, time: number, tree: object[]|null}|null} version the picked version
+ */
+function showVersion(version) {
+	preview.value = version
+}
+
+/** Restore the previewed version through the sidebar, which saves first and keeps the old state. */
+async function restorePreview() {
+	if (preview.value) {
+		await versionsSidebar.restore?.(preview.value.id)
+	}
+}
+
 /**
  *
  */
@@ -215,7 +254,10 @@ function onPublished(newPath, openUrl = '') {
  * @param {{by: 'text'|'status'|'note', direction: 'asc'|'desc'}} choice the dialog's choice
  */
 function applySort({ by, direction }) {
-	history.value?.execute(sortRows, [by, direction])
+	// A version preview is read-only: sorting then would change the hidden current outline.
+	if (!preview.value) {
+		history.value?.execute(sortRows, [by, direction])
+	}
 	sortOpen.value = false
 }
 
@@ -230,12 +272,21 @@ async function getWorkingFile() {
 defineExpose({ beforeLeave, getWorkingFile })
 
 onMounted(() => {
+	Object.assign(versionsSidebar, {
+		active: true,
+		flush: flushBeforeRestore,
+		reload: reloadAfterRestore,
+		onPreview: showVersion,
+		onRestored: () => showVersion(null),
+		onClose: closeVersions,
+	})
 	load()
 	window.addEventListener('pagehide', flushWhenLeaving)
 	window.addEventListener('beforeunload', warnIfUnsaved)
 	globalThis.document.addEventListener('visibilitychange', onVisibilityChange)
 })
 onUnmounted(() => {
+	resetVersionsSidebar()
 	loadGeneration++
 	window.removeEventListener('pagehide', flushWhenLeaving)
 	window.removeEventListener('beforeunload', warnIfUnsaved)
@@ -243,8 +294,12 @@ onUnmounted(() => {
 	unsubscribe?.()
 	void saver?.flush().finally(() => saver?.destroy())
 })
+watch([() => props.fileId, title, versionsOpen, () => preview.value?.id ?? null], ([fileId, outlineTitle, open, selectedId]) => {
+	Object.assign(versionsSidebar, { fileId, title: outlineTitle, open, selectedId })
+}, { immediate: true })
 watch(() => props.fileId, () => {
 	sortOpen.value = false
+	closeVersions()
 	load()
 })
 </script>
@@ -264,10 +319,35 @@ watch(() => props.fileId, () => {
 				:publishPath="document?.publishPath ?? null"
 				:name="name"
 				:beforePublish="flushPendingSave"
+				:sortDisabled="Boolean(preview)"
 				@published="onPublished"
-				@openVersions="versionsOpen = true"
-				@openSort="sortOpen = true" />
-			<OutlineEditor v-if="history" :history="history" class="outline-editor" />
+				@openVersions="toggleVersions"
+				@openSort="sortOpen = !preview" />
+			<template v-if="preview">
+				<div class="version-banner" role="status">
+					<NcIconSvgWrapper class="version-banner__icon" :path="mdiEyeOutline" :size="20" />
+					<div class="version-banner__text">
+						<b>Version from {{ previewTime }}</b>
+						<span>Read-only. Your current outline is unchanged.</span>
+					</div>
+					<NcButton v-if="preview.tree" variant="primary" @click="restorePreview">
+						Restore this version
+					</NcButton>
+					<NcButton variant="tertiary" @click="showVersion(null)">
+						Back to current
+					</NcButton>
+				</div>
+				<OutlineEditor
+					v-if="previewHistory"
+					:key="preview.id"
+					:history="previewHistory"
+					class="outline-editor"
+					readonly />
+				<p v-else class="version-unreadable" role="status">
+					This version can't be opened
+				</p>
+			</template>
+			<OutlineEditor v-else-if="history" :history="history" class="outline-editor" />
 			<SortDialog
 				:open="sortOpen"
 				@close="sortOpen = false"
@@ -277,12 +357,6 @@ watch(() => props.fileId, () => {
 				:name="name"
 				@reload="reloadAfterConflict"
 				@keepCopy="keepCopy" />
-			<VersionsPanel
-				:fileId="props.fileId"
-				:open="versionsOpen"
-				:flush="flushBeforeRestore"
-				:reload="reloadAfterRestore"
-				@close="versionsOpen = false" />
 			<StatusLine
 				:status="saveStatus"
 				:openUrl="publishedOpenUrl"
@@ -317,4 +391,19 @@ watch(() => props.fileId, () => {
 :deep(.status-line) {
 	flex: none;
 }
+
+.version-banner {
+	flex: none;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px 12px;
+	margin: 6px 0 4px;
+	padding: 10px 14px;
+	border-radius: var(--border-radius-large, 10px);
+	background: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
+}
+.version-banner__text { flex: 1 1 240px; display: flex; flex-direction: column; }
+.version-unreadable { flex: none; color: var(--color-error-text); padding: 12px 4px; }
 </style>

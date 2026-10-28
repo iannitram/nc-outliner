@@ -10,6 +10,11 @@ const props = defineProps({
 		type: Object,
 		required: true,
 	},
+	/** Show the rows without any way to change them (a version preview): no inputs, drag, add, delete or sort. */
+	readonly: {
+		type: Boolean,
+		default: false,
+	},
 })
 
 const rootRef = ref(null)
@@ -345,10 +350,16 @@ function dropOnRow(row, event) {
 	endDrag()
 }
 
+/**
+ *
+ */
+function noop() {}
+
 provide('outlineEditor', {
-	onInput: handleInput,
+	readonly: props.readonly,
+	onInput: props.readonly ? noop : handleInput,
 	toggleCollapsed,
-	onKeydown: handleKeydown,
+	onKeydown: props.readonly ? noop : handleKeydown,
 	onFocus: handleFocus,
 	isDragging,
 	dropTarget,
@@ -377,6 +388,7 @@ defineExpose({
 	<div
 		ref="rootRef"
 		class="outline-editor"
+		:class="{ 'outline-editor--readonly': readonly }"
 		role="tree">
 		<div class="outline-column">
 			<div role="tree">
@@ -389,7 +401,7 @@ defineExpose({
 					</template>
 				</OutlineRow>
 				<div
-					v-if="isEmpty"
+					v-if="isEmpty && !readonly"
 					class="outline-row level-1 outline-placeholder"
 					role="treeitem">
 					<div class="outline-row__line">
@@ -405,7 +417,7 @@ defineExpose({
 					</div>
 				</div>
 			</div>
-			<KeyboardHints :rowCount="rowCount" />
+			<KeyboardHints v-if="!readonly" :rowCount="rowCount" />
 		</div>
 	</div>
 </template>

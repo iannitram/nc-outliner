@@ -14,6 +14,7 @@ import {
 import { ReportButton } from 'craft-bugreport-web'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import ThemeSetting from './components/ThemeSetting.vue'
+import VersionsSidebar from './components/VersionsSidebar.vue'
 import OutlineList from './views/OutlineList.vue'
 import OutlineView from './views/OutlineView.vue'
 import { createOutline, getSettings, listOutlines } from './api/outlines.js'
@@ -320,6 +321,7 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 					@open="onOutlineOpened"
 					@create="onOutlineOpened" />
 			</NcAppContent>
+			<VersionsSidebar />
 		</NcContent>
 		<Teleport to="body">
 			<NcThemeProvider :dark="theme === 'dark'" :light="theme === 'light'">

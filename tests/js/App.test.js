@@ -25,7 +25,7 @@ vi.mock('craft-bugreport-web', () => ({ ReportButton: {
 	props: ['config', 'getWorkingFile'],
 	template: '<button>Report a bug</button>',
 } }))
-vi.mock('@nextcloud/auth', () => ({ getRequestToken: () => 'test-csrf-token' }))
+vi.mock('@nextcloud/auth', () => ({ getRequestToken: () => 'test-csrf-token', getCurrentUser: () => null, onRequestTokenUpdate: () => {} }))
 vi.mock('@nextcloud/initial-state', () => ({ loadState: () => ({ version: '0.1.0', commit: 'abcdef1', ncVersion: '33.0.10', configured: false }) }))
 vi.mock('@nextcloud/vue', () => {
 	const container = { template: '<div><slot /></div>' }

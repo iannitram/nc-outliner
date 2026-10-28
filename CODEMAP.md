@@ -430,13 +430,14 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 |---|---|---|---|
 | `src/App.vue` | Shell: the list, or one outline when the URL hash is `#/outline/<fileId>` (no router library); the theme class | #90, #96 | present (skeleton) |
 | `src/views/OutlineList.vue` | My outlines, New outline, open one, Import | #90, #27 | planned |
-| `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, versions and publish | #90, #97 | planned |
+| `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, publish, and the clock button that toggles the versions sidebar (teleported into `#content-vue`); a picked version replaces the editor with a read-only `OutlineEditor` under the "Restore this version / Back to current" banner | #90, #97, #185 | planned |
 | `src/components/OutlineEditor.vue` | Renders the tree from History, caret and focus by row id, keydown to the keymap | #91 | present |
 | `src/components/OutlineRow.vue` | One row: handle, disclosure triangle or bullet, a plain text input (no rich text in 1.0), the note under it | #91, #93, #94, #98 | present |
 | `src/components/OutlineTopBar.vue` | Slim top bar: title, Publish, Versions icon button and ⋯ actions | #183 | present |
 | `src/components/StatusLine.vue` | Status line: Saved / Saving / Can't save (retrying), row/word counts, last-published link | #183 | present |
 | `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | planned |
-| `src/components/VersionsPanel.vue` | Versions list, read-only preview, Restore, Name this version | #111 | planned |
+| `src/components/VersionsPanel.vue` | The versions `NcAppSidebar` (right column): list grouped Today / Yesterday / Earlier with Current first, name tags, unreadable marks, a ⋯ menu (Restore, Name this version, naming in place), the green naming offer after a restore, Escape closes. Emits `preview` / `restored` / `close`; exposes `restore(id)` | #111, #185 | present |
+| `src/model/versionTree.js` | `parseVersionTree(text)`: an old version's OPML as a row tree for the preview, or null (never raw text) | #180, #185 | present |
 | `src/components/PublishButton.vue` | Publish to Doc: folder picker, then open in Nextcloud Office | #9 | present |
 | `src/components/ThemeSetting.vue` | Auto / Light / Dark | #96 | present |
 | **TEMPORARY** `src/services/crashLog.js` (with `lib/Controller/ClientLogController.php`, the route, and the `crash_log` switch read through `data-crash-log` on `#nc_outliner`) | Uncaught errors, unhandled rejections, Vue component errors and the app's save failures and conflicts, sent batched (one POST at most every 2 s) and at most 20 a minute per page (the rest dropped), sanitized on both sides. `installCrashLog()` is the first call in `src/main.js`. Remove after the crash-rate review (owner, 2026-10-28) | #177 | present (temporary) |
