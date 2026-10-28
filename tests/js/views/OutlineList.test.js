@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OutlineList from '../../../src/views/OutlineList.vue'
-import { createOutline, listOutlines } from '../../../src/api/outlines.js'
+import { createOutline } from '../../../src/api/outlines.js'
 
 vi.mock('../../../src/api/outlines.js', () => ({
 	createOutline: vi.fn(),
@@ -13,7 +13,6 @@ describe('OutlineList', () => {
 
 	beforeEach(() => {
 		createOutline.mockReset()
-		listOutlines.mockReset()
 	})
 
 	afterEach(() => {
@@ -21,32 +20,17 @@ describe('OutlineList', () => {
 		wrapper = undefined
 	})
 
-	it('shows the empty state when the API returns no outlines', async () => {
-		listOutlines.mockResolvedValue([])
+	it('shows the empty state with NcEmptyContent and New outline button', async () => {
 		wrapper = mount(OutlineList)
 		await flushPromises()
 
-		expect(wrapper.text()).toContain('No outlines yet.')
-	})
-
-	it('shows each outline name and modified time in the list', async () => {
-		const mtime = 1700000000
-		const expectedDate = new Date(mtime * 1000).toLocaleString()
-		listOutlines.mockResolvedValue([
-			{ fileId: 1, name: 'First outline', mtime },
-			{ fileId: 2, name: 'Second outline', mtime: mtime + 3600 },
-		])
-		wrapper = mount(OutlineList)
-		await flushPromises()
-
-		expect(wrapper.text()).toContain('First outline')
-		expect(wrapper.text()).toContain(expectedDate)
-		expect(wrapper.text()).toContain('Second outline')
-		expect(wrapper.text()).toContain(new Date((mtime + 3600) * 1000).toLocaleString())
+		expect(wrapper.text()).toContain('No outlines yet')
+		expect(wrapper.text()).toContain('Outlines are saved as .opml files in the Outlines folder of your Files')
+		expect(wrapper.find('button').text()).toContain('New outline')
+		expect(wrapper.text()).not.toContain('Import OPML')
 	})
 
 	it('triggers create calls the API create function and emits open to open the new outline', async () => {
-		listOutlines.mockResolvedValue([])
 		createOutline.mockResolvedValue({ fileId: 42, name: '', etag: 'etag-1' })
 		wrapper = mount(OutlineList)
 		await flushPromises()
@@ -56,5 +40,17 @@ describe('OutlineList', () => {
 
 		expect(createOutline).toHaveBeenCalledWith('')
 		expect(wrapper.emitted('open')).toEqual([[42]])
+		expect(wrapper.emitted('create')).toEqual([[42]])
+	})
+
+	it('displays an error message when creating an outline fails', async () => {
+		createOutline.mockRejectedValue(new Error('Network error'))
+		wrapper = mount(OutlineList)
+		await flushPromises()
+
+		await wrapper.get('button').trigger('click')
+		await flushPromises()
+
+		expect(wrapper.text()).toContain('Could not create an outline.')
 	})
 })
