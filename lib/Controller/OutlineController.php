@@ -9,6 +9,7 @@ use OCA\NcOutliner\Opml\OpmlParseException;
 use OCA\NcOutliner\Opml\Outline;
 use OCA\NcOutliner\Opml\Row;
 use OCA\NcOutliner\Service\ConflictException;
+use OCA\NcOutliner\Service\FolderConflictException;
 use OCA\NcOutliner\Service\NotFoundException;
 use OCA\NcOutliner\Service\IOutlineStore;
 use OCP\AppFramework\Controller;
@@ -29,7 +30,11 @@ final class OutlineController extends Controller {
 
 	#[NoAdminRequired]
 	public function index(): JSONResponse {
-		return new JSONResponse($this->store->list($this->uid()));
+		try {
+			return new JSONResponse($this->store->list($this->uid()));
+		} catch (FolderConflictException $e) {
+			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_CONFLICT);
+		}
 	}
 
 	#[NoAdminRequired]
@@ -38,6 +43,8 @@ final class OutlineController extends Controller {
 			return new JSONResponse($this->store->create($this->uid(), $name), Http::STATUS_CREATED);
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (FolderConflictException $e) {
+			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_CONFLICT);
 		}
 	}
 
