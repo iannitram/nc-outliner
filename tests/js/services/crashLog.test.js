@@ -321,6 +321,16 @@ describe('sanitizers', () => {
 		expect(sanitizeText('cannot read "x of row')).toBe(`cannot read ${ELLIPSIS}`)
 	})
 
+	it('replaces typographic quotes too, and cuts at an unpaired one', () => {
+		expect(sanitizeText('Error: “CANARY_TEXT_7f3a” and «CANARY_NOTE_7f3a»')).toBe(`Error: ${ELLIPSIS} and ${ELLIPSIS}`)
+		expect(sanitizeText('Error: can’t find CANARY_TITLE_7f3a')).toBe(`Error: can${ELLIPSIS}`)
+	})
+
+	it('turns control characters and line separators into spaces (no log injection)', () => {
+		expect(sanitizeText('Error: a\r\nFAKE\tb\u2028c\u001bd')).toBe('Error: a  FAKE b c d')
+		expect(sanitizeText('Mozilla/5.0\r\nFAKE', true)).toBe('Mozilla/5.0  FAKE')
+	})
+
 	it('keeps only app script file names in a stack and cuts it to 2 KB', () => {
 		expect(sanitizeStack('Error: x\n    at f (https://h/apps/nc_outliner/js/nc_outliner-main.mjs?v=1:1:2)\n    at g (https://h/other.js:3:4)\n    at <anonymous>')).toBe('at nc_outliner-main.mjs:1:2\nat <other>:3:4')
 		const long = '    at f (https://h/apps/nc_outliner/js/nc_outliner-main.mjs:1:2)\n'.repeat(200)

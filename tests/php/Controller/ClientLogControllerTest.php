@@ -227,4 +227,35 @@ final class ClientLogControllerTest extends TestCase {
 
 		ClientLogController::reportServerException($logger, 'Foo::bar', new \RuntimeException('row "CANARY_TEXT_7f3a" missing'));
 	}
+
+	public function testServerExceptionIsNotLoggedWhenTheSwitchIsOff(): void {
+		$logger = $this->createMock(LoggerInterface::class);
+		$logger->expects($this->never())->method($this->anything());
+		$appConfig = $this->createMock(IAppConfig::class);
+		$appConfig->method('getValueString')->with('nc_outliner', 'crash_log', '1')->willReturn('0');
+
+		ClientLogController::reportServerException($logger, 'Foo::bar', new \RuntimeException('boom'), $appConfig);
+	}
+
+	public function testLogInjectionIsPrevented(): void {
+		$this->assertSame('Error: a  FAKE b c d', ClientLogController::sanitizeText("Error: a\r\nFAKE\tb\u{2028}c\x1bd"));
+		$this->assertSame('Error: … and …', ClientLogController::sanitizeText('Error: “CANARY_TEXT_7f3a” and «CANARY_NOTE_7f3a»'));
+		$this->assertSame('Error: can…', ClientLogController::sanitizeText('Error: can’t find CANARY_TITLE_7f3a'));
+
+		$controller = $this->controller();
+		$this->request->method('getParam')->with('events')->willReturn([$this->event([
+			'message' => "TypeError: boom\nFAKE LINE",
+			'userAgent' => "Mozilla/5.0\r\nFAKE UA",
+			'appVersion' => "0.1.0\n",
+			'ncVersion' => "33\nFAKE",
+			'pageId' => "abc\n",
+			'time' => "2026-10-28T10:00:00.000Z\n",
+			'view' => "#/outline\n/7",
+		])]);
+		$this->logger->expects($this->once())->method('error')->with($this->callback(
+			static fn (string $line): bool => preg_match('/[\x00-\x1F\x7F]/', $line) !== 1 && !str_contains($line, '0.1.0'),
+		), ['app' => 'nc_outliner']);
+
+		$controller->receive();
+	}
 }

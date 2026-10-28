@@ -25,8 +25,9 @@ const MAX_MESSAGE = 500
 const MAX_STACK = 2048
 const MAX_VIEW = 100
 const MAX_USER_AGENT = 200
-const QUOTED = /'[^']*'|"[^"]*"|`[^`]*`/g
-const UNPAIRED_QUOTE = /['"`]/
+const CONTROL = /[\p{Cc}\p{Zl}\p{Zp}]/gu
+const QUOTED = /'[^']*'|"[^"]*"|`[^`]*`|“[^”]*”|‘[^’]*’|«[^»]*»/g
+const UNPAIRED_QUOTE = /['"`“”‘’«»]/
 const FULL_URL = /[a-z][a-z0-9+.-]*:\/\/\S*/gi
 const QUERY_OR_FRAGMENT = /[?#]\S*/g
 // A path with a file extension; a path whose name has spaces (up to 3 more words, then a word with an
@@ -41,7 +42,7 @@ const ROUTE_WORD = /^[a-z_-]{1,20}$/
 let state = null
 
 /**
- * Removes quoted text, unpaired quotes, full URLs ("<url>"), query strings and fragments, and
+ * Turns control characters into spaces, and removes quoted text (straight or typographic), unpaired quotes, full URLs ("<url>"), query strings and fragments, and
  * anything that looks like a file name or path ("<file>") from a message.
  *
  * @param {unknown} text message text
@@ -49,7 +50,8 @@ let state = null
  * @return {string} the sanitized text
  */
 export function sanitizeText(text, keepPaths = false) {
-	let out = String(text).slice(0, MAX_INPUT).replace(QUOTED, '…')
+	// Control characters and line separators become spaces, so one event is one log line.
+	let out = String(text).slice(0, MAX_INPUT).replace(CONTROL, ' ').replace(QUOTED, '…')
 	const quote = out.search(UNPAIRED_QUOTE)
 	if (quote !== -1) {
 		out = `${out.slice(0, quote)}…`
