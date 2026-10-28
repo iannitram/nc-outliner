@@ -8,11 +8,16 @@ use OCA\NcOutliner\AppInfo\Application;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\Constants;
+use OCP\Files\Folder;
 use OCP\Http\Client\IClientService;
 use OCP\IAppConfig;
 use OCP\IConfig;
 use OCP\IRequest;
 use OCP\IUserSession;
+use OCP\Share\Exceptions\ShareNotFound;
+use OCP\Share\IManager as IShareManager;
+use Psr\Log\LoggerInterface;
 
 final class BugReportController extends Controller {
 	public function __construct(
@@ -21,6 +26,8 @@ final class BugReportController extends Controller {
 		private readonly IAppConfig $appConfig,
 		private readonly IConfig $config,
 		private readonly IUserSession $userSession,
+		private readonly IShareManager $shareManager,
+		private readonly LoggerInterface $logger,
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -50,7 +57,7 @@ final class BugReportController extends Controller {
 		}
 		$base = $this->appConfig->getValueString(Application::APP_ID, 'bug_drop_base');
 		$token = $this->appConfig->getValueString(Application::APP_ID, 'bug_drop_token');
-		if ($base === '' || $token === '') {
+		if ($token === '') {
 			return new JSONResponse(['message' => 'Bug reports are not set up for this app.'], 503);
 		}
 		if (empty($file['tmp_name']) || !is_string($file['tmp_name'])) {
@@ -65,6 +72,39 @@ final class BugReportController extends Controller {
 		}
 		$times[] = $now;
 		$this->config->setUserValue($user->getUID(), Application::APP_ID, 'bug_report_times', json_encode($times));
+		// The drop is normally a File Drop share on this same Nextcloud: write the zip into it
+		// directly, so nothing goes over the network (owner, 2026-10-28). Only a token that is not
+		// a share here falls back to the drop's public WebDAV URL.
+		try {
+			$share = $this->shareManager->getShareByToken($token);
+		} catch (ShareNotFound) {
+			$share = null;
+		} catch (\Throwable $e) {
+			$this->logger->error('Bug report relay: could not look up the drop share: ' . get_class($e), ['app' => Application::APP_ID]);
+			return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
+		}
+		if ($share !== null) {
+			if (($share->getPermissions() & Constants::PERMISSION_CREATE) === 0) {
+				$this->logger->error('Bug report relay: the drop share does not allow creating files', ['app' => Application::APP_ID]);
+				return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
+			}
+			try {
+				$folder = $share->getNode();
+				if (!$folder instanceof Folder) {
+					$this->logger->error('Bug report relay: the drop share is not a folder', ['app' => Application::APP_ID]);
+					return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
+				}
+				$folder->newFile($file['name'], $bytes);
+				return new JSONResponse(['sent' => true], 201);
+			} catch (\Throwable $e) {
+				$this->logger->error('Bug report relay: could not write the report into the drop share: ' . get_class($e), ['app' => Application::APP_ID]);
+				return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
+			}
+		}
+		if ($base === '') {
+			$this->logger->error('Bug report relay: the drop token is not a share here and no drop base URL is set', ['app' => Application::APP_ID]);
+			return new JSONResponse(['message' => 'Bug reports are not set up for this app.'], 503);
+		}
 		try {
 			$response = $this->clientService->newClient()->put(
 				rtrim($base, '/') . '/public.php/dav/files/' . rawurlencode($token) . '/' . $file['name'],
@@ -73,8 +113,10 @@ final class BugReportController extends Controller {
 			if (in_array($response->getStatusCode(), [201, 204], true)) {
 				return new JSONResponse(['sent' => true], 201);
 			}
-		} catch (\Throwable) {
-			// Client exceptions can include the private URL. Never expose or log them.
+			$this->logger->error('Bug report relay: the drop answered HTTP ' . $response->getStatusCode(), ['app' => Application::APP_ID]);
+		} catch (\Throwable $e) {
+			// Client exceptions can include the private URL: log the class only, never the message.
+			$this->logger->error('Bug report relay: the HTTP upload to the drop failed: ' . get_class($e), ['app' => Application::APP_ID]);
 		}
 		return new JSONResponse(['message' => 'The bug drop refused the report.'], 502);
 	}
