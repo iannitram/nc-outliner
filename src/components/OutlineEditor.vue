@@ -2,7 +2,7 @@
 import { nextTick, onUnmounted, provide, ref, watch } from 'vue'
 import OutlineRow from './OutlineRow.vue'
 import * as keymap from '../editor/keymap.js'
-import { sortRows, updateRow } from '../model/outline.js'
+import { moveTo, remove, sortRows, updateRow } from '../model/outline.js'
 
 const props = defineProps({
 	history: {
@@ -17,6 +17,8 @@ const activeRowId = ref(null)
 const caretPos = ref(0)
 const sortBy = ref('text')
 const sortDirection = ref('asc')
+const dragSourceId = ref(null)
+const dropTarget = ref(null)
 const inputRefs = new Map()
 
 let unsubscribe = null
@@ -165,11 +167,159 @@ function toggleSortDirection() {
 	sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
 }
 
+/**
+ * @param {import('../model/outline.js').Tree} rows the rows to search
+ * @param {string} id the row id to find
+ * @return {import('../model/outline.js').Row|null}
+ */
+function findRow(rows, id) {
+	for (const row of rows) {
+		if (row.id === id) {
+			return row
+		}
+		const found = findRow(row.children ?? [], id)
+		if (found) {
+			return found
+		}
+	}
+	return null
+}
+
+/**
+ * @param {import('../model/outline.js').Tree} rows the rows to search
+ * @param {string} id the row id to find
+ * @param {string|null} parentId the parent of this sibling list
+ * @return {{parentId: string|null, index: number}|null}
+ */
+function findParentInfo(rows, id, parentId = null) {
+	for (let index = 0; index < rows.length; index++) {
+		if (rows[index].id === id) {
+			return { parentId, index }
+		}
+		const found = findParentInfo(rows[index].children ?? [], id, rows[index].id)
+		if (found) {
+			return found
+		}
+	}
+	return null
+}
+
+/**
+ * Work out where in a row the pointer is: its top third means before it, its
+ * bottom third means after it, and its middle means nest inside it.
+ *
+ * @param {DragEvent} event the drag event
+ * @return {'before'|'after'|'nest'}
+ */
+function dropPosition(event) {
+	const element = event.currentTarget
+	if (!element || typeof element.getBoundingClientRect !== 'function') {
+		return 'nest'
+	}
+	const rect = element.getBoundingClientRect()
+	const offset = (event.clientY ?? 0) - rect.top
+	if (rect.height > 0) {
+		if (offset < rect.height / 3) {
+			return 'before'
+		}
+		if (offset > (rect.height * 2) / 3) {
+			return 'after'
+		}
+	}
+	return 'nest'
+}
+
+/**
+ * @param {import('../model/outline.js').Row} row the row under the pointer
+ * @param {DragEvent} event the drag event
+ * @return {{rowId: string, position: 'before'|'after'|'nest'}|null}
+ */
+function dropTargetFor(row, event) {
+	const sourceId = dragSourceId.value
+	if (!sourceId || row.id === sourceId) {
+		return null
+	}
+	const source = findRow(tree.value, sourceId)
+	if (source && containsRow(source, row.id)) {
+		return null
+	}
+	return { rowId: row.id, position: dropPosition(event) }
+}
+
+/** @return {boolean} whether a row is being dragged */
+function isDragging() {
+	return dragSourceId.value !== null
+}
+
+/**
+ * @param {import('../model/outline.js').Row} row the row being dragged
+ */
+function startDrag(row) {
+	dragSourceId.value = row.id
+	dropTarget.value = null
+}
+
+/** Finish a drag, whether it ended in a drop or not. */
+function endDrag() {
+	dragSourceId.value = null
+	dropTarget.value = null
+}
+
+/**
+ * @param {import('../model/outline.js').Row} row the row under the pointer
+ * @param {DragEvent} event the dragover event
+ */
+function dragOverRow(row, event) {
+	const target = dropTargetFor(row, event)
+	dropTarget.value = target ? { ...target } : null
+}
+
+/**
+ * Drop the dragged row at the place the pointer names, as one History entry.
+ *
+ * @param {import('../model/outline.js').Row} row the row under the pointer
+ * @param {DragEvent} event the drop event
+ */
+function dropOnRow(row, event) {
+	const sourceId = dragSourceId.value
+	const target = dropTargetFor(row, event)
+	if (!sourceId || !target) {
+		endDrag()
+		return
+	}
+
+	const without = remove(tree.value, sourceId)
+	const info = findParentInfo(without, target.rowId)
+	if (!info) {
+		endDrag()
+		return
+	}
+
+	let parentId = info.parentId
+	let index = info.index
+	if (target.position === 'after') {
+		index = info.index + 1
+	} else if (target.position === 'nest') {
+		const targetRow = findRow(without, target.rowId)
+		parentId = target.rowId
+		index = targetRow?.children?.length ?? 0
+	}
+
+	props.history.execute(moveTo, [sourceId, parentId, index])
+	endDrag()
+}
+
 provide('outlineEditor', {
 	onInput: handleInput,
 	toggleCollapsed,
 	onKeydown: handleKeydown,
 	onFocus: handleFocus,
+	isDragging,
+	dropTarget,
+	startDrag,
+	endDrag,
+	dragOverRow,
+	dropOnRow,
 	registerInput: (id, el) => {
 		if (el) {
 			inputRefs.set(id, el)

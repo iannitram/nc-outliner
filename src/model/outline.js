@@ -190,6 +190,85 @@ export function updateRow(tree, id, patch) {
 }
 
 /**
+ * The row at a path from the root, or null for an empty path.
+ *
+ * @param rows
+ * @param path
+ */
+function findRowAt(rows, path) {
+	let siblings = rows
+	let row = null
+	for (const index of path) {
+		row = siblings[index]
+		siblings = row.children
+	}
+	return row
+}
+
+/**
+ * Issue #98. Move a row, with its children, to be child number `index` of
+ * `parentId` (`null` means the top level). `index` is the position after the
+ * row has been removed from its old place. Returns the input tree when the
+ * move cannot apply or changes nothing.
+ *
+ * @param {Tree} tree
+ * @param {string} id
+ * @param {string|null} parentId
+ * @param {number} index
+ * @return {Tree}
+ */
+export function moveTo(tree, id, parentId, index) {
+	const path = findPath(tree, id)
+	if (!path || !Number.isInteger(index) || index < 0) {
+		return tree
+	}
+
+	if (parentId !== null) {
+		const parentPath = findPath(tree, parentId)
+		if (!parentPath) {
+			return tree
+		}
+		if (parentPath.length >= path.length && path.every((step, i) => parentPath[i] === step)) {
+			return tree
+		}
+	}
+
+	const fromParentId = path.length === 1 ? null : findRowAt(tree, path.slice(0, -1)).id
+	if (parentId === fromParentId && index === path[path.length - 1]) {
+		return tree
+	}
+
+	const row = findRowAt(tree, path)
+	const without = remove(tree, id)
+
+	if (parentId === null) {
+		if (index > without.length) {
+			return tree
+		}
+		const copy = without.slice()
+		copy.splice(index, 0, row)
+		return copy
+	}
+
+	const parentPath = findPath(without, parentId)
+	if (!parentPath) {
+		return tree
+	}
+	const parent = findRowAt(without, parentPath)
+	const children = parent.children ?? []
+	if (index > children.length) {
+		return tree
+	}
+	return changeSiblings(without, parentPath, (siblings, parentIndex) => {
+		const copy = siblings.slice()
+		const nextChildren = children.slice()
+		nextChildren.splice(index, 0, row)
+		copy[parentIndex] = { ...parent, children: nextChildren }
+		return copy
+	})
+}
+
+/**
  * Issue #31. Sort every sibling list in the outline by its topic, checkbox
  * status or note. Each level is sorted independently, and children stay with
  * their row. A new tree is returned only when at least one list changes.
