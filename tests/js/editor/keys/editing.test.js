@@ -12,6 +12,7 @@ function deepFreeze(value) {
 
 const row = (id, ...children) => ({ id, text: id, note: '', collapsed: false, children })
 const startTree = () => deepFreeze([row('A', row('A1'), row('A2')), row('B'), row('C')])
+const promoteTree = () => deepFreeze([row('A', row('A1'), row('E', row('E1'), row('E2', row('E21'))), row('A2')), row('B')])
 const shape = (tree) => tree.map((r) => (r.children.length ? { [r.id]: shape(r.children) } : r.id))
 
 const key = (k, overrides = {}) => deepFreeze({ key: k, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...overrides })
@@ -49,6 +50,24 @@ describe('editing keys', () => {
 		const { focus } = run('deleteEmptyRow', 'A1')
 
 		expect(focus).toHaveBeenCalledWith('A', 'end')
+	})
+
+	it('2c. deleteEmptyRow on E promotes its children into its place, in order', () => {
+		const history = createHistory(promoteTree())
+		commands.deleteEmptyRow({ history, rowId: 'E', focus: vi.fn() })
+
+		expect(shape(history.current())).toEqual([{ A: ['A1', 'E1', { E2: ['E21'] }, 'A2'] }, 'B'])
+	})
+
+	it('2d. deleteEmptyRow on a row with children is one undo step that restores the row and its children', () => {
+		const start = promoteTree()
+		const history = createHistory(start)
+		commands.deleteEmptyRow({ history, rowId: 'E', focus: vi.fn() })
+		expect(shape(history.current())).toEqual([{ A: ['A1', 'E1', { E2: ['E21'] }, 'A2'] }, 'B'])
+
+		history.undo()
+		expect(history.current()).toBe(start)
+		expect(history.canUndo()).toBe(false)
 	})
 
 	it.each(PLATFORMS)('3. binding names the editing commands (isMac %s)', (isMac) => {
