@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { indent, insertAfter, moveDown, moveUp, outdent, remove, updateRow } from '../../../src/model/outline.js'
+import { indent, insertAfter, moveDown, moveUp, outdent, remove, sortRows, updateRow } from '../../../src/model/outline.js'
 
 function startTree() {
 	return [
@@ -227,5 +227,39 @@ describe('outline model operations', () => {
 		const before = structuredClone(tree)
 		expect(updateRow(tree, 'nope', { text: 'x' })).toBe(tree)
 		expect(tree).toEqual(before)
+	})
+
+	it('sorts siblings by topic without separating their children or changing the input', () => {
+		const tree = [
+			{ id: 'b', text: 'beta', note: '', collapsed: false, children: [
+				{ id: 'b2', text: 'z child', note: '', collapsed: false, children: [] },
+				{ id: 'b1', text: 'a child', note: '', collapsed: false, children: [] },
+			] },
+			{ id: 'a', text: 'Alpha', note: '', collapsed: false, children: [] },
+		]
+		const before = structuredClone(tree)
+		const result = sortRows(tree, 'text')
+		expect(rowIds(result)).toEqual([['a', []], ['b', [['b1', []], ['b2', []]]]])
+		expect(tree).toEqual(before)
+	})
+
+	it('sorts descending by note and by checkbox status', () => {
+		const tree = [
+			{ id: 'none', text: '', note: '', extra: { _status: 'unchecked' }, children: [] },
+			{ id: 'done', text: '', note: 'zeta', extra: { _status: 'checked' }, children: [] },
+			{ id: 'unknown', text: '', note: 'alpha', children: [] },
+		]
+		expect(sortRows(tree, 'note', 'desc').map((row) => row.id)).toEqual(['done', 'unknown', 'none'])
+		expect(sortRows(tree, 'status').map((row) => row.id)).toEqual(['none', 'unknown', 'done'])
+	})
+
+	it('keeps stable order on ties and returns the original tree for invalid or no-op sorts', () => {
+		const tree = [
+			{ id: 'a', text: 'same', note: '', children: [] },
+			{ id: 'b', text: 'same', note: '', children: [] },
+		]
+		expect(sortRows(tree, 'text')).toBe(tree)
+		expect(sortRows(tree, 'unknown')).toBe(tree)
+		expect(sortRows(tree, 'text', 'sideways')).toBe(tree)
 	})
 })
