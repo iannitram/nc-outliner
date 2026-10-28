@@ -2,7 +2,7 @@ import { showSuccess } from '@nextcloud/dialogs'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import OutlineView from '../../../src/views/OutlineView.vue'
-import { listOutlines, readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
+import { exportOpml, listOutlines, readOutline, saveCopy, saveOutline } from '../../../src/api/outlines.js'
 import { listVersions, restoreVersion } from '../../../src/api/versions.js'
 
 vi.mock('@nextcloud/dialogs', () => ({
@@ -11,6 +11,7 @@ vi.mock('@nextcloud/dialogs', () => ({
 }))
 
 vi.mock('../../../src/api/outlines.js', () => ({
+	exportOpml: vi.fn(),
 	listOutlines: vi.fn(),
 	readOutline: vi.fn(),
 	saveCopy: vi.fn(),
@@ -78,6 +79,18 @@ const initialOutline = {
 }
 
 describe('OutlineView autosave conflict flow', () => {
+	it('exports the current unsaved outline through the OPML writer', async () => {
+		exportOpml.mockResolvedValue('<opml>current edits</opml>')
+		const wrapper = mount(OutlineView, { props: { fileId: 42 } })
+		expect(await wrapper.vm.getWorkingFile()).toBeNull()
+		await flushPromises()
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
+		await flushPromises()
+		const file = await wrapper.vm.getWorkingFile()
+		expect(file).toEqual({ name: 'outline.opml', type: 'text/x-opml', data: '<opml>current edits</opml>' })
+		expect(exportOpml).toHaveBeenCalledWith(expect.objectContaining({ rows: [expect.objectContaining({ text: 'Edited' })] }))
+		wrapper.unmount()
+	})
 	let wrapper
 
 	beforeEach(() => {

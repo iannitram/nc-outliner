@@ -1,10 +1,24 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { ReportButton } from 'craft-bugreport-web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../../src/App.vue'
 import { getSettings, setSettings } from '../../src/api/outlines.js'
 
 vi.mock('../../src/views/OutlineList.vue', () => ({ default: { template: '<div>My outlines view</div>' } }))
-vi.mock('../../src/views/OutlineView.vue', () => ({ default: { props: ['fileId'], template: '<div>Outline {{ fileId }}</div>' } }))
+vi.mock('../../src/views/OutlineView.vue', () => ({ default: {
+	props: ['fileId'],
+	methods: {
+		getWorkingFile: () => ({ name: 'outline.opml', type: 'text/x-opml', data: '<opml />' }),
+	},
+	template: '<div>Outline {{ fileId }}</div>',
+} }))
+vi.mock('craft-bugreport-web', () => ({ ReportButton: {
+	name: 'ReportButton',
+	props: ['config', 'getWorkingFile'],
+	template: '<button>Report a bug</button>',
+} }))
+vi.mock('@nextcloud/auth', () => ({ getRequestToken: () => 'test-csrf-token' }))
+vi.mock('@nextcloud/initial-state', () => ({ loadState: () => ({ version: '0.1.0', commit: 'abcdef1', ncVersion: '33.0.10', configured: false }) }))
 vi.mock('@nextcloud/vue', () => {
 	const container = { template: '<div><slot /></div>' }
 	const themeProvider = {
@@ -25,6 +39,24 @@ vi.mock('../../src/api/outlines.js', () => ({
 }))
 
 describe('App', () => {
+	it('mounts the report button with relay-only config and current working file', async () => {
+		const wrapper = mount(App)
+		await flushPromises()
+		const button = wrapper.getComponent(ReportButton)
+		const config = button.props('config')
+		expect(config.relayUrl).toMatch(/\/apps\/nc_outliner\/api\/bugreport$/)
+		expect(config.headers.requesttoken).toBe('test-csrf-token')
+		expect(config).toMatchObject({ app: 'Outliner', version: '0.1.0', commit: 'abcdef1', ncVersion: '33.0.10' })
+		expect(config).not.toHaveProperty('dropBase')
+		expect(config).not.toHaveProperty('dropToken')
+		expect(await button.props('getWorkingFile')()).toBeNull()
+		expect(wrapper.text()).toContain('Bug reports are not set up for this app.')
+		window.location.hash = '#/outline/42'
+		window.dispatchEvent(new Event('hashchange'))
+		await flushPromises()
+		expect(await button.props('getWorkingFile')()).toEqual({ name: 'outline.opml', type: 'text/x-opml', data: '<opml />' })
+		wrapper.unmount()
+	})
 	beforeEach(() => {
 		vi.clearAllMocks()
 		getSettings.mockResolvedValue({ theme: 'auto' })

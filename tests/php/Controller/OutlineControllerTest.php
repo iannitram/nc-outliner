@@ -19,6 +19,21 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class OutlineControllerTest extends TestCase {
+	public function testExportUsesTheMergedWriterWithoutSaving(): void {
+		$this->request->method('getParams')->willReturn(['outline' => [
+			'title' => 'Current & unsaved',
+			'rows' => [['id' => 'r1', 'text' => 'Edited <row>', 'note' => 'A note', 'collapsed' => true, 'children' => []]],
+		]]);
+		$this->store->expects($this->never())->method('save');
+		$response = $this->controller->export();
+		$this->assertSame(200, $response->getStatus());
+		$outline = (new \OCA\NcOutliner\Opml\OpmlCodec())->parse($response->getData()['data']);
+		$this->assertSame('Current & unsaved', $outline->title);
+		$this->assertSame('Edited <row>', $outline->rows[0]->text);
+		$this->assertSame('A note', $outline->rows[0]->note);
+		$this->assertTrue($outline->rows[0]->collapsed);
+	}
+
 	private IOutlineStore $store;
 	private IRequest $request;
 	private IUserSession $userSession;
