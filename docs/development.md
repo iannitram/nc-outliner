@@ -71,7 +71,7 @@ The checker never pulls an image implicitly. Docker must be running for your acc
 
 ## Running the app in a test Nextcloud
 
-Use a throwaway container, never the production Nextcloud or its volumes. Mount this checkout (after `npm run build`) into `custom_apps/nc_outliner`, then:
+Use a throwaway container, never a live Nextcloud or its volumes. Mount this checkout (after `npm run build`) into `custom_apps/nc_outliner`, then:
 
 ```sh
 occ app:enable nc_outliner
@@ -79,7 +79,7 @@ occ app:enable nc_outliner
 
 Load `/index.php/apps/nc_outliner/` while logged in. The page should show the "Outlines" heading. On any failure, read the Nextcloud log (`occ log:tail` or `data/nextcloud.log`).
 
-Deploying into a live Nextcloud needs the owner's approval each time.
+Deploy to a live Nextcloud only with the maintainer's approval.
 
 ## Where things go
 

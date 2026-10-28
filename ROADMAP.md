@@ -5,7 +5,7 @@ Goal: feature parity with OmniOutliner 6 Pro, adapted to a Nextcloud web app (th
 **How this file works**
 - Every feature has a fixed **ID** (F01, F02, …). IDs never change, so the Notes column can name dependencies even after rows move.
 - A feature moves **Unwritten → PR** when a pull request opens (add the PR link in Notes), and **PR → Merged** when it merges (add the merge date).
-- **Unwritten is ordered from most likely to be used to least likely**, judged for planning, school and work notes on a desktop browser.
+- **Unwritten is ordered from most likely to be used to least likely**, judged for planning and note-taking on a desktop browser.
 - **Complexity** is the predicted effort of writing the code: Low, Medium or High.
 - **Notes** names what a feature depends on ("Needs F09") and anything else a builder should know.
 
@@ -31,7 +31,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 
 | Rank | ID | Feature | Complexity | Notes (dependencies) |
 |---|---|---|---|---|
-| 0 | F73 | **Updates from the admin panel** (1.0, SPEC M15): signed releases through the merged app-store feed (craft-nc-appstore), offered on the Apps page and installed by its scheduled job | Medium | #128, #129, #130; needs craft-nc-appstore 1.0 **On main:** nothing yet; blocked on craft-nc-appstore #8, #10, #14. |
+| 0 | F73 | **Updates from the admin panel** (1.0, SPEC M15): signed releases through the merged app-store feed (private), offered on the Apps page and installed by its scheduled job | Medium | #128, #129, #130; needs the private app-store feed 1.0 **On main:** nothing yet; blocked on the feed's own tickets. |
 | 1 | F01 | **Outline files:** create and open `.opml` outlines in the user's `Outlines/` folder (created on first use), as the signed-in user | Medium | Foundation: everything depends on it. The file format needs room for row IDs, rich text, styles and columns later (OPML attributes plus an app namespace). Old plain-JS PR #1 was merged, then its code left main in #100 under ADR 0002 (start fresh) **On main:** OPML codec (#85, #103) and `OutlineStore` (#88); the API routes (#108) and the list view (#90) are open. |
 | 2 | F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Needs F01. The editing core: keyboard handling and caret movement between rows. Old plain-JS PR #2 closed as superseded 2026-10-25 (ADR 0002) **On main:** the model's `insertAfter`, `remove`, `updateRow` (#86, #105); the editor (#91) and keys (#107) are open. |
 | 3 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02. Old plain-JS PR #5 closed as superseded 2026-10-25 (ADR 0002) **On main:** the model's `indent` and `outdent` (#104); the keys (#92) are open. |

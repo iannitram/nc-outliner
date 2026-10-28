@@ -20,8 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # GitHub-hosted runners: this repo is public, and a public repo never runs on
-        # self-hosted machines (the pipeline repo's R29).
+        # GitHub-hosted runners only: this repo is public.
         include:
           - os: linux
             runner: ubuntu-latest
