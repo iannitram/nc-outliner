@@ -92,6 +92,15 @@ function handleInput(row, event) {
 }
 
 /**
+ * Toggle a row through History so collapse state can be undone.
+ *
+ * @param {import('../model/outline.js').Row} row the row to toggle
+ */
+function toggleCollapsed(row) {
+	props.history.execute(updateRow, [row.id, { collapsed: !row.collapsed }])
+}
+
+/**
  *
  * @param {import('../model/outline.js').Row} row the focused row
  * @param {FocusEvent} event the focus event
@@ -144,6 +153,7 @@ function toggleSortDirection() {
 
 provide('outlineEditor', {
 	onInput: handleInput,
+	toggleCollapsed,
 	onKeydown: handleKeydown,
 	onFocus: handleFocus,
 	registerInput: (id, el) => {

@@ -197,6 +197,26 @@ describe('OutlineEditor', () => {
 		expect(wrapper.find('[data-row-id="r3"]').exists()).toBe(true)
 	})
 
+	it('collapses from the disclosure button through updateRow and keeps the state undoable', async () => {
+		const history = createHistory([{
+			id: 'r1',
+			text: 'Parent',
+			note: '',
+			collapsed: false,
+			children: [{ id: 'r2', text: 'Child', note: '', collapsed: false, children: [] }],
+		}])
+		const execute = vi.spyOn(history, 'execute')
+		wrapper = mount(OutlineEditor, { props: { history } })
+
+		await wrapper.find('button[aria-expanded="true"]').trigger('click')
+
+		expect(execute).toHaveBeenCalledWith(updateRow, ['r1', { collapsed: true }])
+		expect(history.current()[0].collapsed).toBe(true)
+		expect(wrapper.find('[data-row-id="r2"]').exists()).toBe(false)
+		history.undo()
+		expect(history.current()[0].collapsed).toBe(false)
+	})
+
 	it('renders handle, toggle/triangle/bullet, and note slots', () => {
 		const initialTree = [
 			{ id: 'r1', text: 'Row with slots', note: '', collapsed: false, children: [] },
