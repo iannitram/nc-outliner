@@ -20,6 +20,7 @@
     "@nextcloud/files": "^4.1.1",
     "@nextcloud/router": "^3.2.0",
     "@nextcloud/vue": "^9.14.0",
+    "craft-bugreport-web": "github:iannitram/craft-bugreport-web#4549b81",
     "vue": "^3.5.44"
   },
   "devDependencies": {

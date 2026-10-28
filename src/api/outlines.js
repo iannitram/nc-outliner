@@ -14,6 +14,12 @@ import { generateUrl } from '@nextcloud/router'
 const outlinesUrl = generateUrl('/apps/nc_outliner/api/outlines')
 const settingsUrl = generateUrl('/apps/nc_outliner/api/settings')
 
+/** @param {OutlineDoc} outline current edits @return {Promise<string>} OPML from the shared server writer */
+export async function exportOpml(outline) {
+	const response = await axios.post(generateUrl('/apps/nc_outliner/api/outline-opml'), { outline })
+	return response.data.data
+}
+
 /** @return {Promise<OutlineEntry[]>} */
 export async function listOutlines() {
 	const response = await axios.get(outlinesUrl)
@@ -52,7 +58,10 @@ export async function saveOutline(fileId, outline, etag) {
 	}
 }
 
-/** @param {number} fileId @param {OutlineDoc} outline @return {Promise<{fileId: number, name: string, etag: string}>} */
+/**
+ * @param {number} fileId @param {OutlineDoc} outline @return {Promise<{fileId: number, name: string, etag: string}>}
+ * @param outline
+ */
 export async function saveCopy(fileId, outline) {
 	const response = await axios.post(`${outlinesUrl}/${fileId}/copy`, { outline })
 	return response.data

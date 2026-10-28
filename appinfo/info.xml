@@ -13,6 +13,10 @@
         <php min-version="8.2"/>
         <nextcloud min-version="33" max-version="33"/>
     </dependencies>
+    <settings>
+        <admin>OCA\NcOutliner\Settings\Admin</admin>
+        <admin-section>OCA\NcOutliner\Settings\AdminSection</admin-section>
+    </settings>
     <navigations>
         <navigation>
             <name>Outliner</name>
