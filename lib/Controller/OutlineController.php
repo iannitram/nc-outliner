@@ -18,12 +18,15 @@ use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http;
 use OCP\IRequest;
 use OCP\IUserSession;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class OutlineController extends Controller {
 	public function __construct(
 		IRequest $request,
 		private readonly IOutlineStore $store,
 		private readonly IUserSession $userSession,
+		private readonly LoggerInterface $logger = new NullLogger(),
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -34,6 +37,9 @@ final class OutlineController extends Controller {
 			return new JSONResponse($this->store->list($this->uid()));
 		} catch (FolderConflictException $e) {
 			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_CONFLICT);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 
@@ -45,6 +51,9 @@ final class OutlineController extends Controller {
 			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
 		} catch (FolderConflictException $e) {
 			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_CONFLICT);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 
@@ -58,6 +67,9 @@ final class OutlineController extends Controller {
 			return new JSONResponse([], Http::STATUS_NOT_FOUND);
 		} catch (OpmlParseException) {
 			return new JSONResponse(['message' => 'This file is not a readable outline'], Http::STATUS_UNPROCESSABLE_ENTITY);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 
@@ -80,6 +92,9 @@ final class OutlineController extends Controller {
 			return new JSONResponse(['etag' => $e->currentEtag], Http::STATUS_PRECONDITION_FAILED);
 		} catch (NotFoundException) {
 			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 
@@ -97,6 +112,9 @@ final class OutlineController extends Controller {
 			);
 		} catch (NotFoundException) {
 			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 

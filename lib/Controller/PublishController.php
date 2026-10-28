@@ -19,6 +19,8 @@ use OCP\IRequest;
 use OCP\IURLGenerator;
 use OCP\IUserSession;
 use OCP\Lock\LockedException;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class PublishController extends Controller {
 	public function __construct(
@@ -26,6 +28,7 @@ final class PublishController extends Controller {
 		private readonly PublishService $publishService,
 		private readonly IUserSession $userSession,
 		private readonly IURLGenerator $urlGenerator,
+		private readonly LoggerInterface $logger = new NullLogger(),
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
@@ -49,6 +52,9 @@ final class PublishController extends Controller {
 			return new JSONResponse(['message' => 'The storage for this folder is unavailable. Try again later.'], Http::STATUS_SERVICE_UNAVAILABLE);
 		} catch (NotPermittedException) {
 			return new JSONResponse(['message' => 'Cannot save the document in this folder. It may be read-only.'], Http::STATUS_FORBIDDEN);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 }
