@@ -2,7 +2,7 @@
 
 Every module 1.0 needs: where it lives, what it owns, what it exports, which issue fills it, and who calls whom. Vue 3 on Nextcloud's own stack (ADR 0001), started fresh (ADR 0002). The spec is [SPEC.md](SPEC.md); tickets and order are in [docs/plan/1.0-work.md](docs/plan/1.0-work.md).
 
-Describes commit: 0b8d9e4 (2026-10-28)
+Describes commit: a91405a (2026-10-28)
 
 **Status** on each module: **present** (on main and working), **stub** (on main with its signatures, body throws "not implemented"; the issue fills it in), or **planned** (not on main yet; the issue creates the file at the path given). Move a module's status in the PR that changes it.
 
@@ -25,7 +25,7 @@ Merged in #84.
 | Path | What it is |
 |---|---|
 | `appinfo/info.xml` | App id `nc_outliner`, name "Outliner", Nextcloud 33 only, the navigation entry (route `nc_outliner.page.index`) |
-| `appinfo/routes.php` | Routes: `GET /` (page#index), the five outline routes, the publish route and the two settings routes (see [API](#api)). Later routes are added here |
+| `appinfo/routes.php` | Routes: `GET /` (page#index), the six outline routes (list, create, show, update, copy, export), the publish route, the two settings routes and the bug-report routes (see [API](#api)). Later routes are added here |
 | `lib/AppInfo/Application.php` | App bootstrap; holds `APP_ID`; registers `IOutlineStore` as an alias of `OutlineStore` |
 | `lib/Controller/PageController.php` | `index()` returns the `main` template |
 | `templates/main.php` | Loads the built script `js/nc_outliner-main.mjs` and stylesheet `css/nc_outliner-style.css`; has the mount div `#nc_outliner` |
@@ -97,7 +97,7 @@ Outline { title: string, rows: Tree, publishPath: string|null }
 
 - `id` is stable and kept in the file (`nco:id`). New rows get one from `newId()` in the browser or `bin2hex(random_bytes(8))` on the server when a file has none.
 - 1.0 rows have no rich text, styles or columns (SPEC Won'ts). The file keeps room for them: anything new goes in the `nco:` namespace, so no migration is forced later.
-- #94 adds `noteHidden: boolean` (a note shown or hidden per row). #27 adds `state` for imported checkbox state (kept in the file, not shown in 1.0).
+- `noteHidden: boolean` (a note shown or hidden per row) is present on `Row` (also an `extra` array for unknown attributes). #27 adds `state` for imported checkbox state (kept in the file, not shown in 1.0).
 
 ### OPML file layout
 
@@ -237,6 +237,9 @@ All routes are under `/apps/nc_outliner/api`, take and return JSON, and are `#[N
 | `GET /outlines/{fileId}` | | `200 {fileId, name, etag, outline}` · `404` · `422 {message}` when the file is not a readable outline | #108 |
 | `PUT /outlines/{fileId}` | `{outline}`, header `If-Match: <etag>` | `200 {etag}` · `412 {etag}` (changed elsewhere) · `404` · `400 {message}` without the header or without an `outline` with a `rows` array | #108 |
 | `POST /outlines/{fileId}/copy` | `{outline}` | `201 {fileId, name, etag}` · `404` · `400 {message}` as for `PUT` | #108 |
+| `POST /api/outline-opml` | `{outline}` | `200 {data}` (the merged OPML text, used by Report a bug) · `400 {message}` | #125 |
+| `POST /api/bugreport` | multipart zip | relays to the drop; five attempts per user per hour | #125 |
+| `POST /api/admin/bugreport` | `{base, token}` (admin) | saves the drop settings; the token is never echoed | #124 |
 | `POST /outlines/import` | multipart `file` | `201 {fileId, name, etag}` · `422 {message}` | #27 |
 | `GET /settings` · `PUT /settings` | `{theme}` (`PUT` only) | `200 {theme}` · `400 {message}` for a value other than `auto`, `light` or `dark` | #109 (merged in #151) |
 | Versions | | No routes: the browser uses WebDAV, see [Versions](#versions) and ADR 0004 | #4 |
@@ -280,7 +283,7 @@ Restore keeps the current state as a version (SPEC M10) with nothing added, but 
 
 | | |
 |---|---|
-| File | `lib/Service/OutlineStore.php` gains `import(string $uid, string $fileName, string $xml): array` (planned); route in `OutlineController` |
+| File | `lib/Service/OutlineStore.php` gains `import(string $uid, string $fileName, string $xml): array` (planned: neither the method nor its route exists yet); route in `OutlineController` |
 | Owns | An uploaded OPML file becomes a new outline in `Outlines/`, after a full parse (so a broken file is refused whole) |
 | Issue | #27 |
 
@@ -316,7 +319,7 @@ All browser code lives under `src/` (ES modules, Vue 3 `<script setup>`, Nextclo
 | File | `src/model/outline.js` (present) |
 | Tests | `tests/js/model/outline.test.js` (present) |
 | Owns | The tree and every change to it, as pure functions. Each returns a new tree, leaves its input unchanged, and moves a row's children with it. An operation that cannot apply (indent the first row, move the last row down) returns the input tree itself (`===`), which History reads as "no change" |
-| Issues | #86 `insertAfter`, `remove`, `moveUp`, `moveDown` · #104 `indent`, `outdent` · #105 `updateRow` (all merged) · #98 adds `moveTo` |
+| Issues | #86 `insertAfter`, `remove`, `moveUp`, `moveDown` · #104 `indent`, `outdent` · #105 `updateRow` (all merged) · #98 `moveTo` (present) · `sortRows(tree, by, direction)` (present) |
 | Called by | History, keyboard groups, drag |
 
 ```js
@@ -376,8 +379,8 @@ publish(fileId, folder, name): Promise<{ fileId, path, openUrl }>
 
 | | |
 |---|---|
-| Files | `src/editor/keymap.js` (present: the contract, `commandForKey`, `runCommand`, `modKey`, `isMac`), `src/editor/keys/editing.js`, `structure.js`, `move.js`, `fold.js` (stubs) |
-| Tests | `tests/js/editor/keys/<group>.test.js` (planned, one per group) |
+| Files | `src/editor/keymap.js` (present: the contract, `commandForKey`, `runCommand`, `modKey`, `isMac`), `src/editor/keys/editing.js`, `structure.js`, `move.js`, `fold.js` (present) |
+| Tests | `tests/js/editor/keys/<group>.test.js` (present, one per group; `editing.edgecases.test.js` adds the edge cases) |
 | Owns | Which key does what. Each group file owns its keys and its commands, so the key issues never edit the same file |
 | Issues | #107 editing · #92 structure · #95 move · #93 fold |
 | Called by | Editor (on keydown) |
@@ -408,8 +411,8 @@ Arrow keys alone (no modifier) keep their normal caret movement in every other c
 
 | | |
 |---|---|
-| File | `src/editor/saver.js` (planned) |
-| Tests | `tests/js/editor/saver.test.js` (planned; vitest fake timers) |
+| File | `src/editor/saver.js` (present) |
+| Tests | `tests/js/editor/saver.test.js` (present; vitest fake timers) |
 | Owns | When to save, the save status, retrying, and spotting a conflict (SPEC M13). No Save button |
 | Issue | #97 |
 | Called by | OutlineView |
@@ -429,19 +432,27 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | File | Owns | Issue | Status |
 |---|---|---|---|
 | `src/App.vue` | Shell: the list, or one outline when the URL hash is `#/outline/<fileId>` (no router library); the theme class | #90, #96 | present (skeleton) |
-| `src/views/OutlineList.vue` | My outlines, New outline, open one, Import | #90, #27 | planned |
-| `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, publish, and the clock button that toggles the versions sidebar (teleported into `#content-vue`); a picked version replaces the editor with a read-only `OutlineEditor` under the "Restore this version / Back to current" banner | #90, #97, #185 | planned |
+| `src/views/OutlineList.vue` | My outlines, New outline, open one. Import is hidden until #27 | #90, #27 | present (Import planned) |
+| `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, publish, and the clock button that toggles the versions sidebar (teleported into `#content-vue`); a picked version replaces the editor with a read-only `OutlineEditor` under the "Restore this version / Back to current" banner | #90, #97, #185 | present |
 | `src/components/OutlineEditor.vue` | Renders the tree from History, caret and focus by row id, keydown to the keymap | #91 | present |
 | `src/components/OutlineRow.vue` | One row: handle, disclosure triangle or bullet, a plain text input (no rich text in 1.0), the note under it | #91, #93, #94, #98 | present |
 | `src/components/OutlineTopBar.vue` | Slim top bar: title, Publish, Versions icon button and ⋯ actions | #183 | present |
 | `src/components/StatusLine.vue` | Status line: Saved / Saving / Can't save (retrying), row/word counts, last-published link | #183 | present |
-| `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | planned |
+| `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | present |
+| `src/components/SortDialog.vue` | Sort dialog opened from the top bar ⋯ menu; applies `sortRows` from `src/model/outline.js` through `OutlineView` | | present |
+| `src/components/KeyboardHints.vue` | Card above the editor listing the main keys; hides itself after five uses of the editor or on "Hide" (remembered in `localStorage`). Used by `OutlineEditor` | | present |
+| `src/components/VersionsSidebar.vue` | Wraps `VersionsPanel` for the shell; mounted by `App.vue` and driven by `src/views/versionsSidebarState.js` (`versionsSidebar` reactive state, `resetVersionsSidebar()`), which `OutlineView` writes to | #185 | present |
+| `src/icons.js` | The few Material Design icon paths the UI uses (clock, eye, tag, alert) | | present |
+| `src/utils/format.js` | `formatOutlineName(name)` and `formatRelativeTime(mtime, now, locale)` for the list and status line | | present |
+| `lib/Controller/BugReportController.php` | `POST /api/bugreport`: relays one bug-report zip to the drop (see the Report a bug row above) | #125 | present |
+| `lib/Controller/AdminController.php` | `POST /api/admin/bugreport`: saves the drop base and token (admin only) | #124 | present |
+| `lib/Settings/Admin.php` + `AdminSection.php` + `templates/settings-admin.php` | The admin-panel section "Outliner" and its form | #124 | present |
 | `src/components/VersionsPanel.vue` | The versions `NcAppSidebar` (right column): list grouped Today / Yesterday / Earlier with Current first, name tags, unreadable marks, a ⋯ menu (Restore, Name this version, naming in place), the green naming offer after a restore, Escape closes. Emits `preview` / `restored` / `close`; exposes `restore(id)` | #111, #185 | present |
 | `src/model/versionTree.js` | `parseVersionTree(text)`: an old version's OPML as a row tree for the preview, or null (never raw text) | #180, #185 | present |
 | `src/components/PublishButton.vue` | Publish to Doc: folder picker, then open in Nextcloud Office | #9 | present |
 | `src/components/ThemeSetting.vue` | Auto / Light / Dark | #96 | present |
 | **TEMPORARY** `src/services/crashLog.js` (with `lib/Controller/ClientLogController.php`, the route, and the `crash_log` switch read through `data-crash-log` on `#nc_outliner`) | Uncaught errors, unhandled rejections, Vue component errors and the app's save failures and conflicts, sent batched (one POST at most every 2 s) and at most 20 a minute per page (the rest dropped), sanitized on both sides. `installCrashLog()` is the first call in `src/main.js`. Remove after the crash-rate review (owner, 2026-10-28) | #177 | present (temporary) |
-| `src/main.js` + `src/App.vue` (Report a bug) | `installErrorBuffer()` first at startup; shared `ReportButton` in navigation with version/commit/Nextcloud version from initial state, same-origin relay URL and CSRF header. `OutlineView.getWorkingFile()` serializes current edits via `POST /api/outline-opml` and the merged PHP OPML writer, or returns null on the list. `BugReportController::relay` accepts one zip, validates name/10 MB limit, limits each user to five attempts per rolling hour (IConfig timestamps), then PUTs it unchanged through IClientService. Drop base/token remain server-side in IAppConfig, edited through the admin-only CSRF-protected Outliner section (`lib/Settings/`, `AdminController`, `templates/settings-admin.php`); the saved token is never echoed. `appinfo/build.json` is generated by Vite with the source commit. | #124, #125 | present (this branch) |
+| `src/main.js` + `src/App.vue` (Report a bug) | `installErrorBuffer()` first at startup; shared `ReportButton` in navigation with version/commit/Nextcloud version from initial state, same-origin relay URL and CSRF header. `OutlineView.getWorkingFile()` serializes current edits via `POST /api/outline-opml` and the merged PHP OPML writer, or returns null on the list. `BugReportController::relay` accepts one zip, validates name/10 MB limit, limits each user to five attempts per rolling hour (IConfig timestamps), then PUTs it unchanged through IClientService. Drop base/token remain server-side in IAppConfig, edited through the admin-only CSRF-protected Outliner section (`lib/Settings/`, `AdminController`, `templates/settings-admin.php`); the saved token is never echoed. `appinfo/build.json` is generated by Vite with the source commit. | #124, #125 | present |
 | `appinfo/info.xml` + `.github/workflows/release.yml` (updates from the admin panel) | The release fields the private app-store feed reads (id, a.b.c version, Nextcloud 33 range, PHP minimum; guarded by `tests/js/release/infoxml.test.js`) and the tag workflow that calls the feed's build workflow; signing and publishing happen outside CI, never in CI | #128, #129, #130 | planned |
 
 Colours come only from Nextcloud's theme variables (`--color-main-background`, `--color-main-text`, `--color-border` and the rest), so the app follows Nextcloud's dark and light mode with no code. The Light or Dark override forces the theme using `@nextcloud/vue`'s `NcThemeProvider` (`:dark="theme === 'dark'"` and `:light="theme === 'light'"`), scoping `[data-theme-dark]` and `[data-theme-light]` across the app shell.
