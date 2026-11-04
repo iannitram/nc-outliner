@@ -118,7 +118,24 @@ These refinements of existing features are in [PR #199](https://github.com/ianni
 | 69 | F67 | **Regex find** | Low | Needs F23 |
 | 70 | F68 | **Export PowerPoint (.pptx):** top-level rows become slides | High | Needs F07's document model |
 | 71 | F69 | **Password-protected outlines** (client-side encryption) | High | Needs F01. Nextcloud's own encryption may be enough; decide before building |
-| 72 | F70 | **Automation and plug-ins:** a scripting API for the outline (the Omni Automation stand-in) | High | Needs a stable internal API, so after most of the above |
+| 72 | F70 | **Automation and plug-ins:** a scripting API for the outline (the Omni Automation stand-in) | High | Needs a stable internal API, so after most of the above. The scripting part moved to [Automation](#automation-after-10-added-2026-11-03-my-decision) (F77, added 2026-11-03); F70 keeps plug-ins (my own code loaded into the app) |
+
+### Automation (after 1.0, added 2026-11-03, my decision)
+
+Drive the outliner with no browser: a command line, an MCP server and script files, so an agent or I can test and iterate quickly, and an AI can use the outliner as a tool. It comes **right after the 1.0 work**, ahead of the after-1.0 rows in the table above, and does not change 1.0 (SPEC is unchanged).
+
+How it fits this app: the outline operations live in the browser model (`src/model/outline.js`, `src/model/history.js`), which has no browser dependencies, so **headless** means running that same model in Node on a local `.opml` file, reading and writing OPML and `.odt` through the app's own pure PHP classes (one codec, one publisher). **Attach** means talking to a running Nextcloud through the app's own JSON API with an app password. The command line is a small Node client (`nco`), not an `occ` command: an `occ` command would need a second copy of the model in PHP and a shell on the server. Same split as our other apps (core, command line, MCP, scripts); nothing is dropped. Code map: [Automation](CODEMAP.md#automation).
+
+Order: F74 first, then F77, then F75, then F76.
+
+| ID | Feature | Complexity | Notes |
+|---|---|---|---|
+| F74 | **Automation core:** one backend contract and one table of named outline operations, with a headless backend (the model in Node on a local `.opml`) and an attach backend (a running Nextcloud through the app's API) | High | #213. Needs F01, F05, F07 (all 1.0). First check: the app's routes accept an app password from outside the browser |
+| F75 | **Command line** `nco`: `list`, `show`, `run <script>`, `publish`, `mcp`; headless by default, `--attach` for a server | Medium | #214. Needs F74, F77 |
+| F76 | **MCP server** over stdio: list, open and create outlines; add, edit, delete, move, indent, outdent, collapse, expand and sort rows; run a script; undo, redo, save, Publish to Doc | Medium | #215. Needs F74, F75, F77. Column tools come with F43 and checkbox tools with F10 |
+| F77 | **Scripts:** a text file of outline operations, one per line, checked whole and applied as one undo step; headless, through MCP, or from the ⋯ menu in the browser | Medium | #216. Needs F74 |
+
+**Done when** an AI agent completes 10 real editing tasks through the MCP server with no browser, and the same 10 with `--attach` against a test Nextcloud (F76's test).
 
 ---
 
@@ -131,7 +148,7 @@ These refinements of existing features are in [PR #199](https://github.com/ianni
 | Touch Bar customization | Mac hardware | None |
 | LinkBack (edit embedded content in its source app) | macOS inter-app protocol | F38 opens attachments in their own Nextcloud app |
 | Liquid Glass design, Apple Vision Pro app | Apple platform UI | F31 themes |
-| Apple Shortcuts actions, Apple Intelligence plug-ins | Apple platform | F70 |
+| Apple Shortcuts actions, Apple Intelligence plug-ins | Apple platform | F70 plug-ins; F75 command line and F76 MCP server |
 | Dictation, Emoji & Symbols window | Provided by the OS and browser | Works in any text field already |
 | Universal licensing, free trial, Free Viewer Mode | Commercial licensing | None (private app) |
 | Share to another app as plain text | macOS share sheet | F35 export, F36 row links |

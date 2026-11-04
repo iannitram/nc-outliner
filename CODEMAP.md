@@ -13,6 +13,7 @@ Describes commit: a91405a (2026-10-28)
 - [Data shapes](#data-shapes)
 - Server (PHP): [OPML codec](#opml-codec) · [ODT writer](#odt-writer) · [ODT package](#odt-package) · [Outline store](#outline-store) · [API](#api) · [Theme setting](#theme-setting) · [Versions](#versions) · [Import](#import) · [Publish](#publish)
 - Browser (JS): [Outline model](#outline-model) · [History (undo and redo)](#history-undo-and-redo) · [Browser API client](#browser-api-client) · [Keyboard](#keyboard) · [Saver](#saver) · [Views and components](#views-and-components)
+- [Automation](#automation) (planned, after 1.0, added 2026-11-03): command line, MCP server, scripts
 - [Mac, PC and Linux](#mac-pc-and-linux)
 - [Open-source pieces](#open-source-pieces)
 - [Tests](#tests)
@@ -456,6 +457,26 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | `appinfo/info.xml` + `.github/workflows/release.yml` (updates from the admin panel) | The release fields the private app-store feed reads (id, a.b.c version, Nextcloud 33 range, PHP minimum; guarded by `tests/js/release/infoxml.test.js`) and the tag workflow that calls the feed's build workflow; signing and publishing happen outside CI, never in CI | #128, #129, #130 | planned |
 
 Colours come only from Nextcloud's theme variables (`--color-main-background`, `--color-main-text`, `--color-border` and the rest), so the app follows Nextcloud's dark and light mode with no code. The Light or Dark override forces the theme using `@nextcloud/vue`'s `NcThemeProvider` (`:dark="theme === 'dark'"` and `:light="theme === 'light'"`), scoping `[data-theme-dark]` and `[data-theme-light]` across the app shell.
+
+## Automation
+
+Planned, after 1.0 (added 2026-11-03, my decision; [ROADMAP.md](ROADMAP.md), Automation, F74-F77). None of these files exist yet; each row turns present when its issue merges. They let the outline be edited with no browser: headless on a local `.opml` file, or attached to a running Nextcloud through the [API](#api).
+
+| File | Owns | Issue | Status |
+|---|---|---|---|
+| `src/automation/operations.js` | The named outline operations (`add`, `edit`, `delete`, `moveUp`, `moveDown`, `moveTo`, `indent`, `outdent`, `collapse`, `expand`, `sort`), each a call into the [Outline model](#outline-model); a row is named by id or by a position path (`1.2`). Pure (no DOM, no Node API), so the Vite build and Node both import it. A later feature that adds a row field (F10 checkboxes, F43 columns) adds its op here | #213 (F74) | planned |
+| `cli/backend.mjs` | The `Backend` contract (list, read, apply ops, undo, redo, save, publish) and `applyAll(tree, steps)`, one composite op so [History](#history-undo-and-redo) records a batch as one undo step | #213 (F74) | planned |
+| `cli/headless.mjs` | `Headless`: the model and History in Node over a folder of `.opml` files | #213 (F74) | planned |
+| `cli/pure.php` | `opml-to-json`, `json-to-opml`, `json-to-odt` on stdin and stdout, through the [OPML codec](#opml-codec), [ODT writer](#odt-writer) and [ODT package](#odt-package), so headless reads, writes and publishes with the same code as the server. PHP found as `tests/tools/php.mjs` finds it (lookup moved into a shared helper) | #213 (F74) | planned |
+| `cli/attach.mjs` | `Attach`: the [API](#api) routes from outside the browser (`GET /api/outlines`, `GET`/`PUT /api/outlines/{fileId}` with `If-Match`, `POST .../publish`) with an app password from `NCO_APP_PASSWORD` only; a `412` is "changed elsewhere", never overwritten | #213 (F74) | planned |
+| `src/automation/script.js` | Script files: `parseScript(text)` (one op per line, `#` comments, quoted text, ids, paths, `$n` for rows the script added) and `scriptOp(steps)`; checked whole, a bad line changes nothing and is named | #216 (F77) | planned |
+| `src/components/ScriptDialog.vue` | Run script… from the ⋯ menu of `OutlineTopBar.vue`: paste or pick a text file, run as one `history.execute`; wired in `OutlineView.vue` like `SortDialog.vue`, mounted in `#nc-outliner-dialogs` | #216 (F77) | planned |
+| `cli/nco.mjs` | The `nco` command (`package.json` `bin`): `list`, `show`, `run <script> <outline>`, `publish`, `mcp`; headless by default, `--attach` for a server; `util.parseArgs` | #214 (F75) | planned |
+| `cli/mcp.mjs` | The MCP server (JSON-RPC 2.0 over stdio), started by `nco mcp [--attach]`: one tool per backend call or op, plus `run_script`, `undo`, `redo`, `save`, `publish_to_doc` | #215 (F76) | planned |
+
+How they link: `nco` and the MCP server pick `Headless` or `Attach`; both backends apply the same `operations.js` ops through the same `createHistory`, and scripts become one composite op, so a script is one undo step in the browser and in a headless session alike. Nothing in `lib/` changes: headless uses the pure PHP classes through `cli/pure.php`, and attach uses the routes that exist. `cli/` is a developer and agent tool, left out of the app package the release workflow (#129) builds.
+
+Mac, PC and Linux: Node and PHP run on all three; paths go through `node:path`; the PHP lookup is the one the tests already use on all three.
 
 ## Mac, PC and Linux
 
