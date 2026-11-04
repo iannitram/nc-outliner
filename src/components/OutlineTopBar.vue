@@ -1,7 +1,8 @@
 <script setup>
-import { NcActionButton, NcActions, NcButton } from '@nextcloud/vue'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { NcActionButton, NcActions, NcButton, NcIconSvgWrapper } from '@nextcloud/vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import PublishButton from './PublishButton.vue'
+import { mdiContentCopy, mdiDeleteOutline, mdiDownload, mdiPencilOutline } from '../icons.js'
 
 const props = defineProps({
 	title: {
@@ -35,7 +36,38 @@ const props = defineProps({
 	},
 })
 
-defineEmits(['published', 'openVersions', 'openSort'])
+const emit = defineEmits(['published', 'openVersions', 'openSort', 'rename', 'duplicate', 'export', 'delete'])
+
+// #218: click the title to rename the outline. Enter or leaving the field saves; Escape cancels.
+const editingTitle = ref(false)
+const draftTitle = ref('')
+const titleInput = ref(null)
+
+/** Turn the title into a text field holding the current name. */
+async function startRename() {
+	draftTitle.value = props.title
+	editingTitle.value = true
+	await nextTick()
+	titleInput.value?.focus()
+	titleInput.value?.select()
+}
+
+/** Leave the text field and rename when the name changed. */
+function commitRename() {
+	if (!editingTitle.value) {
+		return
+	}
+	editingTitle.value = false
+	const next = draftTitle.value.trim()
+	if (next !== '' && next !== props.title) {
+		emit('rename', next)
+	}
+}
+
+/** Leave the text field without renaming. */
+function cancelRename() {
+	editingTitle.value = false
+}
 
 const topBarRef = ref(null)
 const observedNarrow = ref(false)
@@ -66,8 +98,25 @@ onUnmounted(() => {
 <template>
 	<header ref="topBarRef" class="outline-top-bar tb" :class="{ 'outline-top-bar--narrow': effectiveNarrow }">
 		<span class="nav-toggle-spacer" aria-hidden="true" />
-		<h1 class="title" :title="title">
-			{{ title }}
+		<input
+			v-if="editingTitle"
+			ref="titleInput"
+			v-model="draftTitle"
+			class="title title-input"
+			type="text"
+			aria-label="Outline name"
+			maxlength="250"
+			@keydown.enter.prevent="commitRename"
+			@keydown.esc.prevent.stop="cancelRename"
+			@blur="commitRename">
+		<h1 v-else class="title" :title="title">
+			<button
+				type="button"
+				class="title-button"
+				aria-label="Rename outline"
+				@click="startRename">
+				{{ title }}
+			</button>
 		</h1>
 		<span class="spacer sp" />
 		<PublishButton
@@ -123,6 +172,30 @@ onUnmounted(() => {
 				<NcActionButton @click="$emit('openVersions')">
 					Versions
 				</NcActionButton>
+				<NcActionButton closeAfterClick @click="startRename">
+					<template #icon>
+						<NcIconSvgWrapper :path="mdiPencilOutline" />
+					</template>
+					Rename
+				</NcActionButton>
+				<NcActionButton closeAfterClick @click="$emit('duplicate')">
+					<template #icon>
+						<NcIconSvgWrapper :path="mdiContentCopy" />
+					</template>
+					Duplicate
+				</NcActionButton>
+				<NcActionButton closeAfterClick @click="$emit('export')">
+					<template #icon>
+						<NcIconSvgWrapper :path="mdiDownload" />
+					</template>
+					Export (.opml)
+				</NcActionButton>
+				<NcActionButton closeAfterClick @click="$emit('delete')">
+					<template #icon>
+						<NcIconSvgWrapper :path="mdiDeleteOutline" />
+					</template>
+					Delete
+				</NcActionButton>
 			</slot>
 		</NcActions>
 	</header>
@@ -157,6 +230,38 @@ onUnmounted(() => {
 	padding: 0 6px;
 	margin: 0;
 	color: var(--color-main-text);
+}
+
+/* The title reads as plain text until hovered, like a document name in Files or Drive. */
+.title-button {
+	all: unset;
+	display: block;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	padding: 4px 6px;
+	margin-inline: -6px;
+	border-radius: var(--border-radius, 6px);
+	cursor: text;
+}
+
+.title-button:hover,
+.title-button:focus-visible {
+	background-color: var(--color-background-hover);
+}
+
+.title-button:focus-visible {
+	outline: 2px solid var(--color-primary-element);
+}
+
+.title-input {
+	flex: 0 1 360px;
+	font: inherit;
+	font-size: 16px;
+	font-weight: 600;
+	height: 36px;
+	margin: 0;
 }
 
 .spacer {

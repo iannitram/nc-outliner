@@ -50,6 +50,49 @@ describe('OutlineRow', () => {
 		expect(emitted[emitted.length - 1][1]).toBe('one two three tail')
 	})
 
+	it('inserts pasted plain text at the caret as one line (#220)', async () => {
+		const row = { id: 'r1', text: 'ab', note: '', collapsed: false, children: [] }
+		wrapper = mount(OutlineRow, { props: { row }, attachTo: document.body })
+		const input = wrapper.get('textarea.outline-row__input')
+		input.element.setSelectionRange(1, 1)
+		const event = new Event('paste', { bubbles: true, cancelable: true })
+		event.clipboardData = { getData: (type) => (type === 'text/plain' ? 'one\r\ntwo' : '') }
+		input.element.dispatchEvent(event)
+		expect(event.defaultPrevented).toBe(true)
+		expect(input.element.value).toBe('aone twob')
+		expect(input.element.selectionStart).toBe(8)
+		const emitted = wrapper.emitted('input-text')
+		expect(emitted[emitted.length - 1].slice(0, 2)).toEqual(['r1', 'aone twob'])
+	})
+
+	it('replaces selected text on paste and passes the result to the editor', () => {
+		const row = { id: 'r1', text: 'hello world', note: '', collapsed: false, children: [] }
+		const onInput = vi.fn()
+		wrapper = mount(OutlineRow, {
+			props: { row },
+			global: { provide: { outlineEditor: { onInput, registerInput() {}, unregisterInput() {} } } },
+			attachTo: document.body,
+		})
+		const input = wrapper.get('textarea.outline-row__input')
+		input.element.setSelectionRange(6, 11)
+		const event = new Event('paste', { bubbles: true, cancelable: true })
+		event.clipboardData = { getData: () => 'there' }
+		input.element.dispatchEvent(event)
+		expect(input.element.value).toBe('hello there')
+		expect(onInput).toHaveBeenCalledTimes(1)
+		expect(onInput.mock.calls[0][0]).toEqual(row)
+		expect(onInput.mock.calls[0][1].target.value).toBe('hello there')
+	})
+
+	it('leaves an empty or non-text paste to the browser', () => {
+		const row = { id: 'r1', text: '', note: '', collapsed: false, children: [] }
+		wrapper = mount(OutlineRow, { props: { row }, attachTo: document.body })
+		const event = new Event('paste', { bubbles: true, cancelable: true })
+		event.clipboardData = { getData: () => '' }
+		wrapper.get('textarea.outline-row__input').element.dispatchEvent(event)
+		expect(event.defaultPrevented).toBe(false)
+	})
+
 	it('grows wrapped text on input, width changes and History updates, then disconnects', async () => {
 		let resize
 		const disconnect = vi.fn()

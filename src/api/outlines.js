@@ -103,3 +103,57 @@ export async function publish(fileId, folder, name) {
 		throw err
 	}
 }
+
+/**
+ * Rename an outline file. The server also sets the outline's title to the new name.
+ *
+ * @param {number} fileId outline file id
+ * @param {string} name new name, without .opml
+ * @return {Promise<{fileId: number, name: string, etag: string}>} the renamed file
+ */
+export async function renameOutline(fileId, name) {
+	try {
+		const response = await axios.put(`${outlinesUrl}/${fileId}/name`, { name })
+		return response.data
+	} catch (error) {
+		const err = new Error(error.response?.data?.message || error.message)
+		err.response = error.response
+		throw err
+	}
+}
+
+/**
+ * @param {number} fileId outline file id
+ * @return {Promise<{fileId: number, name: string, etag: string}>} the new copy
+ */
+export async function duplicateOutline(fileId) {
+	const response = await axios.post(`${outlinesUrl}/${fileId}/duplicate`)
+	return response.data
+}
+
+/**
+ * Move an outline to the Nextcloud trash bin.
+ *
+ * @param {number} fileId outline file id
+ */
+export async function deleteOutline(fileId) {
+	await axios.delete(`${outlinesUrl}/${fileId}`)
+}
+
+/**
+ * Download the stored .opml file to the computer.
+ *
+ * @param {number} fileId outline file id
+ * @param {string} name file name to save as
+ */
+export async function downloadOutline(fileId, name) {
+	const response = await axios.get(`${outlinesUrl}/${fileId}/download`, { responseType: 'blob' })
+	const url = URL.createObjectURL(response.data)
+	const link = document.createElement('a')
+	link.href = url
+	link.download = name
+	document.body.appendChild(link)
+	link.click()
+	link.remove()
+	setTimeout(() => URL.revokeObjectURL(url), 1000)
+}

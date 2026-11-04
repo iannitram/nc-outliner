@@ -97,7 +97,7 @@ describe('OutlineTopBar.vue', () => {
 			},
 		})
 		const entries = wrapper.findAllComponents({ name: 'NcActionButton' })
-		expect(entries.map((entry) => entry.text())).toEqual(['Sort rows…', 'Versions'])
+		expect(entries.map((entry) => entry.text())).toEqual(['Sort rows…', 'Versions', 'Rename', 'Duplicate', 'Export (.opml)', 'Delete'])
 		await entries[0].find('button').trigger('click')
 		expect(wrapper.emitted('openSort')).toHaveLength(1)
 		await entries[1].find('button').trigger('click')
@@ -185,5 +185,43 @@ describe('OutlineTopBar.vue', () => {
 			expect(publishBtnComponent.props('iconOnly')).toBe(true)
 			expect(wrapper.find('.publish-button-text').exists()).toBe(false)
 		})
+	})
+})
+
+describe('OutlineTopBar title rename (#218)', () => {
+	it('turns the title into a field on click and emits the new name on Enter', async () => {
+		const wrapper = mount(OutlineTopBar, { props: { title: 'Untitled', fileId: 42 }, attachTo: document.body })
+		await wrapper.get('button.title-button').trigger('click')
+		const field = wrapper.get('input.title-input')
+		expect(field.element.value).toBe('Untitled')
+		expect(document.activeElement).toBe(field.element)
+		await field.setValue('  Trip plan ')
+		await field.trigger('keydown', { key: 'Enter' })
+		expect(wrapper.emitted('rename')).toEqual([['Trip plan']])
+		expect(wrapper.find('input.title-input').exists()).toBe(false)
+		wrapper.unmount()
+	})
+
+	it('saves once when the field loses focus after Enter', async () => {
+		const wrapper = mount(OutlineTopBar, { props: { title: 'Untitled', fileId: 42 } })
+		await wrapper.get('button.title-button').trigger('click')
+		const field = wrapper.get('input.title-input')
+		await field.setValue('Plan')
+		await field.trigger('blur')
+		expect(wrapper.emitted('rename')).toEqual([['Plan']])
+	})
+
+	it('cancels on Escape and ignores an unchanged or empty name', async () => {
+		const wrapper = mount(OutlineTopBar, { props: { title: 'Untitled', fileId: 42 } })
+		await wrapper.get('button.title-button').trigger('click')
+		await wrapper.get('input.title-input').setValue('Other')
+		await wrapper.get('input.title-input').trigger('keydown', { key: 'Escape' })
+		expect(wrapper.find('input.title-input').exists()).toBe(false)
+		await wrapper.get('button.title-button').trigger('click')
+		await wrapper.get('input.title-input').setValue('   ')
+		await wrapper.get('input.title-input').trigger('blur')
+		await wrapper.get('button.title-button').trigger('click')
+		await wrapper.get('input.title-input').trigger('blur')
+		expect(wrapper.emitted('rename')).toBeUndefined()
 	})
 })

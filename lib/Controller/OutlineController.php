@@ -14,7 +14,9 @@ use OCA\NcOutliner\Service\FolderConflictException;
 use OCA\NcOutliner\Service\NotFoundException;
 use OCA\NcOutliner\Service\IOutlineStore;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http;
 use OCP\IRequest;
@@ -120,6 +122,60 @@ final class OutlineController extends Controller {
 				$this->store->saveCopy($this->uid(), $fileId, $this->outlineFromArray($outline)),
 				Http::STATUS_CREATED,
 			);
+		} catch (NotFoundException) {
+			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
+	}
+
+	#[NoAdminRequired]
+	public function rename(int $fileId, string $name = ''): JSONResponse {
+		try {
+			return new JSONResponse($this->store->rename($this->uid(), $fileId, $name));
+		} catch (\InvalidArgumentException $e) {
+			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (ConflictException $e) {
+			return new JSONResponse(['etag' => $e->currentEtag], Http::STATUS_CONFLICT);
+		} catch (NotFoundException) {
+			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
+	}
+
+	#[NoAdminRequired]
+	public function duplicate(int $fileId): JSONResponse {
+		try {
+			return new JSONResponse($this->store->duplicate($this->uid(), $fileId), Http::STATUS_CREATED);
+		} catch (NotFoundException) {
+			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
+	}
+
+	#[NoAdminRequired]
+	public function destroy(int $fileId): JSONResponse {
+		try {
+			$this->store->delete($this->uid(), $fileId);
+			return new JSONResponse([]);
+		} catch (NotFoundException) {
+			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
+	}
+
+	#[NoAdminRequired]
+	public function download(int $fileId): Response {
+		try {
+			$file = $this->store->download($this->uid(), $fileId);
+			return new DataDownloadResponse($file['content'], $file['name'], 'text/x-opml');
 		} catch (NotFoundException) {
 			return new JSONResponse([], Http::STATUS_NOT_FOUND);
 		} catch (\Throwable $e) {

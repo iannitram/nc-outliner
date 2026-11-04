@@ -17,6 +17,7 @@ import { crashLogWarning } from '../services/crashLog.js' // TEMPORARY: remove a
 import { resetVersionsSidebar, versionsSidebar } from './versionsSidebarState.js'
 
 const props = defineProps({ fileId: { type: Number, required: true } })
+const emit = defineEmits(['rename', 'duplicate', 'export', 'delete'])
 const loading = ref(true)
 const error = ref('')
 const name = ref('')
@@ -298,7 +299,21 @@ function undoOutsideRows(event) {
 	}
 }
 
-defineExpose({ beforeLeave, getWorkingFile })
+/** Read the outline again, for example after it was renamed. */
+async function reload() {
+	await load()
+}
+
+/** Stop autosave for this outline without saving, before its file is deleted. */
+function discard() {
+	unsubscribe?.()
+	unsubscribe = null
+	saver?.destroy()
+	saver = null
+	currentSession = null
+}
+
+defineExpose({ beforeLeave, getWorkingFile, reload, discard })
 
 onMounted(() => {
 	Object.assign(versionsSidebar, {
@@ -353,7 +368,11 @@ watch(() => props.fileId, () => {
 				:sortDisabled="Boolean(preview)"
 				@published="onPublished"
 				@openVersions="toggleVersions"
-				@openSort="sortOpen = !preview" />
+				@openSort="sortOpen = !preview"
+				@rename="(newName) => emit('rename', newName)"
+				@duplicate="emit('duplicate')"
+				@export="emit('export')"
+				@delete="emit('delete')" />
 			<template v-if="preview">
 				<div class="version-banner" role="status">
 					<NcIconSvgWrapper class="version-banner__icon" :path="mdiEyeOutline" :size="20" />
