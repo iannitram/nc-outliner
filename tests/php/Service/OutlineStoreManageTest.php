@@ -102,6 +102,12 @@ final class OutlineStoreManageTest extends TestCase {
 		$this->store->rename('alice', 10, 'a/b');
 	}
 
+	public function testRenameRefusesALeadingDot(): void {
+		$this->file(10, 'Plan.opml');
+		$this->expectException(\InvalidArgumentException::class);
+		$this->store->rename('alice', 10, '.hidden');
+	}
+
 	public function testRenameWhileASaveHoldsTheLockIsAConflict(): void {
 		$root = $this->createMock(IRootFolder::class);
 		$user = $this->createMock(Folder::class);

@@ -384,6 +384,10 @@ final class OutlineStore implements IOutlineStore {
 			throw new \InvalidArgumentException('Name cannot have trailing dots or spaces');
 		}
 
+		if (str_starts_with($name, '.')) {
+			throw new \InvalidArgumentException('Name cannot start with a dot');
+		}
+
 		if (str_ends_with(strtolower($name), '.opml')) {
 			$baseName = substr($name, 0, -5);
 			if ($baseName === '') {
