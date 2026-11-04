@@ -1,14 +1,17 @@
 <script setup>
 import { getRequestToken } from '@nextcloud/auth'
+import { showConfirmation, showError, showSuccess } from '@nextcloud/dialogs'
 import { loadState } from '@nextcloud/initial-state'
 import { generateUrl } from '@nextcloud/router'
 import {
+	NcActionButton,
 	NcAppContent,
 	NcAppNavigation,
 	NcAppNavigationItem,
 	NcAppNavigationNew,
 	NcAppNavigationSettings,
 	NcContent,
+	NcIconSvgWrapper,
 	NcThemeProvider,
 } from '@nextcloud/vue'
 import { ReportButton } from 'craft-bugreport-web'
@@ -17,7 +20,16 @@ import ThemeSetting from './components/ThemeSetting.vue'
 import VersionsSidebar from './components/VersionsSidebar.vue'
 import OutlineList from './views/OutlineList.vue'
 import OutlineView from './views/OutlineView.vue'
-import { createOutline, getSettings, listOutlines } from './api/outlines.js'
+import {
+	createOutline,
+	deleteOutline,
+	downloadOutline,
+	duplicateOutline,
+	getSettings,
+	listOutlines,
+	renameOutline,
+} from './api/outlines.js'
+import { mdiContentCopy, mdiDeleteOutline, mdiDownload } from './icons.js'
 import { formatOutlineName, formatRelativeTime } from './utils/format.js'
 
 const STORAGE_KEY = 'nc_outliner_last_outline'
@@ -251,6 +263,143 @@ async function onOutlineOpened(newId) {
 	await selectOutline(newId)
 }
 
+/**
+ * Save the open outline's pending edits before acting on its file.
+ *
+ * @param {number} id outline file id
+ * @return {Promise<boolean>} false when edits for that outline are still unsaved
+ */
+async function flushIfOpen(id) {
+	if (id !== fileId.value || !outlineView.value?.beforeLeave) {
+		return true
+	}
+	return outlineView.value.beforeLeave()
+}
+
+/**
+ * @param {number} id outline file id
+ * @return {object|undefined} its entry in the navigation list
+ */
+function findEntry(id) {
+	return outlines.value.find((o) => o.fileId === id)
+}
+
+/**
+ * Rename an outline from the sidebar or the top bar title (#218, #219).
+ *
+ * @param {number} id outline file id
+ * @param {string} newName the typed name, without .opml
+ */
+async function renameEntry(id, newName) {
+	const entry = findEntry(id)
+	const trimmed = String(newName ?? '').trim()
+	if (!entry || trimmed === '' || trimmed === formatOutlineName(entry.name)) {
+		return
+	}
+	if (!(await flushIfOpen(id))) {
+		showError('Your changes are still unsaved, so the outline was not renamed.')
+		return
+	}
+	try {
+		await renameOutline(id, trimmed)
+	} catch (error) {
+		showError(error.response?.status === 400 ? error.message : 'Could not rename the outline.')
+		return
+	}
+	await refreshOutlines()
+	if (id === fileId.value) {
+		await outlineView.value?.reload?.()
+	}
+}
+
+/**
+ * @param {number} id outline file id
+ */
+async function duplicateEntry(id) {
+	if (!(await flushIfOpen(id))) {
+		showError('Your changes are still unsaved, so the outline was not duplicated.')
+		return
+	}
+	try {
+		const copy = await duplicateOutline(id)
+		await refreshOutlines()
+		showSuccess(`Made ${formatOutlineName(copy.name)}`)
+	} catch {
+		showError('Could not duplicate the outline.')
+	}
+}
+
+/**
+ * Download the outline's .opml file.
+ *
+ * @param {number} id outline file id
+ */
+async function exportEntry(id) {
+	const entry = findEntry(id)
+	if (!entry) {
+		return
+	}
+	if (!(await flushIfOpen(id))) {
+		showError('Your changes are still unsaved, so the outline was not exported.')
+		return
+	}
+	try {
+		await downloadOutline(id, entry.name)
+	} catch {
+		showError('Could not export the outline.')
+	}
+}
+
+/**
+ * Move an outline to the trash bin after asking. Deleting the open outline opens the next one.
+ *
+ * @param {number} id outline file id
+ */
+async function deleteEntry(id) {
+	const entry = findEntry(id)
+	if (!entry) {
+		return
+	}
+	const confirmed = await showConfirmation({
+		name: 'Delete outline',
+		text: `Delete "${formatOutlineName(entry.name)}"? It goes to the Nextcloud trash bin, where you can restore it.`,
+		labelConfirm: 'Delete',
+		labelReject: 'Cancel',
+		severity: 'warning',
+	})
+	if (!confirmed) {
+		return
+	}
+	const isOpen = id === fileId.value
+	if (isOpen) {
+		// Save first, then stop autosave so nothing writes to the deleted file.
+		if (!(await flushIfOpen(id))) {
+			showError('Your changes are still unsaved, so the outline was not deleted.')
+			return
+		}
+		outlineView.value?.discard?.()
+	}
+	try {
+		await deleteOutline(id)
+	} catch {
+		showError('Could not delete the outline.')
+		if (isOpen) {
+			await outlineView.value?.reload?.()
+		}
+		return
+	}
+	await refreshOutlines()
+	if (isOpen) {
+		const next = outlines.value[0]
+		const nextHash = next ? `#/outline/${next.fileId}` : ''
+		hash.value = nextHash
+		window.location.hash = nextHash
+		if (next) {
+			writeLastOpenedOutline(next.fileId)
+		}
+	}
+}
+
 onMounted(async () => {
 	window.addEventListener('hashchange', syncHash)
 	try {
@@ -291,7 +440,31 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 					:name="formatOutlineName(entry.name)"
 					:href="`#/outline/${entry.fileId}`"
 					:active="entry.fileId === fileId"
+					:editable="true"
+					editLabel="Rename"
+					editPlaceholder="Outline name"
+					@update:name="(newName) => renameEntry(entry.fileId, newName)"
 					@click="selectOutline(entry.fileId, $event)">
+					<template #actions>
+						<NcActionButton closeAfterClick @click="duplicateEntry(entry.fileId)">
+							<template #icon>
+								<NcIconSvgWrapper :path="mdiContentCopy" />
+							</template>
+							Duplicate
+						</NcActionButton>
+						<NcActionButton closeAfterClick @click="exportEntry(entry.fileId)">
+							<template #icon>
+								<NcIconSvgWrapper :path="mdiDownload" />
+							</template>
+							Export (.opml)
+						</NcActionButton>
+						<NcActionButton closeAfterClick @click="deleteEntry(entry.fileId)">
+							<template #icon>
+								<NcIconSvgWrapper :path="mdiDeleteOutline" />
+							</template>
+							Delete
+						</NcActionButton>
+					</template>
 					<template #extra>
 						<span class="outline-entry-date" @click.stop="selectOutline(entry.fileId, $event)">
 							{{ formatTime(entry.mtime) }}
@@ -314,7 +487,14 @@ onUnmounted(() => window.removeEventListener('hashchange', syncHash))
 				</template>
 			</NcAppNavigation>
 			<NcAppContent>
-				<OutlineView v-if="fileId !== null" ref="outlineView" :fileId="fileId" />
+				<OutlineView
+					v-if="fileId !== null"
+					ref="outlineView"
+					:fileId="fileId"
+					@rename="(newName) => renameEntry(fileId, newName)"
+					@duplicate="duplicateEntry(fileId)"
+					@export="exportEntry(fileId)"
+					@delete="deleteEntry(fileId)" />
 				<OutlineList
 					v-else-if="!outlinesLoading && outlines.length === 0"
 					:error="outlinesError"

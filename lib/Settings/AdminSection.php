@@ -14,5 +14,5 @@ final class AdminSection implements IIconSection {
 	public function getID(): string { return Application::APP_ID; }
 	public function getName(): string { return 'Outliner'; }
 	public function getPriority(): int { return 70; }
-	public function getIcon(): string { return $this->urlGenerator->imagePath(Application::APP_ID, 'app.svg'); }
+	public function getIcon(): string { return $this->urlGenerator->imagePath(Application::APP_ID, 'app-dark.svg'); }
 }

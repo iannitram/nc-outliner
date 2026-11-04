@@ -209,6 +209,28 @@ function handleInput(event) {
 }
 
 /**
+ * Paste plain text into the row ourselves (#220), so a paste always lands as text in this row
+ * whatever the browser or clipboard source does by default. Line breaks become spaces.
+ *
+ * @param {ClipboardEvent} event the paste event
+ */
+function handlePaste(event) {
+	const el = event.target
+	const text = event.clipboardData?.getData('text/plain')
+	if (readonly || !el || typeof text !== 'string' || text === '') {
+		return
+	}
+	event.preventDefault()
+	const flat = text.replace(/\r\n|\r|\n/g, ' ')
+	const start = el.selectionStart ?? el.value.length
+	const end = el.selectionEnd ?? start
+	el.value = el.value.slice(0, start) + flat + el.value.slice(end)
+	const caret = start + flat.length
+	el.setSelectionRange?.(caret, caret)
+	handleInput({ target: el, type: 'input', inputType: 'insertFromPaste', data: flat })
+}
+
+/**
  *
  * @param {KeyboardEvent} event the keydown event
  */
@@ -373,6 +395,7 @@ defineExpose({
 				:readonly="readonly"
 				:aria-label="row.text || 'Row text'"
 				@input="handleInput"
+				@paste="handlePaste"
 				@keydown="handleKeydown"
 				@focus="handleFocus" />
 			<span v-if="foldedLabel" class="outline-row__more">{{ foldedLabel }}</span>

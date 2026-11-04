@@ -5,6 +5,7 @@ const { axios } = vi.hoisted(() => ({
 		get: vi.fn(),
 		post: vi.fn(),
 		put: vi.fn(),
+		delete: vi.fn(),
 	},
 }))
 
@@ -15,11 +16,15 @@ vi.mock('@nextcloud/router', () => ({
 
 import {
 	createOutline,
+	deleteOutline,
+	downloadOutline,
+	duplicateOutline,
 	exportOpml,
 	getSettings,
 	listOutlines,
 	publish,
 	readOutline,
+	renameOutline,
 	saveCopy,
 	saveOutline,
 	setSettings,
@@ -131,5 +136,51 @@ describe('outlines API client', () => {
 		})
 
 		await expect(publish(7, 'Documents', 'Plan')).rejects.toThrow('Outline not found')
+	})
+})
+
+describe('outline file actions (#218, #219)', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+	})
+
+	it('renames through PUT .../name', async () => {
+		axios.put.mockResolvedValue({ data: { fileId: 7, name: 'Plan.opml', etag: 'e' } })
+		await expect(renameOutline(7, 'Plan')).resolves.toEqual({ fileId: 7, name: 'Plan.opml', etag: 'e' })
+		expect(axios.put).toHaveBeenCalledWith(`${outlinesUrl}/7/name`, { name: 'Plan' })
+	})
+
+	it('passes the server message on for a refused name', async () => {
+		axios.put.mockRejectedValue({ message: 'Request failed', response: { status: 400, data: { message: 'Name contains forbidden characters' } } })
+		await expect(renameOutline(7, 'a/b')).rejects.toMatchObject({ message: 'Name contains forbidden characters', response: { status: 400 } })
+	})
+
+	it('duplicates through POST .../duplicate', async () => {
+		axios.post.mockResolvedValue({ data: { fileId: 8, name: 'Plan (copy).opml', etag: 'e' } })
+		await expect(duplicateOutline(7)).resolves.toMatchObject({ fileId: 8 })
+		expect(axios.post).toHaveBeenCalledWith(`${outlinesUrl}/7/duplicate`)
+	})
+
+	it('deletes through DELETE', async () => {
+		axios.delete.mockResolvedValue({ data: [] })
+		await deleteOutline(7)
+		expect(axios.delete).toHaveBeenCalledWith(`${outlinesUrl}/7`)
+	})
+
+	it('downloads the stored file under its name', async () => {
+		const blob = new Blob(['<opml/>'])
+		axios.get.mockResolvedValue({ data: blob })
+		const createObjectURL = vi.fn(() => 'blob:x')
+		vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() })
+		const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function() {
+			expect(this.download).toBe('Plan.opml')
+			expect(this.getAttribute('href')).toBe('blob:x')
+		})
+		await downloadOutline(7, 'Plan.opml')
+		expect(axios.get).toHaveBeenCalledWith(`${outlinesUrl}/7/download`, { responseType: 'blob' })
+		expect(createObjectURL).toHaveBeenCalledWith(blob)
+		expect(click).toHaveBeenCalledTimes(1)
+		click.mockRestore()
+		vi.unstubAllGlobals()
 	})
 })

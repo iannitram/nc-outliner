@@ -26,7 +26,7 @@ Merged in #84.
 | Path | What it is |
 |---|---|
 | `appinfo/info.xml` | App id `nc_outliner`, name "Outliner", Nextcloud 33 only, the navigation entry (route `nc_outliner.page.index`) |
-| `appinfo/routes.php` | Routes: `GET /` (page#index), the six outline routes (list, create, show, update, copy, export), the publish route, the two settings routes and the bug-report routes (see [API](#api)). Later routes are added here |
+| `appinfo/routes.php` | Routes: `GET /` (page#index), the ten outline routes (list, create, show, update, copy, export, rename, duplicate, delete, download), the publish route, the two settings routes and the bug-report routes (see [API](#api)). Later routes are added here |
 | `lib/AppInfo/Application.php` | App bootstrap; holds `APP_ID`; registers `IOutlineStore` as an alias of `OutlineStore` |
 | `lib/Controller/PageController.php` | `index()` returns the `main` template |
 | `templates/main.php` | Loads the built script `js/nc_outliner-main.mjs` and stylesheet `css/nc_outliner-style.css`; has the mount div `#nc_outliner` |
@@ -207,13 +207,20 @@ final class OutlineStore implements IOutlineStore {
     public function save(string $uid, int $fileId, Outline $outline, string $ifMatch): string;   // returns the new etag
     /** @return array{fileId: int, name: string, etag: string} */
     public function saveCopy(string $uid, int $fileId, Outline $outline): array;  // "<name> (my copy).opml"
+    /** @return array{fileId: int, name: string, etag: string} */
+    public function rename(string $uid, int $fileId, string $name): array;   // moves the file, sets the OPML title; ConflictException while a save holds the lock
+    /** @return array{fileId: int, name: string, etag: string} */
+    public function duplicate(string $uid, int $fileId): array;              // "<name> (copy).opml", title to match
+    public function delete(string $uid, int $fileId): void;                  // to the Nextcloud trash bin
+    /** @return array{name: string, content: string} */
+    public function download(string $uid, int $fileId): array;               // the stored .opml as it is
 }
 final class ConflictException extends \RuntimeException { public function __construct(public string $currentEtag); }
 final class NotFoundException extends \RuntimeException {}
 final class FolderConflictException extends \RuntimeException {}   // "Outlines" exists but is not a folder
 ```
 
-`IOutlineStore` declares `list`, `create`, `read`, `save` and `saveCopy` (not `ensureFolder`); `Application::register()` aliases it to `OutlineStore`, and the controller tests mock the interface.
+`IOutlineStore` declares `list`, `create`, `read`, `save`, `saveCopy`, `rename`, `duplicate`, `delete` and `download` (not `ensureFolder`); `Application::register()` aliases it to `OutlineStore`, and the controller tests mock the interface.
 
 - A file id is looked up only inside that user's `Outlines/` folder, so another user's id is "not found", never readable.
 - Names: an invalid name throws `\InvalidArgumentException` (the API answers 400); `.opml` added if missing; the characters `\ / : * ? " < > |` and trailing dots or spaces are refused, and a name that differs from an existing one only by case gets " (2)" ([Mac, PC and Linux](#mac-pc-and-linux)).
@@ -238,6 +245,10 @@ All routes are under `/apps/nc_outliner/api`, take and return JSON, and are `#[N
 | `GET /outlines/{fileId}` | | `200 {fileId, name, etag, outline}` · `404` · `422 {message}` when the file is not a readable outline | #108 |
 | `PUT /outlines/{fileId}` | `{outline}`, header `If-Match: <etag>` | `200 {etag}` · `412 {etag}` (changed elsewhere) · `404` · `400 {message}` without the header or without an `outline` with a `rows` array | #108 |
 | `POST /outlines/{fileId}/copy` | `{outline}` | `201 {fileId, name, etag}` · `404` · `400 {message}` as for `PUT` | #108 |
+| `PUT /outlines/{fileId}/name` | `{name}` | `200 {fileId, name, etag}` · `400 {message}` for a bad name · `409 {etag}` while a save is running · `404` | #218, #219 |
+| `POST /outlines/{fileId}/duplicate` | | `201 {fileId, name, etag}` · `404` | #219 |
+| `DELETE /outlines/{fileId}` | | `200 []` (moved to the trash bin) · `404` | #219 |
+| `GET /outlines/{fileId}/download` | | the `.opml` file as a download · `404` | #219 |
 | `POST /api/outline-opml` | `{outline}` | `200 {data}` (the merged OPML text, used by Report a bug) · `400 {message}` | #125 |
 | `POST /api/bugreport` | multipart zip | relays to the drop; five attempts per user per hour | #125 |
 | `POST /api/admin/bugreport` | `{base, token}` (admin) | saves the drop settings; the token is never echoed | #124 |
@@ -432,12 +443,12 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 
 | File | Owns | Issue | Status |
 |---|---|---|---|
-| `src/App.vue` | Shell: the list, or one outline when the URL hash is `#/outline/<fileId>` (no router library); the theme class | #90, #96 | present (skeleton) |
+| `src/App.vue` | Shell: the list, or one outline when the URL hash is `#/outline/<fileId>` (no router library); the theme class; each sidebar entry has Rename, Duplicate, Export (.opml) and Delete | #90, #96, #219 | present (skeleton) |
 | `src/views/OutlineList.vue` | My outlines, New outline, open one. Import is hidden until #27 | #90, #27 | present (Import planned) |
 | `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, publish, and the clock button that toggles the versions sidebar (teleported into `#content-vue`); a picked version replaces the editor with a read-only `OutlineEditor` under the "Restore this version / Back to current" banner | #90, #97, #185 | present |
 | `src/components/OutlineEditor.vue` | Renders the tree from History, caret and focus by row id, keydown to the keymap | #91 | present |
 | `src/components/OutlineRow.vue` | One row: handle, disclosure triangle or bullet, a plain text input (no rich text in 1.0), the note under it | #91, #93, #94, #98 | present |
-| `src/components/OutlineTopBar.vue` | Slim top bar: title, Publish, Versions icon button and ⋯ actions | #183 | present |
+| `src/components/OutlineTopBar.vue` | Slim top bar: title (click to rename), Publish, Versions icon button and ⋯ actions (Sort, Versions, Rename, Duplicate, Export, Delete) | #183, #218, #219 | present |
 | `src/components/StatusLine.vue` | Status line: Saved / Saving / Can't save (retrying), row/word counts, last-published link | #183 | present |
 | `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | present |
 | `src/components/SortDialog.vue` | Sort dialog opened from the top bar ⋯ menu; applies `sortRows` from `src/model/outline.js` through `OutlineView` | | present |

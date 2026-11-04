@@ -5,13 +5,18 @@ import App from '../../src/App.vue'
 import { createOutline, getSettings, listOutlines, setSettings } from '../../src/api/outlines.js'
 
 let beforeLeaveMock = vi.fn().mockResolvedValue(true)
+const reloadMock = vi.fn()
+const discardMock = vi.fn()
 
 vi.mock('../../src/views/OutlineView.vue', () => ({
 	default: {
 		props: ['fileId'],
+		emits: ['rename', 'duplicate', 'export', 'delete'],
 		setup(props, { expose }) {
 			expose({
 				beforeLeave: () => beforeLeaveMock(),
+				reload: () => reloadMock(),
+				discard: () => discardMock(),
 				getWorkingFile: () => ({ name: 'outline.opml', type: 'text/x-opml', data: '<opml />' }),
 			})
 			return {}
@@ -27,6 +32,7 @@ vi.mock('craft-bugreport-web', () => ({ ReportButton: {
 } }))
 vi.mock('@nextcloud/auth', () => ({ getRequestToken: () => 'test-csrf-token', getCurrentUser: () => null, onRequestTokenUpdate: () => {} }))
 vi.mock('@nextcloud/initial-state', () => ({ loadState: () => ({ version: '0.1.0', commit: 'abcdef1', ncVersion: '33.0.10', configured: false }) }))
+vi.mock('@nextcloud/dialogs', () => ({ showConfirmation: vi.fn(), showError: vi.fn(), showSuccess: vi.fn() }))
 vi.mock('@nextcloud/vue', () => {
 	const container = { template: '<div><slot /></div>' }
 	const themeProvider = {
@@ -39,10 +45,12 @@ vi.mock('@nextcloud/vue', () => {
 		template: '<div class="app-navigation-new"><button :disabled="disabled" @click="$emit(\'click\')">{{ text }}</button></div>',
 	}
 	const navigationItem = {
-		props: ['name', 'active', 'href'],
-		emits: ['click'],
+		name: 'NcAppNavigationItem',
+		props: ['name', 'active', 'href', 'editable', 'editLabel', 'editPlaceholder'],
+		emits: ['click', 'update:name'],
 		template: `
-			<li class="app-navigation-entry" :class="{ active }">
+			<li class="app-navigation-entry" :class="{ active }" :data-editable="editable || null">
+
 				<a class="app-navigation-entry-link" :href="href || '#'" @click="$emit('click', $event)">
 					<span class="app-navigation-entry__name">{{ name }}</span>
 				</a>
@@ -71,14 +79,20 @@ vi.mock('@nextcloud/vue', () => {
 		NcAppNavigationItem: navigationItem,
 		NcEmptyContent: emptyContent,
 		NcButton: container,
+		NcActionButton: { name: 'NcActionButton', emits: ['click'], template: '<button class="action" @click="$emit(\'click\')"><slot /></button>' },
+		NcIconSvgWrapper: { props: ['path'], template: '<span />' },
 		NcThemeProvider: themeProvider,
 	}
 })
 
 vi.mock('../../src/api/outlines.js', () => ({
 	createOutline: vi.fn(),
+	deleteOutline: vi.fn(),
+	downloadOutline: vi.fn(),
+	duplicateOutline: vi.fn(),
 	getSettings: vi.fn(),
 	listOutlines: vi.fn(),
+	renameOutline: vi.fn(),
 	setSettings: vi.fn(),
 }))
 
