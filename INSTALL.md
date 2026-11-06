@@ -8,7 +8,7 @@ There is one way to install it: build a package, then **replace** the app folder
 
 Every install of new code needs a new version: `0.1.1` becomes `0.1.2`. Set the same number in both `appinfo/info.xml` (`<version>`) and `package.json` (`"version"`), and commit.
 
-Why: Nextcloud's cache buster for the app's script (`?v=…`) is derived from the version. If the version stays the same, browsers keep running the old cached script after the server has the new one. The packaging and install steps below refuse a version that doesn't change.
+Why: Nextcloud's cache buster for the app's script (`?v=…`) is derived from the version. If the version stays the same, browsers keep running the old cached script after the server has the new one. `npm run package` does not check the version against earlier builds. `npm run install:docker` refuses to replace a server that already runs this version with a different script (unless you pass `--same-version`).
 
 ## 2. Build the package
 
@@ -25,10 +25,10 @@ This builds the app and writes `build/nc_outliner-<version>.tar.gz`, with one `n
 npm run install:docker -- <container>
 ```
 
-`<container>` is the Nextcloud container's name from `docker ps`. If Nextcloud is not at `/var/www/html` inside it, add `--root <path>`. The script:
+`<container>` is the Nextcloud container's name from `docker ps`. If Nextcloud is not at `/var/www/html` inside it, add `--root <path>` or `--root=<path>`. The path must be absolute and must not contain `..`; any other option or extra argument stops the script before it touches Docker. The script:
 
 1. stops if Nextcloud has another `nc_outliner` folder under `--root` that it could load instead, such as one under `apps/` or a nested `nc_outliner/nc_outliner`. It does not search folders outside `--root` (see `apps_paths` in 3b);
-2. stops if the server already runs this version with different code (see step 1);
+2. stops if the server already runs this version with different code (see step 1; `--same-version` skips this check);
 3. deletes `custom_apps/nc_outliner` and unpacks the package in its place, owned by `www-data`;
 4. runs `occ upgrade` when the version changed, then `occ app:enable nc_outliner`;
 5. checks that Nextcloud loads the app from `custom_apps/nc_outliner`, reports the new version, and finds the script file in that folder identical to this build's (it reads the file on disk; it does not fetch it over HTTP).

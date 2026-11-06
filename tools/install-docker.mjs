@@ -1,7 +1,7 @@
 // Installs build/nc_outliner-<version>.tar.gz into a Nextcloud running in Docker, then checks that
 // Nextcloud uses the copy just installed. Usage (after `npm run package`):
 //
-//   npm run install:docker -- <container> [--root /var/www/html] [--same-version]
+//   npm run install:docker -- <container> [--root <path> | --root=<path>] [--same-version]
 //
 // It replaces custom_apps/nc_outliner as a whole folder (never copies over it), runs `occ upgrade`
 // and `occ app:enable`, and stops with a clear message when:
@@ -16,14 +16,10 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseInstallArgs } from './install-args.mjs'
 
 const APP_ID = 'nc_outliner'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
-const args = process.argv.slice(2)
-const container = args.find((a) => !a.startsWith('--') && args[args.indexOf(a) - 1] !== '--root')
-const rootIndex = args.indexOf('--root')
-const ncRoot = rootIndex === -1 ? '/var/www/html' : args[rootIndex + 1]
-const sameVersionOk = args.includes('--same-version')
 
 /**
  * @param {string} message what is wrong and how to fix it
@@ -32,6 +28,15 @@ function fail(message) {
 	console.error(`install: ${message}`)
 	process.exit(1)
 }
+
+// Parse and check the arguments before any docker call.
+let parsed
+try {
+	parsed = parseInstallArgs(process.argv.slice(2))
+} catch (error) {
+	fail(error.message)
+}
+const { container, ncRoot, sameVersionOk } = parsed
 
 /**
  * Run a shell command in the container.
@@ -62,15 +67,7 @@ function occ(command, options = {}) {
 	return inContainer(`cd ${ncRoot} && php occ ${command}`, { user: 'www-data', ...options })
 }
 
-// The container name goes to docker as its own argument (no shell). The root path is written into
-// shell commands in the container, so only plain absolute paths are accepted.
-if (!container || !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(container)) {
-	fail('name the container: npm run install:docker -- <container>   (docker ps lists them)')
-}
-if (rootIndex !== -1 && !/^\/[A-Za-z0-9._/-]*[A-Za-z0-9._-]$/.test(ncRoot ?? '')) {
-	fail(`--root needs an absolute path inside the container, such as /var/www/html (got "${ncRoot ?? ''}").`)
-}
-
+// The container name goes to docker as its own argument (no shell).
 const version = readFileSync(join(root, 'appinfo/info.xml'), 'utf8').match(/<version>([^<]+)<\/version>/)?.[1]
 const tarball = join(root, 'build', `${APP_ID}-${version}.tar.gz`)
 if (!existsSync(tarball)) {
