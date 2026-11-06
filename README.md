@@ -34,4 +34,4 @@ Stage and status: [PIPELINE.md](PIPELINE.md); history: [CHANGELOG.md](CHANGELOG.
 
 Vue 3 on Nextcloud's own stack (decided 2026-10-25, [ADR 0001](docs/adr/0001-vue-front-end.md)). Where each module goes: [CODEMAP.md](CODEMAP.md).
 
-The app deploys as a folder copy into the Nextcloud container's `custom_apps/`. A deploy to a live Nextcloud server needs the maintainer's approval.
+To install it, follow [INSTALL.md](INSTALL.md): raise the version, `npm run package`, then `npm run install:docker -- <container>` (or the manual steps there). A deploy to a live Nextcloud server needs the maintainer's approval.

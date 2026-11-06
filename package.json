@@ -8,8 +8,10 @@
   "scripts": {
     "build": "vite build --mode production",
     "dev": "vite build --mode development --watch",
+    "install:docker": "node tools/install-docker.mjs",
     "lint": "eslint .",
     "lint:php": "node tests/tools/php.mjs lint",
+    "package": "npm run build && node tools/package.mjs",
     "test": "vitest run",
     "test:php": "node tests/tools/php.mjs test"
   },
@@ -29,6 +31,7 @@
     "@vitejs/plugin-vue": "^6.0.10",
     "@vue/test-utils": "^2.5.1",
     "eslint": "^10.13.0",
+    "globals": "^17.14.0",
     "jsdom": "^30.1.3",
     "vite": "^7.3.6",
     "vitest": "^5.0.5"
