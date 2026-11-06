@@ -81,6 +81,8 @@ Load `/index.php/apps/nc_outliner/` while logged in. The page should show the "O
 
 Deploy to a live Nextcloud only with the maintainer's approval.
 
+**Raise the version in `appinfo/info.xml` before every install of new code** (for example 0.1.1 to 0.1.2). Nextcloud adds `?v=` plus a hash of the app version to the script and stylesheet links, so with the same version a browser keeps the old cached stylesheet next to the new script. Vue's scoped styles are keyed by a per-component hash that changes when the component changes, so every component edited since the last install then shows unstyled while the others look fine.
+
 ## Where things go
 
 - Vue code in `src/`, unit tests in `tests/js/*.test.js`.

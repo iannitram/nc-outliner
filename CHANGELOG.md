@@ -2,6 +2,7 @@
 
 Newest first. One line per change of stage, release or decision that the next session needs.
 
+- 2026-11-06 Version 0.1.1. The 2026-11-06 install of #221 showed the outline rows and the top bar unstyled (title under the sidebar button): the version was still 0.1.0, so browsers kept the 2026-10-28 stylesheet, whose scoped-style hashes no longer match the changed components. Raise the version before every install (docs/development.md).
 - 2026-11-03 My decision: Automation added after 1.0 (command line, MCP server, scripts): F74 core #213, F75 command line `nco` #214, F76 MCP server #215, F77 scripts #216; 1.0 scope unchanged; the scripting part of F70 moves to F77, F70 keeps plug-ins.
 - 2026-11-02 Code map refreshed to match main: editor key groups, saver, list, conflict dialog and admin/bug-report files marked present; missing files and routes added; Import still planned.
 - 2026-10-26 End-of-night sweep: code map, roadmap and plan match main after 11 merged tickets (#85-#89, #101, #103-#106, #112); #125 resized to Medium (needs the shared bug-report module).
