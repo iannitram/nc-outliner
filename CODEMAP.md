@@ -449,6 +449,7 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, publish, and the clock button that toggles the versions sidebar (teleported into `#content-vue`); a picked version replaces the editor with a read-only `OutlineEditor` under the "Restore this version / Back to current" banner | #90, #97, #185 | present |
 | `src/components/OutlineEditor.vue` | Renders the tree from History, caret and focus by row id, keydown to the keymap | #91 | present |
 | `src/components/OutlineRow.vue` | One row: handle, disclosure triangle or bullet, a plain text input (no rich text in 1.0), the note under it | #91, #93, #94, #98 | present |
+| `src/editor/clipboard.js` | Text to paste from a clipboard event (plain text, else the text of copied HTML) and inserting it at the caret; used by the row text and the note | #220 | present |
 | `src/components/OutlineTopBar.vue` | Slim top bar: title (click to rename), Publish, Versions icon button and ⋯ actions (Sort, Versions, Rename, Duplicate, Export, Delete) | #183, #218, #219 | present |
 | `src/components/StatusLine.vue` | Status line: Saved / Saving / Can't save (retrying), row/word counts, last-published link | #183 | present |
 | `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | present |

@@ -123,6 +123,54 @@ final class OutlineStoreManageTest extends TestCase {
 		$store->rename('alice', 10, 'Other');
 	}
 
+	public function testRenameOfAnUnreadableFileStillMovesItAndLeavesItsContent(): void {
+		$file = $this->file(10, 'Broken.opml');
+		$file->putContent('not opml at all');
+
+		$result = $this->store->rename('alice', 10, 'Fixed');
+
+		$this->assertSame('Fixed.opml', $result['name']);
+		$this->assertSame('not opml at all', $file->getContent());
+	}
+
+	public function testRenameToAnUnreadableFilesNameAddsANumber(): void {
+		$this->file(10, 'Plan.opml');
+		$taken = $this->file(11, 'Notes.opml');
+		$taken->putContent('not opml at all');
+
+		$this->assertSame('Notes (2).opml', $this->store->rename('alice', 10, 'Notes')['name']);
+	}
+
+	public function testRenameReleasesTheLockWhenTheMoveFails(): void {
+		$root = $this->createMock(IRootFolder::class);
+		$user = $this->createMock(Folder::class);
+		$root->method('getUserFolder')->willReturn($user);
+		$user->method('nodeExists')->willReturn(true);
+		$user->method('get')->willReturn($this->outlines);
+		$locks = new FakeLockingProvider();
+		$store = new OutlineStore($root, $this->codec, $locks);
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(10);
+		$file->method('getName')->willReturn('Plan.opml');
+		$file->method('getPath')->willReturn('/alice/files/Outlines/Plan.opml');
+		$file->method('getEtag')->willReturn('e');
+		$file->method('move')->willThrowException(new \RuntimeException('storage down'));
+		$this->byId[10] = $file;
+		$this->listing[] = $file;
+
+		try {
+			$store->rename('alice', 10, 'Other');
+			$this->fail('The failed move should be reported');
+		} catch (\RuntimeException) {
+		}
+		$this->assertSame([], $locks->held);
+	}
+
+	public function testRenameOfAnUnknownIdIsNotFound(): void {
+		$this->expectException(NotFoundException::class);
+		$this->store->rename('alice', 99, 'Plan');
+	}
+
 	public function testDuplicateWritesACopyWithAMatchingTitle(): void {
 		$this->file(10, 'Plan.opml', 'Plan');
 		$copy = $this->createMock(File::class);

@@ -39,9 +39,11 @@ const props = defineProps({
 const emit = defineEmits(['published', 'openVersions', 'openSort', 'rename', 'duplicate', 'export', 'delete'])
 
 // #218: click the title to rename the outline. Enter or leaving the field saves; Escape cancels.
+// Enter and Escape put focus back on the title, so the keyboard user is where they started.
 const editingTitle = ref(false)
 const draftTitle = ref('')
 const titleInput = ref(null)
+const titleButton = ref(null)
 
 /** Turn the title into a text field holding the current name. */
 async function startRename() {
@@ -67,6 +69,20 @@ function commitRename() {
 /** Leave the text field without renaming. */
 function cancelRename() {
 	editingTitle.value = false
+}
+
+/** Rename on Enter, then focus the title again. */
+async function commitRenameFromKey() {
+	commitRename()
+	await nextTick()
+	titleButton.value?.focus()
+}
+
+/** Cancel on Escape, then focus the title again. */
+async function cancelRenameFromKey() {
+	cancelRename()
+	await nextTick()
+	titleButton.value?.focus()
 }
 
 const topBarRef = ref(null)
@@ -106,11 +122,12 @@ onUnmounted(() => {
 			type="text"
 			aria-label="Outline name"
 			maxlength="250"
-			@keydown.enter.prevent="commitRename"
-			@keydown.esc.prevent.stop="cancelRename"
+			@keydown.enter.prevent="commitRenameFromKey"
+			@keydown.esc.prevent.stop="cancelRenameFromKey"
 			@blur="commitRename">
 		<h1 v-else class="title" :title="title">
 			<button
+				ref="titleButton"
 				type="button"
 				class="title-button"
 				aria-label="Rename outline"

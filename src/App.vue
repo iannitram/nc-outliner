@@ -300,16 +300,43 @@ async function renameEntry(id, newName) {
 		showError('Your changes are still unsaved, so the outline was not renamed.')
 		return
 	}
+	// The server sets the outline's title to the new name, without any ".opml" typed after it.
+	const newTitle = trimmed.replace(/\.opml$/i, '') || 'Untitled'
+	const view = id === fileId.value ? outlineView.value : null
+	const rename = () => renameWithRetry(id, trimmed)
 	try {
-		await renameOutline(id, trimmed)
+		await (view?.renameWhileHeld ? view.renameWhileHeld(newTitle, rename) : rename())
 	} catch (error) {
-		showError(error.response?.status === 400 ? error.message : 'Could not rename the outline.')
+		const status = error.response?.status
+		showError(status === 400
+			? error.message
+			: status === 409
+				? 'The outline is busy saving. Try renaming it again in a moment.'
+				: 'Could not rename the outline.')
 		return
 	}
 	await refreshOutlines()
-	if (id === fileId.value) {
-		await outlineView.value?.reload?.()
+}
+
+/**
+ * Rename, trying again a few times while a save holds the file (the server answers 409).
+ *
+ * @param {number} id outline file id
+ * @param {string} name the new name
+ * @return {Promise<{fileId: number, name: string, etag: string}>} the renamed file
+ */
+async function renameWithRetry(id, name) {
+	for (const wait of [300, 1000, 0]) {
+		try {
+			return await renameOutline(id, name)
+		} catch (error) {
+			if (error.response?.status !== 409 || wait === 0) {
+				throw error
+			}
+			await new Promise((resolve) => setTimeout(resolve, wait))
+		}
 	}
+	throw new Error('unreachable')
 }
 
 /**

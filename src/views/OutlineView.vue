@@ -41,6 +41,8 @@ let unsubscribe = null
 let currentDocument = null
 let currentSession = null
 let loadGeneration = 0
+// While a rename runs, saves wait here so they do not take the file lock, then use its new etag.
+let renameGate = null
 
 /**
  *
@@ -75,11 +77,13 @@ async function load({ discardLocal = false, fileId = props.fileId } = {}) {
 		unsubscribe?.()
 		saver?.destroy()
 		history.value = createHistory(result.outline.rows)
-		const session = { fileId: requestedFileId, etag: result.etag }
+		const session = { fileId: requestedFileId, etag: result.etag, title: result.outline.title }
 		currentSession = session
 		saver = createSaver({
 			save: async (outline) => {
-				const saved = await saveOutline(session.fileId, outline, session.etag)
+				await renameGate
+				// The title changes only by rename, so an edit queued before one still saves the new title.
+				const saved = await saveOutline(session.fileId, { ...outline, title: session.title }, session.etag)
 				if (saved.ok) {
 					session.etag = saved.etag
 					if (session.fileId === props.fileId) {
@@ -299,9 +303,45 @@ function undoOutsideRows(event) {
 	}
 }
 
-/** Read the outline again, for example after it was renamed. */
+/** Read the outline again. */
 async function reload() {
 	await load()
+}
+
+/**
+ * Run a rename of this outline with autosave held, then take on its new name, title and etag in
+ * place. Rows typed while the rename runs stay in the editor and save afterwards (#218 review).
+ *
+ * @param {string} newTitle the outline's title after the rename
+ * @param {() => Promise<{name: string, etag: string}>} rename the server call
+ * @return {Promise<{name: string, etag: string}>} the rename result
+ */
+async function renameWhileHeld(newTitle, rename) {
+	const session = currentSession
+	let release
+	const gate = new Promise((resolve) => {
+		release = resolve
+	})
+	renameGate = gate
+	try {
+		const result = await rename()
+		if (session && session === currentSession) {
+			session.etag = result.etag
+			session.title = newTitle
+			etag.value = result.etag
+			name.value = result.name
+			if (currentDocument) {
+				currentDocument = { ...currentDocument, title: newTitle }
+				document.value = currentDocument
+			}
+		}
+		return result
+	} finally {
+		if (renameGate === gate) {
+			renameGate = null
+		}
+		release()
+	}
 }
 
 /** Stop autosave for this outline without saving, before its file is deleted. */
@@ -313,7 +353,7 @@ function discard() {
 	currentSession = null
 }
 
-defineExpose({ beforeLeave, getWorkingFile, reload, discard })
+defineExpose({ beforeLeave, getWorkingFile, reload, renameWhileHeld, discard })
 
 onMounted(() => {
 	Object.assign(versionsSidebar, {

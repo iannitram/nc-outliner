@@ -1,5 +1,6 @@
 <script setup>
 import { computed, getCurrentInstance, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { clipboardText, insertAtCaret } from '../editor/clipboard.js'
 import { updateRow } from '../model/outline.js'
 
 const props = defineProps({
@@ -209,25 +210,37 @@ function handleInput(event) {
 }
 
 /**
- * Paste plain text into the row ourselves (#220), so a paste always lands as text in this row
- * whatever the browser or clipboard source does by default. Line breaks become spaces.
+ * Paste into the row ourselves (#220), so a paste always lands as text in this row whatever the
+ * browser or clipboard source does by default. Line breaks become spaces.
  *
  * @param {ClipboardEvent} event the paste event
  */
 function handlePaste(event) {
 	const el = event.target
-	const text = event.clipboardData?.getData('text/plain')
-	if (readonly || !el || typeof text !== 'string' || text === '') {
+	const text = clipboardText(event.clipboardData)
+	if (readonly || !el || text === '') {
 		return
 	}
 	event.preventDefault()
 	const flat = text.replace(/\r\n|\r|\n/g, ' ')
-	const start = el.selectionStart ?? el.value.length
-	const end = el.selectionEnd ?? start
-	el.value = el.value.slice(0, start) + flat + el.value.slice(end)
-	const caret = start + flat.length
-	el.setSelectionRange?.(caret, caret)
+	insertAtCaret(el, flat)
 	handleInput({ target: el, type: 'input', inputType: 'insertFromPaste', data: flat })
+}
+
+/**
+ * Paste into the note the same way (#220: the report's paste went into a note). Notes keep line breaks.
+ *
+ * @param {ClipboardEvent} event the paste event
+ */
+function handleNotePaste(event) {
+	const el = event.target
+	const text = clipboardText(event.clipboardData)
+	if (readonly || !el || text === '') {
+		return
+	}
+	event.preventDefault()
+	insertAtCaret(el, text.replace(/\r\n|\r/g, '\n'))
+	handleNoteInput({ target: el, type: 'input', inputType: 'insertFromPaste' })
 }
 
 /**
@@ -434,7 +447,8 @@ defineExpose({
 				:readonly="readonly"
 				rows="1"
 				aria-label="Row note"
-				@input="handleNoteInput" />
+				@input="handleNoteInput"
+				@paste="handleNotePaste" />
 		</div>
 		<div
 			v-if="!row.collapsed && row.children && row.children.length > 0"

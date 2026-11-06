@@ -49,6 +49,11 @@ final class OutlineControllerManageTest extends TestCase {
 		$this->assertSame(Http::STATUS_CONFLICT, $this->controller->rename(7, 'X')->getStatus());
 	}
 
+	public function testRenameOfAnUnknownOutlineIs404(): void {
+		$this->store->method('rename')->willThrowException(new NotFoundException());
+		$this->assertSame(Http::STATUS_NOT_FOUND, $this->controller->rename(99, 'X')->getStatus());
+	}
+
 	public function testDuplicateIs201(): void {
 		$result = ['fileId' => 8, 'name' => 'Plan (copy).opml', 'etag' => 'e'];
 		$this->store->method('duplicate')->with('alice', 7)->willReturn($result);
