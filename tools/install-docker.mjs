@@ -21,7 +21,8 @@ const APP_ID = 'nc_outliner'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const args = process.argv.slice(2)
 const container = args.find((a) => !a.startsWith('--') && args[args.indexOf(a) - 1] !== '--root')
-const ncRoot = args.includes('--root') ? args[args.indexOf('--root') + 1] : '/var/www/html'
+const rootIndex = args.indexOf('--root')
+const ncRoot = rootIndex === -1 ? '/var/www/html' : args[rootIndex + 1]
 const sameVersionOk = args.includes('--same-version')
 
 /**
@@ -61,8 +62,13 @@ function occ(command, options = {}) {
 	return inContainer(`cd ${ncRoot} && php occ ${command}`, { user: 'www-data', ...options })
 }
 
-if (!container) {
+// The container name goes to docker as its own argument (no shell). The root path is written into
+// shell commands in the container, so only plain absolute paths are accepted.
+if (!container || !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(container)) {
 	fail('name the container: npm run install:docker -- <container>   (docker ps lists them)')
+}
+if (rootIndex !== -1 && !/^\/[A-Za-z0-9._/-]*[A-Za-z0-9._-]$/.test(ncRoot ?? '')) {
+	fail(`--root needs an absolute path inside the container, such as /var/www/html (got "${ncRoot ?? ''}").`)
 }
 
 const version = readFileSync(join(root, 'appinfo/info.xml'), 'utf8').match(/<version>([^<]+)<\/version>/)?.[1]
@@ -74,19 +80,22 @@ const localMain = createHash('sha256').update(readFileSync(join(root, 'js', `${A
 
 // Every folder Nextcloud could load the app from. Only custom_apps/ may hold it.
 const target = `${ncRoot}/custom_apps/${APP_ID}`
-const copies = inContainer(`find ${ncRoot} -path '${ncRoot}/data' -prune -o -path '*/${APP_ID}/appinfo/info.xml' -print 2>/dev/null`, { allowFail: true })
+// No allowFail here: if find cannot read the tree, stop, rather than report "no other copies".
+const copies = inContainer(`find ${ncRoot} -path '${ncRoot}/data' -prune -o -path '*/${APP_ID}/appinfo/info.xml' -print`)
 	.split('\n').filter(Boolean).map((path) => path.replace(/\/appinfo\/info\.xml$/, ''))
 const strays = copies.filter((path) => path !== target)
 if (strays.length > 0) {
 	fail(`Nextcloud has other ${APP_ID} folders it could load instead of ${target}:\n  ${strays.join('\n  ')}\nRemove them (keep a backup), then run this again.`)
 }
 
-const installed = occ('app:list --output=json', { allowFail: true })
-const installedVersion = installed ? (JSON.parse(installed).enabled?.[APP_ID] ?? JSON.parse(installed).disabled?.[APP_ID] ?? null) : null
+// No allowFail: if occ cannot report the installed version, stop before the folder is replaced.
+const installed = JSON.parse(occ('app:list --output=json'))
+const installedVersion = installed.enabled?.[APP_ID] ?? installed.disabled?.[APP_ID] ?? null
 if (installedVersion === version && !sameVersionOk) {
+	// An unreadable script counts as different: refuse rather than overwrite a server we cannot see.
 	const remoteMain = inContainer(`sha256sum ${target}/js/${APP_ID}-main.mjs | cut -d' ' -f1`, { allowFail: true })
-	if (remoteMain && remoteMain !== localMain) {
-		fail(`the server already runs ${APP_ID} ${version} with different code. Browsers would keep the old cached files.\nRaise the version in appinfo/info.xml and package.json, run \`npm run package\`, then install again.`)
+	if (remoteMain !== localMain) {
+		fail(`the server already runs ${APP_ID} ${version} with different code (or its script cannot be read). Browsers would keep the old cached files.\nRaise the version in appinfo/info.xml and package.json, run \`npm run package\`, then install again.`)
 	}
 }
 

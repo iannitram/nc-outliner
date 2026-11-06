@@ -45,7 +45,8 @@ if (version !== packageVersion) {
 	fail(`appinfo/info.xml says ${version} but package.json says ${packageVersion}. Make them match.`)
 }
 
-const dirty = git(['status', '--porcelain', '--untracked-files=no'])
+// Untracked files count too: the package copies whole folders (lib/, templates/), so a new file would ship.
+const dirty = git(['status', '--porcelain', '--untracked-files=normal'])
 if (dirty && !allowDirty) {
 	fail(`uncommitted changes:\n${dirty}\nCommit them first, or pass --allow-dirty for a throwaway test server.`)
 }

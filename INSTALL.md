@@ -17,7 +17,7 @@ npm ci
 npm run package
 ```
 
-This builds the app and writes `build/nc_outliner-<version>.tar.gz`, with one `nc_outliner/` folder inside. It stops if the two version numbers differ, if there are uncommitted changes, or if the build is from another commit. For a throwaway test server, `node tools/package.mjs --allow-dirty` packages uncommitted work.
+This builds the app and writes `build/nc_outliner-<version>.tar.gz`, with one `nc_outliner/` folder inside. It stops if the two version numbers differ, or if there are uncommitted changes (new files included). For a throwaway test server, `node tools/package.mjs --allow-dirty` packages uncommitted work.
 
 ## 3a. Install into Nextcloud in Docker
 
@@ -27,11 +27,11 @@ npm run install:docker -- <container>
 
 `<container>` is the Nextcloud container's name from `docker ps`. If Nextcloud is not at `/var/www/html` inside it, add `--root <path>`. The script:
 
-1. stops if Nextcloud has another `nc_outliner` folder it could load instead, such as one under `apps/` or a nested `nc_outliner/nc_outliner`;
+1. stops if Nextcloud has another `nc_outliner` folder under `--root` that it could load instead, such as one under `apps/` or a nested `nc_outliner/nc_outliner`. It does not search folders outside `--root` (see `apps_paths` in 3b);
 2. stops if the server already runs this version with different code (see step 1);
 3. deletes `custom_apps/nc_outliner` and unpacks the package in its place, owned by `www-data`;
 4. runs `occ upgrade` when the version changed, then `occ app:enable nc_outliner`;
-5. checks that Nextcloud loads the app from `custom_apps/nc_outliner`, reports the new version, and serves the script from this build.
+5. checks that Nextcloud loads the app from `custom_apps/nc_outliner`, reports the new version, and finds the script file in that folder identical to this build's (it reads the file on disk; it does not fetch it over HTTP).
 
 It ends with `Done: Nextcloud runs nc_outliner <version> …`. Any other ending says what is wrong.
 
