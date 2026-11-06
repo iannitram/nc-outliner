@@ -29,12 +29,13 @@ Merged in #84.
 | `appinfo/routes.php` | Routes: `GET /` (page#index), the ten outline routes (list, create, show, update, copy, export, rename, duplicate, delete, download), the publish route, the two settings routes and the bug-report routes (see [API](#api)). Later routes are added here |
 | `lib/AppInfo/Application.php` | App bootstrap; holds `APP_ID`; registers `IOutlineStore` as an alias of `OutlineStore` |
 | `lib/Controller/PageController.php` | `index()` returns the `main` template |
-| `templates/main.php` | Loads the built script `js/nc_outliner-main.mjs` and stylesheet `css/nc_outliner-style.css`; has the mount div `#nc_outliner` |
+| `templates/main.php` | Loads the built script `js/nc_outliner-main.mjs` (it injects its own styles; there is no separate stylesheet); has the mount div `#nc_outliner` |
 | `src/main.js` | Creates the Vue app and mounts it on `#nc_outliner` |
 | `src/App.vue` | `NcContent` > `NcAppContent` > `h2` "Outlines". Becomes the shell that shows the list or one outline |
 | `js/`, `css/` | Build output of `npm run build` (generated, not edited) |
 | `img/app.svg` | App icon |
-| `vite.config.mjs` | `@nextcloud/vite-config`; entry `src/main.js`, output `js/` (script) and `css/` (one stylesheet) |
+| `vite.config.mjs` | `@nextcloud/vite-config`; entry `src/main.js`, output `js/`; styles inlined into the script (`inlineCSS`) so script and styles always come from one build |
+| `tools/package.mjs`, `tools/install-docker.mjs` | `npm run package` builds `build/nc_outliner-<version>.tar.gz`; `npm run install:docker` installs it into a Docker Nextcloud and checks it. See `INSTALL.md` |
 | `vitest.config.mjs` | jsdom environment for the JavaScript tests; `maxWorkers: 2` when `CI` is set, to bound worker startup on the shared runners |
 | `eslint.config.mjs` | `@nextcloud/eslint-config` (recommended) |
 | `composer.json` | PHP autoload (`OCA\NcOutliner\` to `lib/`), phpunit and `nextcloud/ocp` for tests |

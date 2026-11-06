@@ -2,6 +2,7 @@
 
 Newest first. One line per change of stage, release or decision that the next session needs.
 
+- 2026-11-06 Version 0.1.1 and a supported install path. The 2026-11-06 install of #221 showed the outline rows and the top bar unstyled (title under the sidebar button). The version was still 0.1.0, so the stylesheet served or cached was from the 2026-10-28 build, and its scoped-style hashes no longer matched the components #221 changed. Styles are now built into the script (no separate stylesheet to go stale). `npm run package` refuses info.xml and package.json that disagree, uncommitted changes and a build from another commit. `npm run install:docker` refuses stray app copies, and refuses to replace a server that already runs the same version with a different script. See INSTALL.md.
 - 2026-11-03 My decision: Automation added after 1.0 (command line, MCP server, scripts): F74 core #213, F75 command line `nco` #214, F76 MCP server #215, F77 scripts #216; 1.0 scope unchanged; the scripting part of F70 moves to F77, F70 keeps plug-ins.
 - 2026-11-02 Code map refreshed to match main: editor key groups, saver, list, conflict dialog and admin/bug-report files marked present; missing files and routes added; Import still planned.
 - 2026-10-26 End-of-night sweep: code map, roadmap and plan match main after 11 merged tickets (#85-#89, #101, #103-#106, #112); #125 resized to Medium (needs the shared bug-report module).

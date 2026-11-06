@@ -81,6 +81,8 @@ Load `/index.php/apps/nc_outliner/` while logged in. The page should show the "O
 
 Deploy to a live Nextcloud only with the maintainer's approval.
 
+To install a build into a Nextcloud, test or live, follow [INSTALL.md](../INSTALL.md). It covers raising the version, `npm run package`, and `npm run install:docker`.
+
 ## Where things go
 
 - Vue code in `src/`, unit tests in `tests/js/*.test.js`.
