@@ -93,6 +93,56 @@ describe('OutlineRow', () => {
 		expect(event.defaultPrevented).toBe(false)
 	})
 
+	it('pastes into the open note of a heading and one undo takes it out again (#220 report)', async () => {
+		// The report: a heading row, its note opened under it, a paste into that note did nothing.
+		const row = { id: 'r1', text: 'Sobriety Essay', note: '', collapsed: false, children: [] }
+		const history = createHistory([row])
+		wrapper = mount(OutlineRow, {
+			props: { row },
+			global: { provide: { outlineEditor: { history, registerInput() {}, unregisterInput() {} } } },
+			attachTo: document.body,
+		})
+		await wrapper.get('button.outline-row__note-toggle').trigger('click')
+		const note = wrapper.get('textarea.outline-row__note')
+		const event = new Event('paste', { bubbles: true, cancelable: true })
+		event.clipboardData = { getData: (type) => (type === 'text/plain' ? 'First line.\r\nSecond line.' : '') }
+		note.element.dispatchEvent(event)
+		expect(event.defaultPrevented).toBe(true)
+		expect(history.current()[0].note).toBe('First line.\nSecond line.')
+		history.undo()
+		expect(history.current()[0].note).toBe('')
+	})
+
+	it('pastes the text of copied HTML when the clipboard has no plain text', () => {
+		const row = { id: 'r1', text: '', note: '', collapsed: false, children: [] }
+		wrapper = mount(OutlineRow, { props: { row }, attachTo: document.body })
+		const input = wrapper.get('textarea.outline-row__input')
+		const event = new Event('paste', { bubbles: true, cancelable: true })
+		event.clipboardData = { getData: (type) => (type === 'text/html' ? '<p>A <b>bold</b> start</p><p>and more</p>' : '') }
+		input.element.dispatchEvent(event)
+		expect(event.defaultPrevented).toBe(true)
+		expect(input.element.value).toBe('A bold start and more')
+	})
+
+	it('undoes a paste into row text through History', () => {
+		const row = { id: 'r1', text: 'ab', note: '', collapsed: false, children: [] }
+		const history = createHistory([row])
+		const onInput = (target, event) => history.execute(updateRow, [target.id, { text: event.target.value }], { mergeKey: `text:${target.id}` })
+		wrapper = mount(OutlineRow, {
+			props: { row },
+			global: { provide: { outlineEditor: { history, onInput, registerInput() {}, unregisterInput() {} } } },
+			attachTo: document.body,
+		})
+		const input = wrapper.get('textarea.outline-row__input')
+		input.element.setSelectionRange(2, 2)
+		const event = new Event('paste', { bubbles: true, cancelable: true })
+		event.clipboardData = { getData: (type) => (type === 'text/plain' ? 'cd' : '') }
+		input.element.dispatchEvent(event)
+		expect(history.current()[0].text).toBe('abcd')
+		history.undo()
+		expect(history.current()[0].text).toBe('ab')
+	})
+
 	it('grows wrapped text on input, width changes and History updates, then disconnects', async () => {
 		let resize
 		const disconnect = vi.fn()

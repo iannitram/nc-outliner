@@ -202,13 +202,35 @@ describe('OutlineTopBar title rename (#218)', () => {
 		wrapper.unmount()
 	})
 
-	it('saves once when the field loses focus after Enter', async () => {
+	it('saves when the field loses focus, and only once when Enter came first', async () => {
 		const wrapper = mount(OutlineTopBar, { props: { title: 'Untitled', fileId: 42 } })
 		await wrapper.get('button.title-button').trigger('click')
 		const field = wrapper.get('input.title-input')
 		await field.setValue('Plan')
 		await field.trigger('blur')
 		expect(wrapper.emitted('rename')).toEqual([['Plan']])
+
+		await wrapper.get('button.title-button').trigger('click')
+		const again = wrapper.get('input.title-input')
+		await again.setValue('Trip')
+		await again.trigger('keydown', { key: 'Enter' })
+		await again.trigger('blur')
+		expect(wrapper.emitted('rename')).toEqual([['Plan'], ['Trip']])
+	})
+
+	it('puts focus back on the title after Escape or Enter', async () => {
+		const wrapper = mount(OutlineTopBar, { props: { title: 'Untitled', fileId: 42 }, attachTo: document.body })
+		await wrapper.get('button.title-button').trigger('click')
+		await wrapper.get('input.title-input').trigger('keydown', { key: 'Escape' })
+		await flushPromises()
+		expect(document.activeElement).toBe(wrapper.get('button.title-button').element)
+
+		await wrapper.get('button.title-button').trigger('click')
+		await wrapper.get('input.title-input').setValue('Trip')
+		await wrapper.get('input.title-input').trigger('keydown', { key: 'Enter' })
+		await flushPromises()
+		expect(document.activeElement).toBe(wrapper.get('button.title-button').element)
+		wrapper.unmount()
 	})
 
 	it('cancels on Escape and ignores an unchanged or empty name', async () => {

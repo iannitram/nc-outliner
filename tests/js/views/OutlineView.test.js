@@ -277,6 +277,29 @@ describe('OutlineView autosave conflict flow', () => {
 		expect(saveOutline).toHaveBeenCalledWith(3, expect.anything(), 'etag-3')
 	})
 
+	it('keeps rows typed during a rename: their save waits for it, then uses the new etag and title', async () => {
+		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-5' })
+		wrapper = mount(OutlineView, { props: { fileId: 3 } })
+		await flushPromises()
+		let finishRename
+		const renaming = wrapper.vm.renameWhileHeld('Trip', () => new Promise((resolve) => {
+			finishRename = resolve
+		}))
+		await buttonLabelled(wrapper, 'Edit outline').trigger('click')
+		await vi.advanceTimersByTimeAsync(1500)
+		expect(saveOutline).not.toHaveBeenCalled()
+
+		finishRename({ fileId: 3, name: 'Trip.opml', etag: 'etag-4' })
+		await renaming
+		await flushPromises()
+
+		expect(readOutline).toHaveBeenCalledTimes(1)
+		expect(saveOutline).toHaveBeenCalledWith(3, expect.objectContaining({
+			title: 'Trip',
+			rows: [expect.objectContaining({ text: 'Edited' })],
+		}), 'etag-4')
+	})
+
 	it('saves outline when PublishButton emits a new publishPath', async () => {
 		saveOutline.mockResolvedValue({ ok: true, etag: 'etag-2' })
 		wrapper = mount(OutlineView, { props: { fileId: 3 } })

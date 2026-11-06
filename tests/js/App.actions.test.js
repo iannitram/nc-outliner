@@ -14,6 +14,7 @@ import {
 let beforeLeaveMock = vi.fn().mockResolvedValue(true)
 const reloadMock = vi.fn()
 const discardMock = vi.fn()
+const renameWhileHeldMock = vi.fn((title, rename) => rename())
 
 vi.mock('../../src/views/OutlineView.vue', () => ({
 	default: {
@@ -23,6 +24,7 @@ vi.mock('../../src/views/OutlineView.vue', () => ({
 			expose({
 				beforeLeave: () => beforeLeaveMock(),
 				reload: () => reloadMock(),
+				renameWhileHeld: (title, rename) => renameWhileHeldMock(title, rename),
 				discard: () => discardMock(),
 				getWorkingFile: () => ({ name: 'outline.opml', type: 'text/x-opml', data: '<opml />' }),
 			})
@@ -138,17 +140,43 @@ describe('App outline actions (#218, #219)', () => {
 		wrapper.unmount()
 	})
 
-	it('renames the open outline from the sidebar, saving first and reloading it', async () => {
+	it('renames the open outline from the sidebar: saves first, holds autosave, and does not reload it', async () => {
 		renameOutline.mockResolvedValue({ fileId: 1, name: 'Trip.opml', etag: 'e' })
 		const wrapper = mount(App)
 		await flushPromises()
 		wrapper.findAllComponents({ name: 'NcAppNavigationItem' })[0].vm.$emit('update:name', ' Trip ')
 		await flushPromises()
 		expect(beforeLeaveMock).toHaveBeenCalled()
+		expect(renameWhileHeldMock).toHaveBeenCalledWith('Trip', expect.any(Function))
 		expect(renameOutline).toHaveBeenCalledWith(1, 'Trip')
-		expect(reloadMock).toHaveBeenCalled()
+		expect(reloadMock).not.toHaveBeenCalled()
 		expect(listOutlines).toHaveBeenCalledTimes(2)
 		wrapper.unmount()
+	})
+
+	it('tries the rename again while a save holds the file, then explains if it still cannot', async () => {
+		vi.useFakeTimers()
+		try {
+			const busy = Object.assign(new Error('Request failed with status code 409'), { response: { status: 409 } })
+			renameOutline.mockRejectedValueOnce(busy).mockResolvedValueOnce({ fileId: 1, name: 'Trip.opml', etag: 'e' })
+			const wrapper = mount(App)
+			await flushPromises()
+			wrapper.getComponent('.outline-view').vm.$emit('rename', 'Trip')
+			await vi.advanceTimersByTimeAsync(300)
+			await flushPromises()
+			expect(renameOutline).toHaveBeenCalledTimes(2)
+			expect(showError).not.toHaveBeenCalled()
+
+			renameOutline.mockReset().mockRejectedValue(busy)
+			wrapper.getComponent('.outline-view').vm.$emit('rename', 'Trip 2')
+			await vi.advanceTimersByTimeAsync(1300)
+			await flushPromises()
+			expect(renameOutline).toHaveBeenCalledTimes(3)
+			expect(showError).toHaveBeenCalledWith('The outline is busy saving. Try renaming it again in a moment.')
+			wrapper.unmount()
+		} finally {
+			vi.useRealTimers()
+		}
 	})
 
 	it('renames from the top bar title', async () => {
