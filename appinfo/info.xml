@@ -4,7 +4,7 @@
     <name>Outliner</name>
     <summary>Create and organize outline files</summary>
     <description>A simple outline editor for Nextcloud.</description>
-    <version>0.1.1</version>
+    <version>0.1.2</version>
     <licence>agpl</licence>
     <author>iannitram</author>
     <namespace>NcOutliner</namespace>
