@@ -43,6 +43,21 @@ describe('clipboardText (#220)', () => {
 		expect(clipboardText(clipboard({ 'text/plain': text }))).toBe(text)
 	})
 
+	it('leaves ordinary text alone when a type name is followed by a hex-looking line', () => {
+		for (const text of [
+			'Supported types:\nimage/png\n1\nimage/jpeg\n2\nend',
+			'Headers\napplication/json\n200\nOK body',
+			'text/csv\nface\nmore',
+			'text/plain\n10\nten bytes',
+		]) {
+			expect(clipboardText(clipboard({ 'text/plain': text }))).toBe(text)
+		}
+	})
+
+	it('drops a lone surrogate but keeps characters outside the basic plane', () => {
+		expect(clipboardText(clipboard({ 'text/plain': 'a\uD800b😀c' }))).toBe('ab😀c')
+	})
+
 	it('gives an empty string when there is no text, as for a copied image', () => {
 		expect(clipboardText(clipboard({ 'image/png': 'x' }))).toBe('')
 		expect(clipboardText(null)).toBe('')

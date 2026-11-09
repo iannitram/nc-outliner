@@ -16,14 +16,18 @@ const COLLABORA_BLOCK = /(?:^|\n)((?:text|application|image)\/[^\n]*)\n[0-9a-fA-
 /**
  * The copied text alone (#224). Firefox's plain text from a Nextcloud Office (Collabora) copy is the
  * text followed by Collabora's own blocks (markdown, plain text again, links, binary object data).
- * Keep what comes before them, or the text/plain block when nothing does.
+ * Keep what comes before them, or the text/plain block when nothing does. Text counts as a Collabora
+ * copy only when it holds both a text/plain block and an Office (application/x-openoffice-…) block,
+ * so ordinary text that lists a type name and a hex-looking line (image/png, then 1) pastes whole.
  *
  * @param {string} text the clipboard's plain text
  * @return {string} the text without Collabora's blocks
  */
 function withoutCollaboraBlocks(text) {
 	const blocks = [...text.matchAll(COLLABORA_BLOCK)]
-	if (blocks.length === 0) {
+	const isCollabora = blocks.some((block) => block[1].startsWith('text/plain'))
+		&& blocks.some((block) => block[1].startsWith('application/x-openoffice-'))
+	if (!isCollabora) {
 		return text
 	}
 	const before = text.slice(0, blocks[0].index).trimEnd()
@@ -47,7 +51,7 @@ function withoutCollaboraBlocks(text) {
  * @return {string} the text without them
  */
 function withoutIllegalCharacters(text) {
-	return text.replace(/[^\t\n\r -퟿-�\u{10000}-\u{10FFFF}]/gu, '')
+	return text.replace(/[^\t\n\r\u{20}-\u{D7FF}\u{E000}-\u{FFFD}\u{10000}-\u{10FFFF}]/gu, '')
 }
 
 /**
