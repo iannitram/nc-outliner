@@ -146,7 +146,7 @@ final class OpmlCodec {
 }
 ```
 
-Parse with `DOMDocument::loadXML($xml, LIBXML_NONET)` and never `LIBXML_NOENT`: imported files are untrusted, so no external entities and no network. Invalid XML or no `<body>` throws `OpmlParseException`, never a partial tree.
+Parse with `DOMDocument::loadXML($xml, LIBXML_NONET)` and never `LIBXML_NOENT`: imported files are untrusted, so no external entities and no network. Invalid XML or no `<body>` throws `OpmlParseException`, never a partial tree. Characters XML 1.0 does not allow (most control characters) are dropped on write; a file that fails to parse is tried once more with them (and references to them) removed, so outlines saved with them before #225 open again.
 
 ### ODT writer
 
@@ -449,7 +449,7 @@ OutlineView calls `flush()` on `visibilitychange` (hidden) and `pagehide`, and w
 | `src/views/OutlineView.vue` | Loads one outline, owns its History and Saver, hosts the editor, status, conflict dialog, publish, and the clock button that toggles the versions sidebar (teleported into `#content-vue`); a picked version replaces the editor with a read-only `OutlineEditor` under the "Restore this version / Back to current" banner | #90, #97, #185 | present |
 | `src/components/OutlineEditor.vue` | Renders the tree from History, caret and focus by row id, keydown to the keymap | #91 | present |
 | `src/components/OutlineRow.vue` | One row: handle, disclosure triangle or bullet, a plain text input (no rich text in 1.0), the note under it | #91, #93, #94, #98 | present |
-| `src/editor/clipboard.js` | Text to paste from a clipboard event (plain text, else the text of copied HTML) and inserting it at the caret; used by the row text and the note | #220 | present |
+| `src/editor/clipboard.js` | Text to paste from a clipboard event (plain text without a Nextcloud Office copy's extra clipboard blocks, else the text of copied HTML; never characters XML cannot hold) and inserting it at the caret; used by the row text and the note | #220, #224, #225 | present |
 | `src/components/OutlineTopBar.vue` | Slim top bar: title (click to rename), Publish, Versions icon button and ⋯ actions (Sort, Versions, Rename, Duplicate, Export, Delete) | #183, #218, #219 | present |
 | `src/components/StatusLine.vue` | Status line: Saved / Saving / Can't save (retrying), row/word counts, last-published link | #183 | present |
 | `src/components/ConflictDialog.vue` | Changed elsewhere: Reload, or Keep mine as a copy | #110 | present |

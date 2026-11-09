@@ -18,6 +18,31 @@ describe('clipboardText (#220)', () => {
 		expect(clipboardText(clipboard({ 'text/html': '<p>One<br>two</p><p>three &amp; four</p>' }))).toBe('One\ntwo\nthree & four')
 	})
 
+	// #224: Firefox's plain text from a Nextcloud Office (Collabora) copy is the text followed by
+	// Collabora's own clipboard blocks: a type line, a hex byte length, then the data.
+	const collabora = 'One two – three.\n\n\t\t \ntext/markdown\n12\n- One two – three.\n'
+		+ 'text/plain;charset=utf-8\n13\nOne two – three.\n'
+		+ 'application/x-openoffice-link;windows_formatname="Link"\nb8\nsoffice/tmp/doc.docx\u0001\u0008\n'
+		+ 'application/x-openoffice-objectdescriptor-xml;windows_formatname="Star Object Descriptor (XML)"\n94\n�e\u0001~@\u0008$'
+
+	it('keeps only the copied text from a Collabora clipboard', () => {
+		expect(clipboardText(clipboard({ 'text/plain': collabora }))).toBe('One two – three.')
+	})
+
+	it('takes the text/plain block when nothing comes before the Collabora blocks', () => {
+		const blocksOnly = collabora.slice(collabora.indexOf('text/markdown'))
+		expect(clipboardText(clipboard({ 'text/plain': blocksOnly }))).toBe('One two – three.')
+	})
+
+	it('drops control characters XML cannot hold, keeping tabs and line breaks (#225)', () => {
+		expect(clipboardText(clipboard({ 'text/plain': 'a\u0001b\u0008c\td\ne￿' }))).toBe('abc\td\ne')
+	})
+
+	it('leaves ordinary text that mentions a type name alone', () => {
+		const text = 'Set the header to\ntext/markdown\nand reload.'
+		expect(clipboardText(clipboard({ 'text/plain': text }))).toBe(text)
+	})
+
 	it('gives an empty string when there is no text, as for a copied image', () => {
 		expect(clipboardText(clipboard({ 'image/png': 'x' }))).toBe('')
 		expect(clipboardText(null)).toBe('')

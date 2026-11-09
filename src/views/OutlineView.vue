@@ -110,13 +110,37 @@ async function load({ discardLocal = false, fileId = props.fileId } = {}) {
 		})
 	} catch {
 		if (generation === loadGeneration) {
-			error.value = saver?.isDirty() ? 'Your changes are still unsaved. Check your connection and try again.' : 'Could not open this outline.'
+			if (saver?.isDirty()) {
+				error.value = 'Your changes are still unsaved. Check your connection and try again.'
+			} else {
+				error.value = 'Could not open this outline.'
+				closeOutline()
+			}
 		}
 	} finally {
 		if (generation === loadGeneration) {
 			loading.value = false
 		}
 	}
+}
+
+/**
+ * Take the previous outline off screen after the next one failed to open (#226), so its rows and title
+ * never show under the outline that is selected. Only called when it has nothing left to save.
+ */
+function closeOutline() {
+	unsubscribe?.()
+	unsubscribe = null
+	saver?.destroy()
+	saver = null
+	currentSession = null
+	currentDocument = null
+	document.value = null
+	history.value = null
+	name.value = ''
+	etag.value = ''
+	preview.value = null
+	conflictOpen.value = false
 }
 
 /**

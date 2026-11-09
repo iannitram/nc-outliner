@@ -24,7 +24,9 @@ final class OpmlCodec {
 
 		try {
 			$document = new \DOMDocument();
-			if (!$document->loadXML($xml, LIBXML_NONET)) {
+			// Outlines saved before #225 can hold characters XML does not allow: drop them and try once more.
+			if (!$document->loadXML($xml, LIBXML_NONET)
+				&& !$document->loadXML(self::withoutIllegalReferences(self::withoutIllegalCharacters($xml)), LIBXML_NONET)) {
 				throw new OpmlParseException('Invalid OPML XML');
 			}
 		} finally {
@@ -158,7 +160,26 @@ final class OpmlCodec {
 			$this->writeRow($document, $body, $row);
 		}
 		
-		return $document->saveXML();
+		// A paste can carry control characters (#225). XML does not allow them and a file holding them
+		// cannot be opened again, so they never reach the file.
+		return self::withoutIllegalCharacters((string)$document->saveXML());
+	}
+
+	/** Drop the characters XML 1.0 does not allow (most C0 controls, U+FFFE, U+FFFF). */
+	private static function withoutIllegalCharacters(string $text): string {
+		return preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u', '', $text) ?? $text;
+	}
+
+	/** Drop character references (&#1; &#x8;) to characters XML 1.0 does not allow. */
+	private static function withoutIllegalReferences(string $xml): string {
+		return preg_replace_callback('/&#(x[0-9a-fA-F]+|[0-9]+);/', static function (array $match): string {
+			$code = $match[1][0] === 'x' ? (int)hexdec(substr($match[1], 1)) : (int)$match[1];
+			$allowed = in_array($code, [0x9, 0xA, 0xD], true)
+				|| ($code >= 0x20 && $code <= 0xD7FF)
+				|| ($code >= 0xE000 && $code <= 0xFFFD)
+				|| ($code >= 0x10000 && $code <= 0x10FFFF);
+			return $allowed ? $match[0] : '';
+		}, $xml) ?? $xml;
 	}
 
 	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row): void {

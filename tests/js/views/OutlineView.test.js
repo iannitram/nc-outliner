@@ -210,6 +210,20 @@ describe('OutlineView autosave conflict flow', () => {
 		expect(document.body.querySelector('input[name="sort-by"]')).toBeNull()
 	})
 
+	it('shows only the error, not the previous outline, when the next outline cannot be opened (#226)', async () => {
+		wrapper = mount(OutlineView, { props: { fileId: 3 } })
+		await flushPromises()
+		expect(wrapper.findComponent({ name: 'OutlineEditor' }).exists()).toBe(true)
+		readOutline.mockRejectedValueOnce(Error('500'))
+		await wrapper.setProps({ fileId: 4 })
+		await flushPromises()
+		expect(wrapper.text()).toContain('Could not open this outline.')
+		expect(wrapper.findComponent({ name: 'OutlineEditor' }).exists()).toBe(false)
+		expect(wrapper.findComponent({ name: 'OutlineTopBar' }).exists()).toBe(false)
+		expect(wrapper.text()).not.toContain('Plan')
+		await expect(wrapper.vm.beforeLeave()).resolves.toBe(true)
+	})
+
 	it('shows a success toast after keepCopy succeeds', async () => {
 		wrapper = mount(OutlineView, { props: { fileId: 3 }, attachTo: document.body })
 		await flushPromises()
