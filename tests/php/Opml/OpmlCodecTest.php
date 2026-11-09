@@ -290,4 +290,34 @@ final class OpmlCodecTest extends TestCase {
 		$this->assertSame('1', $again->rows[0]->extra['a:value']);
 		$this->assertSame('2', $again->rows[1]->extra['a:value']);
 	}
+
+	public function testWritesNoXmlIllegalCharactersSoTheFileOpensAgain(): void {
+		// #225: control characters from a paste were saved as they were, and the file then failed to parse.
+		$codec = new OpmlCodec();
+		$original = new Outline("T\x01", [
+			new Row('r1', "a\x01b\x08c\x0Bd\u{FFFE}e\tf", "n\x02ote", false, [], ['x' => "v\x03"]),
+		], "/D\x04.odt");
+
+		$parsed = $codec->parse($codec->write($original));
+
+		$this->assertSame('T', $parsed->title);
+		$this->assertSame("abcde\tf", $parsed->rows[0]->text);
+		$this->assertSame('note', $parsed->rows[0]->note);
+		$this->assertSame('v', $parsed->rows[0]->extra['x']);
+		$this->assertSame('/D.odt', $parsed->publishPath);
+	}
+
+	public function testOpensAFileAlreadySavedWithXmlIllegalCharacters(): void {
+		// #225: outlines saved before the fix hold raw control characters, or character references to them.
+		$outline = $this->parse("<body><outline text=\"a\x01b\x08c\" _note=\"n&#1;o&#x8;te\"/><outline text=\"keep&#9;me &#38; &#x41;\"/></body>");
+
+		$this->assertSame('abc', $outline->rows[0]->text);
+		$this->assertSame('note', $outline->rows[0]->note);
+		$this->assertSame("keep\tme & A", $outline->rows[1]->text);
+	}
+
+	public function testStillRefusesXmlThatIsBrokenForOtherReasons(): void {
+		$this->expectException(OpmlParseException::class);
+		$this->parse("<body><outline text=\"a\x01\"></body>");
+	}
 }
