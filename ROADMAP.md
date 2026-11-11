@@ -2,6 +2,30 @@
 
 Goal: feature parity with OmniOutliner 6 Pro, adapted to a Nextcloud web app (the owner, 2026-10-22).
 
+Updated: 2026-11-11
+
+features:
+- files: Outline files in my Outlines folder: create, open, list, rename, duplicate, move, templates, metadata, password protection (F01, F20, F37, F54, F69)
+- editing: Type, indent, delete, move and drag rows from the keyboard and mouse, with undo and redo (F02, F03, F05, F08, F09, F19, F26, F55, F60)
+- folding: Expand and collapse rows, expand all, focus, text folding, sections sidebar (F04, F13, F18, F41, F42)
+- notes: Row notes and how they are shown (F06, F40)
+- checkboxes: Status checkboxes and calculated parent checkboxes; After 1.0 (F10, F17)
+- arrange: Work on several rows at once: select, cut, copy, paste, group, duplicate, sort (F11, F12, F21, F22, F29, F47)
+- publish: Publish to Doc as .odt, then Word and PowerPoint output (F07, F28, F68)
+- versions: Version list, preview, restore and named versions (F24)
+- autosave: Autosave, save status and the overwrite guard (F72)
+- import: Import OPML, plain text, Markdown, OmniOutliner native files and RTF (F25, F34, F58, F59)
+- export: Export plain text, OPML, Markdown, HTML, CSV and Excel; print and Save as PDF; After 1.0 (F27, F35, F50, F56, F57)
+- search: Search field, find next and previous, regex find, saved filters; After 1.0 (F14, F23, F49, F67)
+- text: Rich text in rows and notes: bold and italic, links in text, links to a row, formatting controls, right-to-left, typography; After 1.0 (F15, F16, F33, F36, F65, F66)
+- styles: Level styles, named styles and row numbering; After 1.0 (F30, F32, F48)
+- look: Look and layout: dark and light mode, themes, the design pass, document look options, zoom, typewriter mode, toolbar, phone layout (F31, F51, F52, F53, F61, F62, F71)
+- columns: Columns, column types, summaries, sort by column; After 1.0 (F43, F44, F45, F46)
+- attachments: Attachments and media: linked files, inline images, audio recording, read aloud; After 1.0 (F38, F39, F63, F64)
+- bug-report: Report a bug and the crash log (SPEC M14)
+- updates: Updates from the admin panel through the private app-store feed (F73, SPEC M15)
+- automation: Automation core, command line, MCP server, scripts and plug-ins; After 1.0 (F70, F74, F75, F76, F77)
+
 **How this file works**
 - Every feature has a fixed **ID** (F01, F02, …). IDs never change, so the Notes column can name dependencies even after rows move.
 - A feature moves **Unwritten → PR** when a pull request opens (add the PR link in Notes), and **PR → Merged** when it merges (add the merge date).
