@@ -326,10 +326,20 @@ describe('null error events', () => {
 		expect(sentEvents()[0]).toMatchObject({ level: 'error', kind: 'error', message: 'Script error.' })
 	})
 
+	it('logs the sanitized message when error is a primitive', () => {
+		installCrashLog(ON)
+
+		window.dispatchEvent(new ErrorEvent('error', { message: 'failed at https://example.test/file.js', error: 'thrown' }))
+		vi.advanceTimersByTime(2000)
+
+		expect(sentEvents()).toHaveLength(1)
+		expect(sentEvents()[0].message).toBe('failed at <url>')
+	})
+
 	it('drops the ResizeObserver loop notice', () => {
 		installCrashLog(ON)
 
-		window.dispatchEvent(new ErrorEvent('error', { message: 'ResizeObserver loop completed with undelivered notifications.', error: null }))
+		window.dispatchEvent(new ErrorEvent('error', { message: 'ResizeObserver loop completed with undelivered notifications.', error: new Error('ignored') }))
 		vi.advanceTimersByTime(2000)
 
 		expect(sentEvents()).toHaveLength(0)
