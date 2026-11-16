@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { indent, insertAfter, moveDown, moveUp, outdent, remove, updateRow } from '../../../src/model/outline.js'
+import { indent, insertAfter, moveDown, moveTo, moveUp, outdent, remove, sortRows, updateRow } from '../../../src/model/outline.js'
 
 function startTree() {
 	return [
@@ -226,6 +226,105 @@ describe('outline model operations', () => {
 		const tree = startTree()
 		const before = structuredClone(tree)
 		expect(updateRow(tree, 'nope', { text: 'x' })).toBe(tree)
+		expect(tree).toEqual(before)
+	})
+
+	it('updates noteHidden and returns the input tree when it is unchanged', () => {
+		const tree = [
+			{ id: 'n', text: 'N', note: 'A note', collapsed: false, noteHidden: false, children: [] },
+		]
+		const before = structuredClone(tree)
+
+		const hidden = updateRow(tree, 'n', { noteHidden: true })
+		expect(hidden[0].noteHidden).toBe(true)
+		expect(hidden[0].note).toBe('A note')
+		expect(tree).toEqual(before)
+		expect(updateRow(tree, 'n', { noteHidden: false })).toBe(tree)
+	})
+
+	it('sorts siblings by topic without separating their children or changing the input', () => {
+		const tree = [
+			{ id: 'b', text: 'beta', note: '', collapsed: false, children: [
+				{ id: 'b2', text: 'z child', note: '', collapsed: false, children: [] },
+				{ id: 'b1', text: 'a child', note: '', collapsed: false, children: [] },
+			] },
+			{ id: 'a', text: 'Alpha', note: '', collapsed: false, children: [] },
+		]
+		const before = structuredClone(tree)
+		const result = sortRows(tree, 'text')
+		expect(rowIds(result)).toEqual([['a', []], ['b', [['b1', []], ['b2', []]]]])
+		expect(tree).toEqual(before)
+	})
+
+	it('sorts descending by note and by checkbox status', () => {
+		const tree = [
+			{ id: 'none', text: '', note: '', extra: { _status: 'unchecked' }, children: [] },
+			{ id: 'done', text: '', note: 'zeta', extra: { _status: 'checked' }, children: [] },
+			{ id: 'unknown', text: '', note: 'alpha', children: [] },
+		]
+		expect(sortRows(tree, 'note', 'desc').map((row) => row.id)).toEqual(['done', 'unknown', 'none'])
+		expect(sortRows(tree, 'status').map((row) => row.id)).toEqual(['none', 'unknown', 'done'])
+	})
+
+	it('keeps stable order on ties and returns the original tree for invalid or no-op sorts', () => {
+		const tree = [
+			{ id: 'a', text: 'same', note: '', children: [] },
+			{ id: 'b', text: 'same', note: '', children: [] },
+		]
+		expect(sortRows(tree, 'text')).toBe(tree)
+		expect(sortRows(tree, 'unknown')).toBe(tree)
+		expect(sortRows(tree, 'text', 'sideways')).toBe(tree)
+	})
+})
+
+describe('moveTo', () => {
+	it('reorders a row among its siblings', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = moveTo(tree, 'C', null, 0)
+		expect(rowIds(result)).toEqual([['C', []], ['A', [['A1', []], ['A2', []]]], ['B', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('nests a row under a new parent with its children', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = moveTo(tree, 'B', 'A', 2)
+		expect(rowIds(result)).toEqual([['A', [['A1', []], ['A2', []], ['B', []]]], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('moves a nested row to the top level', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = moveTo(tree, 'A1', null, 1)
+		expect(rowIds(result)).toEqual([['A', [['A2', []]]], ['A1', []], ['B', []], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('carries a row and all its children to a new place', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		const result = moveTo(tree, 'A', 'B', 0)
+		expect(rowIds(result)).toEqual([['B', [['A', [['A1', []], ['A2', []]]]]], ['C', []]])
+		expect(tree).toEqual(before)
+	})
+
+	it('returns the input tree when the parent is the row or inside its subtree', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		expect(moveTo(tree, 'A', 'A', 0)).toBe(tree)
+		expect(moveTo(tree, 'A', 'A1', 0)).toBe(tree)
+		expect(tree).toEqual(before)
+	})
+
+	it('returns the input tree for a missing row, a missing parent or an unchanged move', () => {
+		const tree = startTree()
+		const before = structuredClone(tree)
+		expect(moveTo(tree, 'nope', null, 0)).toBe(tree)
+		expect(moveTo(tree, 'B', 'nope', 0)).toBe(tree)
+		expect(moveTo(tree, 'B', null, 1)).toBe(tree)
+		expect(moveTo(tree, 'A1', 'A', 0)).toBe(tree)
 		expect(tree).toEqual(before)
 	})
 })

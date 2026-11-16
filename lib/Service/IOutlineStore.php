@@ -21,4 +21,15 @@ interface IOutlineStore {
 
 	/** @return array{fileId: int, name: string, etag: string} */
 	public function saveCopy(string $uid, int $fileId, Outline $outline): array;
+
+	/** @return array{fileId: int, name: string, etag: string} */
+	public function rename(string $uid, int $fileId, string $name): array;
+
+	/** @return array{fileId: int, name: string, etag: string} */
+	public function duplicate(string $uid, int $fileId): array;
+
+	public function delete(string $uid, int $fileId): void;
+
+	/** @return array{name: string, content: string} */
+	public function download(string $uid, int $fileId): array;
 }

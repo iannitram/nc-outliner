@@ -8,6 +8,7 @@
  * @property {string} text
  * @property {string} note
  * @property {boolean} collapsed
+ * @property {boolean} noteHidden whether the note is hidden for this row
  * @property {Row[]} children
  * @property {Record<string, unknown>} [extra] opaque OPML attributes retained by every edit
  *
@@ -21,7 +22,7 @@
  * @return {Row}
  */
 export function newRow(text = '') {
-	return { id: newId(), text, note: '', collapsed: false, children: [] }
+	return { id: newId(), text, note: '', collapsed: false, noteHidden: false, children: [] }
 }
 
 /**
@@ -160,11 +161,11 @@ export function outdent(tree, id) {
 }
 
 /**
- * Issue #105. Set text, note or collapsed on one row.
+ * Issue #105. Set text, note, collapsed or noteHidden on one row.
  *
  * @param {Tree} tree
  * @param {string} id
- * @param {{text?: string, note?: string, collapsed?: boolean}} patch
+ * @param {{text?: string, note?: string, collapsed?: boolean, noteHidden?: boolean}} patch
  * @return {Tree}
  */
 export function updateRow(tree, id, patch) {
@@ -174,7 +175,7 @@ export function updateRow(tree, id, patch) {
 	}
 	const row = path.slice(0, -1).reduce((siblings, index) => siblings[index].children, tree)[path[path.length - 1]]
 	const updates = {}
-	for (const key of ['text', 'note', 'collapsed']) {
+	for (const key of ['text', 'note', 'collapsed', 'noteHidden']) {
 		if (Object.hasOwn(patch, key) && patch[key] !== row[key]) {
 			updates[key] = patch[key]
 		}
@@ -187,4 +188,134 @@ export function updateRow(tree, id, patch) {
 		copy[index] = { ...row, ...updates }
 		return copy
 	})
+}
+
+/**
+ * The row at a path from the root, or null for an empty path.
+ *
+ * @param rows
+ * @param path
+ */
+function findRowAt(rows, path) {
+	let siblings = rows
+	let row = null
+	for (const index of path) {
+		row = siblings[index]
+		siblings = row.children
+	}
+	return row
+}
+
+/**
+ * Issue #98. Move a row, with its children, to be child number `index` of
+ * `parentId` (`null` means the top level). `index` is the position after the
+ * row has been removed from its old place. Returns the input tree when the
+ * move cannot apply or changes nothing.
+ *
+ * @param {Tree} tree
+ * @param {string} id
+ * @param {string|null} parentId
+ * @param {number} index
+ * @return {Tree}
+ */
+export function moveTo(tree, id, parentId, index) {
+	const path = findPath(tree, id)
+	if (!path || !Number.isInteger(index) || index < 0) {
+		return tree
+	}
+
+	if (parentId !== null) {
+		const parentPath = findPath(tree, parentId)
+		if (!parentPath) {
+			return tree
+		}
+		if (parentPath.length >= path.length && path.every((step, i) => parentPath[i] === step)) {
+			return tree
+		}
+	}
+
+	const fromParentId = path.length === 1 ? null : findRowAt(tree, path.slice(0, -1)).id
+	if (parentId === fromParentId && index === path[path.length - 1]) {
+		return tree
+	}
+
+	const row = findRowAt(tree, path)
+	const without = remove(tree, id)
+
+	if (parentId === null) {
+		if (index > without.length) {
+			return tree
+		}
+		const copy = without.slice()
+		copy.splice(index, 0, row)
+		return copy
+	}
+
+	const parentPath = findPath(without, parentId)
+	if (!parentPath) {
+		return tree
+	}
+	const parent = findRowAt(without, parentPath)
+	const children = parent.children ?? []
+	if (index > children.length) {
+		return tree
+	}
+	return changeSiblings(without, parentPath, (siblings, parentIndex) => {
+		const copy = siblings.slice()
+		const nextChildren = children.slice()
+		nextChildren.splice(index, 0, row)
+		copy[parentIndex] = { ...parent, children: nextChildren }
+		return copy
+	})
+}
+
+/**
+ * Issue #31. Sort every sibling list in the outline by its topic, checkbox
+ * status or note. Each level is sorted independently, and children stay with
+ * their row. A new tree is returned only when at least one list changes.
+ * Checkbox state is read from the OPML codec's preserved `extra._status`
+ * attribute; rows with no status sort as unchecked.
+ *
+ * @param {Tree} tree
+ * @param {'text'|'status'|'note'} by
+ * @param {'asc'|'desc'} [direction]
+ * @return {Tree}
+ */
+export function sortRows(tree, by = 'text', direction = 'asc') {
+	if (!['text', 'status', 'note'].includes(by) || !['asc', 'desc'].includes(direction)) {
+		return tree
+	}
+	const sign = direction === 'desc' ? -1 : 1
+	const statusRank = (row) => {
+		const value = row.extra?._status
+		if (value === true || value === 'checked') {
+			return 2
+		}
+		return 0
+	}
+	const compare = (a, b) => {
+		if (by === 'status') {
+			return (statusRank(a) - statusRank(b)) * sign
+		}
+		const aValue = String(a[by] ?? '')
+		const bValue = String(b[by] ?? '')
+		return aValue.localeCompare(bValue, 'en', { sensitivity: 'base' }) * sign
+	}
+	const sortLevel = (rows) => {
+		let changed = false
+		const mapped = rows.map((row) => {
+			const children = sortLevel(row.children)
+			if (children !== row.children) {
+				changed = true
+				return { ...row, children }
+			}
+			return row
+		})
+		const sorted = mapped.slice().sort(compare)
+		if (sorted.some((row, index) => row !== rows[index])) {
+			changed = true
+		}
+		return changed ? sorted : rows
+	}
+	return sortLevel(tree)
 }

@@ -7,29 +7,52 @@ namespace OCA\NcOutliner\Controller;
 use OCA\NcOutliner\AppInfo\Application;
 use OCA\NcOutliner\Opml\OpmlParseException;
 use OCA\NcOutliner\Opml\Outline;
+use OCA\NcOutliner\Opml\OpmlCodec;
 use OCA\NcOutliner\Opml\Row;
 use OCA\NcOutliner\Service\ConflictException;
+use OCA\NcOutliner\Service\FolderConflictException;
 use OCA\NcOutliner\Service\NotFoundException;
 use OCA\NcOutliner\Service\IOutlineStore;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http\DataDownloadResponse;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http;
 use OCP\IRequest;
 use OCP\IUserSession;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class OutlineController extends Controller {
 	public function __construct(
 		IRequest $request,
 		private readonly IOutlineStore $store,
 		private readonly IUserSession $userSession,
+		private readonly LoggerInterface $logger = new NullLogger(),
 	) {
 		parent::__construct(Application::APP_ID, $request);
 	}
 
 	#[NoAdminRequired]
+	public function export(): JSONResponse {
+		$outline = $this->outlineParam($this->request->getParams());
+		if ($outline === null) {
+			return $this->outlineRequired();
+		}
+		return new JSONResponse(['data' => (new OpmlCodec())->write($this->outlineFromArray($outline))]);
+	}
+
+	#[NoAdminRequired]
 	public function index(): JSONResponse {
-		return new JSONResponse($this->store->list($this->uid()));
+		try {
+			return new JSONResponse($this->store->list($this->uid()));
+		} catch (FolderConflictException $e) {
+			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_CONFLICT);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
 	}
 
 	#[NoAdminRequired]
@@ -38,6 +61,11 @@ final class OutlineController extends Controller {
 			return new JSONResponse($this->store->create($this->uid(), $name), Http::STATUS_CREATED);
 		} catch (\InvalidArgumentException $e) {
 			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (FolderConflictException $e) {
+			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_CONFLICT);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 
@@ -51,6 +79,9 @@ final class OutlineController extends Controller {
 			return new JSONResponse([], Http::STATUS_NOT_FOUND);
 		} catch (OpmlParseException) {
 			return new JSONResponse(['message' => 'This file is not a readable outline'], Http::STATUS_UNPROCESSABLE_ENTITY);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 
@@ -73,6 +104,9 @@ final class OutlineController extends Controller {
 			return new JSONResponse(['etag' => $e->currentEtag], Http::STATUS_PRECONDITION_FAILED);
 		} catch (NotFoundException) {
 			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 
@@ -90,6 +124,63 @@ final class OutlineController extends Controller {
 			);
 		} catch (NotFoundException) {
 			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
+	}
+
+	#[NoAdminRequired]
+	public function rename(int $fileId, string $name = ''): JSONResponse {
+		try {
+			return new JSONResponse($this->store->rename($this->uid(), $fileId, $name));
+		} catch (\InvalidArgumentException $e) {
+			return new JSONResponse(['message' => $e->getMessage()], Http::STATUS_BAD_REQUEST);
+		} catch (ConflictException $e) {
+			return new JSONResponse(['etag' => $e->currentEtag], Http::STATUS_CONFLICT);
+		} catch (NotFoundException) {
+			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
+	}
+
+	#[NoAdminRequired]
+	public function duplicate(int $fileId): JSONResponse {
+		try {
+			return new JSONResponse($this->store->duplicate($this->uid(), $fileId), Http::STATUS_CREATED);
+		} catch (NotFoundException) {
+			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
+	}
+
+	#[NoAdminRequired]
+	public function destroy(int $fileId): JSONResponse {
+		try {
+			$this->store->delete($this->uid(), $fileId);
+			return new JSONResponse([]);
+		} catch (NotFoundException) {
+			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
+		}
+	}
+
+	#[NoAdminRequired]
+	public function download(int $fileId): Response {
+		try {
+			$file = $this->store->download($this->uid(), $fileId);
+			return new DataDownloadResponse($file['content'], $file['name'], 'text/x-opml');
+		} catch (NotFoundException) {
+			return new JSONResponse([], Http::STATUS_NOT_FOUND);
+		} catch (\Throwable $e) {
+			ClientLogController::reportServerException($this->logger, __METHOD__, $e);
+			throw $e;
 		}
 	}
 
@@ -119,15 +210,16 @@ final class OutlineController extends Controller {
 		foreach ((array)($data['rows'] ?? []) as $row) {
 			$rows[] = Row::fromArray((array)$row);
 		}
-		return new Outline((string)($data['title'] ?? ''), $rows, isset($data['publishPath']) ? (string)$data['publishPath'] : null);
+		return new Outline((string)($data['title'] ?? ''), $rows, isset($data['publishPath']) ? (string)$data['publishPath'] : null, array_values(array_filter((array)($data['headExtra'] ?? []), 'is_string')));
 	}
 
-	/** @return array{title: string, rows: list<array<string, mixed>>, publishPath: ?string} */
+	/** @return array{title: string, rows: list<array<string, mixed>>, publishPath: ?string, headExtra: list<string>} */
 	private function outlineToArray(Outline $outline): array {
 		return [
 			'title' => $outline->title,
 			'rows' => array_map(static fn (Row $row): array => $row->toArray(), $outline->rows),
 			'publishPath' => $outline->publishPath,
+			'headExtra' => $outline->headExtra,
 		];
 	}
 }

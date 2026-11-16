@@ -13,6 +13,8 @@ use OCA\NcOutliner\Service\OutlineStore;
 use OCP\Files\File;
 use OCP\Files\Folder;
 use OCP\Files\IRootFolder;
+use OCP\Lock\ILockingProvider;
+use OCP\Lock\LockedException;
 use PHPUnit\Framework\TestCase;
 
 final class OutlineStoreTest extends TestCase {
@@ -44,7 +46,7 @@ final class OutlineStoreTest extends TestCase {
 			->with('Outlines')
 			->willReturn($outlinesFolder);
 
-		$store = new OutlineStore($rootFolder, $codec);
+		$store = new OutlineStore($rootFolder, $codec, new FakeLockingProvider());
 
 		$first = $store->ensureFolder('alice');
 		$second = $store->ensureFolder('alice');
@@ -86,7 +88,7 @@ final class OutlineStoreTest extends TestCase {
 			->method('getDirectoryListing')
 			->willReturn([$fileOlder, $nonOpmlFile, $subFolder, $fileNewer]);
 
-		$store = new OutlineStore($rootFolder, $codec);
+		$store = new OutlineStore($rootFolder, $codec, new FakeLockingProvider());
 		$list = $store->list('alice');
 
 		$this->assertSame([
@@ -159,7 +161,7 @@ final class OutlineStoreTest extends TestCase {
 				return $file3;
 			});
 
-		$store = new OutlineStore($rootFolder, $codec);
+		$store = new OutlineStore($rootFolder, $codec, new FakeLockingProvider());
 
 		// 1. Picks "Untitled" when name is empty
 		$res1 = $store->create('alice', '');
@@ -231,7 +233,7 @@ final class OutlineStoreTest extends TestCase {
 			};
 		});
 
-		$store = new OutlineStore($rootFolder, $codec);
+		$store = new OutlineStore($rootFolder, $codec, new FakeLockingProvider());
 
 		// Another user's file id throws NotFoundException
 		try {
@@ -287,7 +289,7 @@ final class OutlineStoreTest extends TestCase {
 
 		$outlinesFolder->method('getById')->with(42)->willReturn([$file]);
 
-		$store = new OutlineStore($rootFolder, $codec);
+		$store = new OutlineStore($rootFolder, $codec, new FakeLockingProvider());
 		$outline = new Outline('Plan', [new Row('r1', 'Row 1', '')]);
 
 		// 1. Stale etag throws ConflictException and writes nothing
@@ -302,6 +304,233 @@ final class OutlineStoreTest extends TestCase {
 		$newEtag = $store->save('alice', 42, $outline, 'etag-current');
 		$this->assertSame('etag-new', $newEtag);
 	}
+
+	public function testSingleSaveWithCorrectIfMatchSucceedsAndWritesOnce(): void {
+		[$store, $file] = $this->storeWithLockModelingFile();
+		$file->method('getEtag')->willReturn('etag-1');
+		$this->expectPutContent($file);
+
+		$etag = $store->save('alice', 42, new Outline('Plan', [new Row('r1', 'Row 1', '')]), 'etag-1');
+
+		$this->assertSame('etag-1', $etag);
+	}
+
+	public function testAppLockIsTakenBeforeGetEtagAndReleasedAfterPutContent(): void {
+		$events = [];
+		$locks = new FakeLockingProvider($events);
+		[$store, $file] = $this->storeWithLockModelingFile($locks);
+		$file->method('getEtag')->willReturnCallback(function () use (&$events): string {
+			$events[] = 'getEtag';
+			return 'etag-1';
+		});
+		$this->expectPutContent($file, function () use (&$events): void {
+			$events[] = 'putContent';
+		});
+
+		$store->save('alice', 42, new Outline('Plan', []), 'etag-1');
+
+		$this->assertSame(['acquire', 'getEtag', 'putContent', 'getEtag', 'release'], $events);
+		$this->assertSame([], $locks->held);
+	}
+
+	public function testAppLockIsReleasedWhenPutContentThrows(): void {
+		$events = [];
+		$locks = new FakeLockingProvider($events);
+		[$store, $file] = $this->storeWithLockModelingFile($locks);
+		$file->method('getEtag')->willReturn('etag-1');
+		$file->expects($this->once())->method('putContent')
+			->willThrowException(new \RuntimeException('disk full'));
+
+		try {
+			$store->save('alice', 42, new Outline('Plan', []), 'etag-1');
+			$this->fail('Expected the write failure to propagate');
+		} catch (\RuntimeException $e) {
+			$this->assertSame('disk full', $e->getMessage());
+		}
+
+		$this->assertSame(['acquire', 'release'], $events);
+		$this->assertSame([], $locks->held);
+	}
+
+	public function testSecondSaveWithSameIfMatchWhileFirstHoldsAppLockIsRefusedWithCurrentEtag(): void {
+		$locks = new FakeLockingProvider();
+		[$store, $file] = $this->storeWithLockModelingFile($locks);
+		$writes = 0;
+		$secondOutcome = null;
+
+		$file->method('getEtag')->willReturn('etag-1');
+		// The first save is still inside putContent() when the second save arrives.
+		$this->expectPutContent($file,
+			function () use ($store, &$writes, &$secondOutcome): void {
+				$writes++;
+				try {
+					$store->save('alice', 42, new Outline('Second', []), 'etag-1');
+					$secondOutcome = 'saved';
+				} catch (ConflictException $e) {
+					$secondOutcome = $e->currentEtag;
+				}
+			},
+		);
+
+		$firstEtag = $store->save('alice', 42, new Outline('First', []), 'etag-1');
+
+		$this->assertSame('etag-1', $firstEtag);
+		$this->assertSame(1, $writes);
+		$this->assertSame('etag-1', $secondOutcome);
+		$this->assertSame([], $locks->held);
+	}
+
+	public function testPutContentLockedByAnotherClientBecomesConflictWithCurrentEtag(): void {
+		$locks = new FakeLockingProvider();
+		[$store, $file] = $this->storeWithLockModelingFile($locks);
+		$file->method('getEtag')->willReturn('etag-current');
+		$file->expects($this->once())->method('putContent')
+			->willThrowException(new LockedException('/Outlines/Plan.opml'));
+
+		try {
+			$store->save('alice', 42, new Outline('Plan', []), 'etag-current');
+			$this->fail('Expected ConflictException when the file is locked by another client');
+		} catch (ConflictException $e) {
+			$this->assertSame('etag-current', $e->currentEtag);
+		}
+		$this->assertSame([], $locks->held);
+	}
+
+	public function testEtagMismatchGivesConflictAndWritesNothing(): void {
+		$locks = new FakeLockingProvider();
+		[$store, $file] = $this->storeWithLockModelingFile($locks);
+		$file->method('getEtag')->willReturn('etag-current');
+		$file->expects($this->never())->method('putContent');
+
+		try {
+			$store->save('alice', 42, new Outline('Plan', []), 'etag-stale');
+			$this->fail('Expected ConflictException on etag mismatch');
+		} catch (ConflictException $e) {
+			$this->assertSame('etag-current', $e->currentEtag);
+		}
+		$this->assertSame([], $locks->held);
+	}
+
+	public function testSaveComparesIfMatchWithFreshEtagReadAfterTakingTheLock(): void {
+		// The node resolved before the lock still reports the etag from before
+		// another save wrote; the lookup after the lock sees the current one.
+		$beforeLock = $this->outlineFileMock('etag-old');
+		$afterLock = $this->outlineFileMock('etag-new');
+		$beforeLock->expects($this->never())->method('putContent');
+		$afterLock->expects($this->never())->method('putContent');
+		$locks = new FakeLockingProvider();
+		$store = $this->storeOverNodeSequence([$beforeLock, $afterLock], $locks);
+
+		try {
+			$store->save('alice', 42, new Outline('Plan', []), 'etag-old');
+			$this->fail('Expected ConflictException: the etag read after the lock is newer');
+		} catch (ConflictException $e) {
+			$this->assertSame('etag-new', $e->currentEtag);
+		}
+		$this->assertSame([], $locks->held);
+	}
+
+	public function testSaveReturnsPostWriteEtagFromFreshLookup(): void {
+		$beforeLock = $this->outlineFileMock('etag-1');
+		// The node written to keeps its cached FileInfo, so it still says etag-1.
+		$written = $this->outlineFileMock('etag-1');
+		$written->expects($this->once())->method('putContent')->with($this->isType('string'));
+		$afterWrite = $this->outlineFileMock('etag-2');
+		$afterWrite->expects($this->never())->method('putContent');
+		$store = $this->storeOverNodeSequence([$beforeLock, $written, $afterWrite]);
+
+		$etag = $store->save('alice', 42, new Outline('Plan', []), 'etag-1');
+
+		$this->assertSame('etag-2', $etag);
+	}
+
+	/** @return File&\PHPUnit\Framework\MockObject\MockObject */
+	private function outlineFileMock(string $etag): File {
+		$file = $this->createMock(File::class);
+		$file->method('getId')->willReturn(42);
+		$file->method('getName')->willReturn('Plan.opml');
+		$file->method('getPath')->willReturn('/alice/files/Outlines/Plan.opml');
+		$file->method('getEtag')->willReturn($etag);
+		return $file;
+	}
+
+	/**
+	 * A store whose Outlines folder returns the given nodes for id 42 in turn,
+	 * one per getById() call, repeating the last one after that.
+	 *
+	 * @param list<File> $nodes
+	 */
+	private function storeOverNodeSequence(array $nodes, ?FakeLockingProvider $locks = null): OutlineStore {
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$userFolder = $this->createMock(Folder::class);
+		$outlinesFolder = $this->createMock(Folder::class);
+
+		$rootFolder->method('getUserFolder')->with('alice')->willReturn($userFolder);
+		$userFolder->method('nodeExists')->with('Outlines')->willReturn(true);
+		$userFolder->method('get')->with('Outlines')->willReturn($outlinesFolder);
+
+		$call = 0;
+		$outlinesFolder->method('getById')->with(42)->willReturnCallback(
+			function () use ($nodes, &$call): array {
+				$node = $nodes[min($call, count($nodes) - 1)];
+				$call++;
+				return [$node];
+			},
+		);
+
+		return new OutlineStore($rootFolder, new OpmlCodec(), $locks ?? new FakeLockingProvider());
+	}
+
+	private \ArrayObject $nodeLocked;
+
+	/**
+	 * A store over a mocked File with id 42 in the user's Outlines folder. Like
+	 * Nextcloud, the file's putContent() throws LockedException when the file node
+	 * itself was locked through $file->lock(); tests set putContent via expectPutContent().
+	 *
+	 * @return array{0: OutlineStore, 1: File&\PHPUnit\Framework\MockObject\MockObject}
+	 */
+	private function expectPutContent(File $file, ?callable $inner = null): void {
+		$nodeLocked = $this->nodeLocked;
+		$file->expects($this->once())->method('putContent')->willReturnCallback(
+			function () use ($nodeLocked, $inner): void {
+				if ($nodeLocked['locked']) {
+					throw new LockedException('/Outlines/Plan.opml');
+				}
+				if ($inner !== null) {
+					$inner();
+				}
+			},
+		);
+	}
+
+	private function storeWithLockModelingFile(?FakeLockingProvider $locks = null): array {
+		$rootFolder = $this->createMock(IRootFolder::class);
+		$userFolder = $this->createMock(Folder::class);
+		$outlinesFolder = $this->createMock(Folder::class);
+		$file = $this->createMock(File::class);
+		$this->nodeLocked = new \ArrayObject(['locked' => false]);
+		$nodeLocked = $this->nodeLocked;
+
+		$rootFolder->method('getUserFolder')->with('alice')->willReturn($userFolder);
+		$userFolder->method('nodeExists')->with('Outlines')->willReturn(true);
+		$userFolder->method('get')->with('Outlines')->willReturn($outlinesFolder);
+
+		$file->method('getId')->willReturn(42);
+		$file->method('getName')->willReturn('Plan.opml');
+		$file->method('lock')->willReturnCallback(function () use ($nodeLocked, $file): File {
+			$nodeLocked['locked'] = true;
+			return $file;
+		});
+		$file->method('unlock')->willReturnCallback(function () use ($nodeLocked, $file): File {
+			$nodeLocked['locked'] = false;
+			return $file;
+		});
+		$outlinesFolder->method('getById')->with(42)->willReturn([$file]);
+
+		return [new OutlineStore($rootFolder, new OpmlCodec(), $locks ?? new FakeLockingProvider()), $file];
+	}
+
 
 	public function testSaveCopyWritesNameMyCopyOpml(): void {
 		$rootFolder = $this->createMock(IRootFolder::class);
@@ -337,7 +566,7 @@ final class OutlineStoreTest extends TestCase {
 				return str_contains($xml, 'Project Plan');
 			}));
 
-		$store = new OutlineStore($rootFolder, $codec);
+		$store = new OutlineStore($rootFolder, $codec, new FakeLockingProvider());
 		$outline = new Outline('Project Plan', [new Row('r1', 'Item 1', '')]);
 
 		$result = $store->saveCopy('alice', 10, $outline);
@@ -347,5 +576,46 @@ final class OutlineStoreTest extends TestCase {
 			'name' => 'Project Plan (my copy).opml',
 			'etag' => 'copy-etag',
 		], $result);
+	}
+}
+
+/**
+ * In-memory ILockingProvider: tracks held keys, refuses a key that is already held.
+ */
+final class FakeLockingProvider implements ILockingProvider {
+	/** @var array<string, int> */
+	public array $held = [];
+
+	/** @param list<string>|null $events */
+	public function __construct(private ?array &$events = null) {
+	}
+
+	public function isLocked(string $path, int $type): bool {
+		return isset($this->held[$path]);
+	}
+
+	public function acquireLock(string $path, int $type, ?string $readablePath = null): void {
+		if (isset($this->held[$path])) {
+			throw new LockedException($readablePath ?? $path);
+		}
+		$this->held[$path] = $type;
+		if ($this->events !== null) {
+			$this->events[] = 'acquire';
+		}
+	}
+
+	public function releaseLock(string $path, int $type): void {
+		unset($this->held[$path]);
+		if ($this->events !== null) {
+			$this->events[] = 'release';
+		}
+	}
+
+	public function changeLock(string $path, int $targetType): void {
+		$this->held[$path] = $targetType;
+	}
+
+	public function releaseAll(): void {
+		$this->held = [];
 	}
 }

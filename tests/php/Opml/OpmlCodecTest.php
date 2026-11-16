@@ -179,4 +179,145 @@ final class OpmlCodecTest extends TestCase {
 		$this->assertStringContainsString('<body/>', $xml);
 		$this->assertSame([], (new OpmlCodec())->parse($xml)->rows);
 	}
+
+	public function testParsesNoteHiddenAttribute(): void {
+		$outline = $this->parse('<body><outline text="A" _note="n" nco:noteHidden="true"/></body>');
+
+		$this->assertSame('n', $outline->rows[0]->note);
+		$this->assertTrue($outline->rows[0]->noteHidden);
+	}
+
+	public function testDefaultsNoteHiddenToFalse(): void {
+		$outline = $this->parse('<body><outline text="A" _note="n"/></body>');
+
+		$this->assertFalse($outline->rows[0]->noteHidden);
+	}
+
+	public function testWritesNoteHiddenAttribute(): void {
+		$outline = new Outline('T', [new Row('r1', 'A', 'n', false, [], [], true)]);
+
+		$xml = (new OpmlCodec())->write($outline);
+		$this->assertStringContainsString('nco:noteHidden="true"', $xml);
+	}
+
+	public function testWritesNoNoteHiddenAttributeWhenFalse(): void {
+		$outline = new Outline('T', [new Row('r1', 'A', 'n')]);
+
+		$xml = (new OpmlCodec())->write($outline);
+		$this->assertStringNotContainsString('nco:noteHidden', $xml);
+	}
+
+	public function testRoundTripWithNoteHidden(): void {
+		$original = new Outline('T', [
+			new Row('r1', 'A', 'a note', false, [
+				new Row('r2', 'B', '', false, [], [], true),
+			], [], true),
+		]);
+
+		$codec = new OpmlCodec();
+		$parsed = $codec->parse($codec->write($original));
+
+		$this->assertEquals($original, $parsed);
+	}
+
+	public function testRowArrayRoundTripKeepsNoteHidden(): void {
+		$row = new Row('r1', 'A', 'a note', true, [new Row('r2', 'B', '', false, [], [], true)], [], true);
+
+		$parsed = Row::fromArray($row->toArray());
+
+		$this->assertEquals($row, $parsed);
+		$this->assertTrue($parsed->noteHidden);
+	}
+
+	public function testUnknownRowAttributesAndHeadElementsSurviveRoundTrip(): void {
+		$codec = new OpmlCodec();
+		$outline = $codec->parse('<opml xmlns:foo="urn:foo"><head><title>T</title><dateCreated>today</dateCreated><ownerName>A</ownerName></head><body><outline text="x" _status="checked" type="x" foo:flag="yes"/></body></opml>');
+		$this->assertSame('checked', $outline->rows[0]->extra['_status']);
+		$this->assertSame('urn:foo', $outline->rows[0]->extra['xmlns:foo']);
+		$xml = $codec->write($outline);
+		$again = $codec->parse($xml);
+		$this->assertSame($outline->rows[0]->extra, $again->rows[0]->extra);
+		$this->assertCount(2, $again->headExtra);
+		$document = new \DOMDocument();
+		$this->assertTrue($document->loadXML($xml, LIBXML_NONET));
+		$xpath = new \DOMXPath($document);
+		$this->assertSame('today', $xpath->evaluate('string(/opml/head/dateCreated)'));
+		$this->assertSame('A', $xpath->evaluate('string(/opml/head/ownerName)'));
+	}
+
+	public function testExtraAttributesSurviveTheRowApiAndCannotOverrideManagedFields(): void {
+		$row = Row::fromArray(['id' => 'id1', 'text' => 'managed', 'extra' => ['_status' => 'checked', 'text' => 'override', 'nco:id' => 'override', 'nco:collapsed' => 'true']]);
+		$this->assertSame(['_status' => 'checked', 'text' => 'override', 'nco:id' => 'override', 'nco:collapsed' => 'true'], $row->toArray()['extra']);
+		$xml = (new OpmlCodec())->write(new \OCA\NcOutliner\Opml\Outline('', [$row]));
+		$this->assertStringContainsString('text="managed"', $xml);
+		$this->assertStringContainsString('_status="checked"', $xml);
+		$this->assertStringContainsString('nco:id="id1"', $xml);
+		$this->assertStringNotContainsString('nco:collapsed="true"', $xml);
+	}
+
+	public function testNoteHiddenIsManagedAndCannotBeDuplicatedOrOverridden(): void {
+		$codec = new OpmlCodec();
+		$outline = $this->parse('<body><outline text="A" _note="n" nco:noteHidden="true" foo="bar"/></body>');
+		$xml = $codec->write($outline);
+
+		$this->assertSame(1, substr_count($xml, 'nco:noteHidden="true"'));
+		$this->assertStringContainsString('foo="bar"', $xml);
+		$this->assertArrayNotHasKey('nco:noteHidden', $outline->rows[0]->extra);
+
+		$again = $codec->parse($xml);
+		$this->assertTrue($again->rows[0]->noteHidden);
+		$this->assertSame('bar', $again->rows[0]->extra['foo']);
+		$this->assertArrayNotHasKey('nco:noteHidden', $again->rows[0]->extra);
+
+		$overriding = new Outline('', [new Row('r1', 'A', '', false, [], ['nco:noteHidden' => 'false'], true)]);
+		$overridingXml = $codec->write($overriding);
+		$this->assertSame(1, substr_count($overridingXml, 'nco:noteHidden'));
+		$this->assertStringContainsString('nco:noteHidden="true"', $overridingXml);
+		$this->assertStringNotContainsString('nco:noteHidden="false"', $overridingXml);
+
+		$introducing = new Outline('', [new Row('r1', 'A', '', false, [], ['nco:noteHidden' => 'true'])]);
+		$this->assertStringNotContainsString('nco:noteHidden', $codec->write($introducing));
+	}
+
+	public function testXmlNamespaceAndPrefixRebindingSurviveWrite(): void {
+		$codec = new OpmlCodec();
+		$outline = $codec->parse('<opml xmlns:a="urn:first"><head/><body><outline text="one" xml:lang="en" a:value="1"/><outline text="two" xmlns:a="urn:second" a:value="2"/></body></opml>');
+		$xml = $codec->write($outline);
+		$this->assertStringContainsString('xml:lang="en"', $xml);
+		$again = $codec->parse($xml);
+		$this->assertSame('urn:first', $again->rows[0]->extra['xmlns:a']);
+		$this->assertSame('urn:second', $again->rows[1]->extra['xmlns:a']);
+		$this->assertSame('1', $again->rows[0]->extra['a:value']);
+		$this->assertSame('2', $again->rows[1]->extra['a:value']);
+	}
+
+	public function testWritesNoXmlIllegalCharactersSoTheFileOpensAgain(): void {
+		// #225: control characters from a paste were saved as they were, and the file then failed to parse.
+		$codec = new OpmlCodec();
+		$original = new Outline("T\x01", [
+			new Row('r1', "a\x01b\x08c\x0Bd\u{FFFE}e\tf", "n\x02ote", false, [], ['x' => "v\x03"]),
+		], "/D\x04.odt");
+
+		$parsed = $codec->parse($codec->write($original));
+
+		$this->assertSame('T', $parsed->title);
+		$this->assertSame("abcde\tf", $parsed->rows[0]->text);
+		$this->assertSame('note', $parsed->rows[0]->note);
+		$this->assertSame('v', $parsed->rows[0]->extra['x']);
+		$this->assertSame('/D.odt', $parsed->publishPath);
+	}
+
+	public function testOpensAFileAlreadySavedWithXmlIllegalCharacters(): void {
+		// #225: outlines saved before the fix hold raw control characters, or character references to them.
+		$outline = $this->parse("<body><outline text=\"a\x01b\x08c\" _note=\"n&#1;o&#x8;te\"/><outline text=\"keep&#9;me &#38; &#x41;\"/></body>");
+
+		$this->assertSame('abc', $outline->rows[0]->text);
+		$this->assertSame('note', $outline->rows[0]->note);
+		$this->assertSame("keep\tme & A", $outline->rows[1]->text);
+	}
+
+	public function testStillRefusesXmlThatIsBrokenForOtherReasons(): void {
+		$this->expectException(OpmlParseException::class);
+		$this->parse("<body><outline text=\"a\x01\"></body>");
+	}
 }

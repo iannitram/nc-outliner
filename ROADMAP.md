@@ -2,10 +2,34 @@
 
 Goal: feature parity with OmniOutliner 6 Pro, adapted to a Nextcloud web app (the owner, 2026-10-22).
 
+Updated: 2026-11-11
+
+features:
+- files: Outline files in my Outlines folder: create, open, list, rename, duplicate, move, templates, metadata, password protection (F01, F20, F37, F54, F69)
+- editing: Type, indent, delete, move and drag rows from the keyboard and mouse, with undo and redo (F02, F03, F05, F08, F09, F19, F26, F55, F60)
+- folding: Expand and collapse rows, expand all, focus, text folding, sections sidebar (F04, F13, F18, F41, F42)
+- notes: Row notes and how they are shown (F06, F40)
+- checkboxes: Status checkboxes and calculated parent checkboxes; After 1.0 (F10, F17)
+- arrange: Work on several rows at once: select, cut, copy, paste, group, duplicate, sort (F11, F12, F21, F22, F29, F47)
+- publish: Publish to Doc as .odt, then Word and PowerPoint output (F07, F28, F68)
+- versions: Version list, preview, restore and named versions (F24)
+- autosave: Autosave, save status and the overwrite guard (F72)
+- import: Import OPML, plain text, Markdown, OmniOutliner native files and RTF (F25, F34, F58, F59)
+- export: Export plain text, OPML, Markdown, HTML, CSV and Excel; print and Save as PDF; After 1.0 (F27, F35, F50, F56, F57)
+- search: Search field, find next and previous, regex find, saved filters; After 1.0 (F14, F23, F49, F67)
+- text: Rich text in rows and notes: bold and italic, links in text, links to a row, formatting controls, right-to-left, typography; After 1.0 (F15, F16, F33, F36, F65, F66)
+- styles: Level styles, named styles and row numbering; After 1.0 (F30, F32, F48)
+- look: Look and layout: dark and light mode, themes, the design pass, document look options, zoom, typewriter mode, toolbar, phone layout (F31, F51, F52, F53, F61, F62, F71)
+- columns: Columns, column types, summaries, sort by column; After 1.0 (F43, F44, F45, F46)
+- attachments: Attachments and media: linked files, inline images, audio recording, read aloud; After 1.0 (F38, F39, F63, F64)
+- bug-report: Report a bug and the crash log (SPEC M14)
+- updates: Updates from the admin panel through the private app-store feed (F73, SPEC M15)
+- automation: Automation core, command line, MCP server, scripts and plug-ins; After 1.0 (F70, F74, F75, F76, F77)
+
 **How this file works**
 - Every feature has a fixed **ID** (F01, F02, …). IDs never change, so the Notes column can name dependencies even after rows move.
 - A feature moves **Unwritten → PR** when a pull request opens (add the PR link in Notes), and **PR → Merged** when it merges (add the merge date).
-- **Unwritten is ordered from most likely to be used to least likely**, judged for planning, school and work notes on a desktop browser.
+- **Unwritten is ordered from most likely to be used to least likely**, judged for planning and note-taking on a desktop browser.
 - **Complexity** is the predicted effort of writing the code: Low, Medium or High.
 - **Notes** names what a feature depends on ("Needs F09") and anything else a builder should know.
 
@@ -27,11 +51,26 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 |---|---|---|---|
 | | *(nothing yet)* | | |
 
+### Approved O1 design polish
+
+These refinements of existing features are in [PR #199](https://github.com/iannitram/nc-outliner/pull/199); they do not change the broader feature stages below.
+
+| Issue | Refinement | Stage |
+|---|---|---|
+| #182 | Inline notes and note icon | PR |
+| #188 | Empty-outline placeholder and keyboard card | PR |
+| #189 | Sort rows dialog, Escape and outline-change dismissal | PR |
+| #184 | Publish picker, feedback and status-line document link | PR |
+| #187 | Theme radios in Outliner settings | PR |
+| #190 | Container width, wrapped rows and touch controls | PR |
+
+---
+
 ## Unwritten
 
 | Rank | ID | Feature | Complexity | Notes (dependencies) |
 |---|---|---|---|---|
-| 0 | F73 | **Updates from the admin panel** (1.0, SPEC M15): signed releases through the merged app-store feed (craft-nc-appstore), offered on the Apps page and installed by its scheduled job | Medium | #128, #129, #130; needs craft-nc-appstore 1.0 **On main:** nothing yet; blocked on craft-nc-appstore #8, #10, #14. |
+| 0 | F73 | **Updates from the admin panel** (1.0, SPEC M15): signed releases through the merged app-store feed (private), offered on the Apps page and installed by its scheduled job | Medium | #128, #129, #130; needs the private app-store feed 1.0 **On main:** nothing yet; blocked on the feed's own tickets. |
 | 1 | F01 | **Outline files:** create and open `.opml` outlines in the user's `Outlines/` folder (created on first use), as the signed-in user | Medium | Foundation: everything depends on it. The file format needs room for row IDs, rich text, styles and columns later (OPML attributes plus an app namespace). Old plain-JS PR #1 was merged, then its code left main in #100 under ADR 0002 (start fresh) **On main:** OPML codec (#85, #103) and `OutlineStore` (#88); the API routes (#108) and the list view (#90) are open. |
 | 2 | F02 | **Type rows:** Enter adds a row below, typing edits it, Backspace on an empty row deletes it | Medium | Needs F01. The editing core: keyboard handling and caret movement between rows. Old plain-JS PR #2 closed as superseded 2026-10-25 (ADR 0002) **On main:** the model's `insertAfter`, `remove`, `updateRow` (#86, #105); the editor (#91) and keys (#107) are open. |
 | 3 | F03 | **Indent / outdent** with Tab and Shift+Tab; children move with their parent | Low | Needs F02. Old plain-JS PR #5 closed as superseded 2026-10-25 (ADR 0002) **On main:** the model's `indent` and `outdent` (#104); the keys (#92) are open. |
@@ -103,7 +142,24 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | 69 | F67 | **Regex find** | Low | Needs F23 |
 | 70 | F68 | **Export PowerPoint (.pptx):** top-level rows become slides | High | Needs F07's document model |
 | 71 | F69 | **Password-protected outlines** (client-side encryption) | High | Needs F01. Nextcloud's own encryption may be enough; decide before building |
-| 72 | F70 | **Automation and plug-ins:** a scripting API for the outline (the Omni Automation stand-in) | High | Needs a stable internal API, so after most of the above |
+| 72 | F70 | **Automation and plug-ins:** a scripting API for the outline (the Omni Automation stand-in) | High | Needs a stable internal API, so after most of the above. The scripting part moved to [Automation](#automation-after-10-added-2026-11-03-my-decision) (F77, added 2026-11-03); F70 keeps plug-ins (my own code loaded into the app) |
+
+### Automation (after 1.0, added 2026-11-03, my decision)
+
+Drive the outliner with no browser: a command line, an MCP server and script files, so an agent or I can test and iterate quickly, and an AI can use the outliner as a tool. It comes **right after the 1.0 work**, ahead of the after-1.0 rows in the table above, and does not change 1.0 (SPEC is unchanged).
+
+How it fits this app: the outline operations live in the browser model (`src/model/outline.js`, `src/model/history.js`), which has no browser dependencies, so **headless** means running that same model in Node on a local `.opml` file, reading and writing OPML and `.odt` through the app's own pure PHP classes (one codec, one publisher). **Attach** means talking to a running Nextcloud through the app's own JSON API with an app password. The command line is a small Node client (`nco`), not an `occ` command: an `occ` command would need a second copy of the model in PHP and a shell on the server. Same split as our other apps (core, command line, MCP, scripts); nothing is dropped. Code map: [Automation](CODEMAP.md#automation).
+
+Order: F74 first, then F77, then F75, then F76.
+
+| ID | Feature | Complexity | Notes |
+|---|---|---|---|
+| F74 | **Automation core:** one backend contract and one table of named outline operations, with a headless backend (the model in Node on a local `.opml`) and an attach backend (a running Nextcloud through the app's API) | High | #213. Needs F01, F05, F07 (all 1.0). First check: the app's routes accept an app password from outside the browser |
+| F75 | **Command line** `nco`: `list`, `show`, `run <script>`, `publish`, `mcp`; headless by default, `--attach` for a server | Medium | #214. Needs F74, F77 |
+| F76 | **MCP server** over stdio: list, open and create outlines; add, edit, delete, move, indent, outdent, collapse, expand and sort rows; run a script; undo, redo, save, Publish to Doc | Medium | #215. Needs F74, F75, F77. Column tools come with F43 and checkbox tools with F10 |
+| F77 | **Scripts:** a text file of outline operations, one per line, checked whole and applied as one undo step; headless, through MCP, or from the ⋯ menu in the browser | Medium | #216. Needs F74 |
+
+**Done when** an AI agent completes 10 real editing tasks through the MCP server with no browser, and the same 10 with `--attach` against a test Nextcloud (F76's test).
 
 ---
 
@@ -116,7 +172,7 @@ Sources: Omni's OmniOutliner 5 Pro reference manual (v5.1.2: menus, outline, sid
 | Touch Bar customization | Mac hardware | None |
 | LinkBack (edit embedded content in its source app) | macOS inter-app protocol | F38 opens attachments in their own Nextcloud app |
 | Liquid Glass design, Apple Vision Pro app | Apple platform UI | F31 themes |
-| Apple Shortcuts actions, Apple Intelligence plug-ins | Apple platform | F70 |
+| Apple Shortcuts actions, Apple Intelligence plug-ins | Apple platform | F70 plug-ins; F75 command line and F76 MCP server |
 | Dictation, Emoji & Symbols window | Provided by the OS and browser | Works in any text field already |
 | Universal licensing, free trial, Free Viewer Mode | Commercial licensing | None (private app) |
 | Share to another app as plain text | macOS share sheet | F35 export, F36 row links |

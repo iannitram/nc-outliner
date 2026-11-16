@@ -11,7 +11,7 @@ Blocked by: <#N, or delete this line>
 Done when: <what is true when it is finished>
 
 <!-- Easy issues only: -->
-## Qwen brief
+## Brief
 Expectation: <exactly what it must do, with the expected results written out>
 Code map snippet:
 ```

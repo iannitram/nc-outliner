@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nc-outliner design pass</title>
+<style>
+/* ============ Presentation page (not part of the app) ============ */
+:root {
+	--page-bg: #e9e7e3;
+	--page-text: #1f1f1f;
+	--page-muted: #5c5c5c;
+	--pin: #c4421a;
+	--sys: system-ui, -apple-system, "Segoe UI", Roboto, Oxygen-Sans, Cantarell, Ubuntu, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page-bg); color: var(--page-text); font: 15px/1.5 var(--sys); }
+.page { max-width: 1340px; margin: 0 auto; padding: 40px 30px 120px; }
+.page > header h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.01em; }
+.page > header p { margin: 0; color: var(--page-muted); max-width: 70ch; text-wrap: pretty; }
+.toc { display: flex; flex-wrap: wrap; gap: 6px 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+.toc a { display: block; padding: 4px 10px; border-radius: 999px; background: #fff; color: var(--page-text); text-decoration: none; font-size: 13px; border: 1px solid #d6d3cd; }
+.toc a:hover { border-color: #9b968c; }
+section.s { margin-top: 64px; }
+section.s > h2 { font-size: 21px; margin: 0 0 4px; display: flex; gap: 10px; align-items: baseline; }
+section.s > h2 .k { font: 600 13px/1 var(--sys); color: #fff; background: #333; padding: 4px 7px; border-radius: 6px; }
+section.s > p.cap { margin: 0 0 16px; color: var(--page-muted); max-width: 80ch; text-wrap: pretty; }
+.label { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin: 22px 0 8px; color: var(--page-text); }
+.label .tag { font-weight: 600; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; padding: 3px 7px; border-radius: 5px; }
+.tag.cur { background: #f3d9d2; color: #7a2410; }
+.tag.new { background: #d4ead9; color: #1d5b2e; }
+.label .dim { color: var(--page-muted); font-weight: 400; }
+.scroller { overflow-x: auto; padding-bottom: 6px; }
+.frame { position: relative; overflow: hidden; border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.12); flex: none; }
+.w1280 { width: 1280px; height: 800px; }
+.w1024 { width: 1024px; height: 720px; }
+.phone { width: 390px; height: 844px; border-radius: 34px; border: 9px solid #1d1d1f; }
+.crop { width: 100%; }
+.row-of { overflow-x: auto; padding-bottom: 6px; display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+.legend { margin: 12px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 8px 28px; max-width: 1280px; }
+.legend li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; text-wrap: pretty; }
+.legend li b.num, .pin { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--pin); color: #fff; font: 700 12px/22px var(--sys); text-align: center; }
+.pin { position: absolute; z-index: 40; box-shadow: 0 0 0 3px rgba(255,255,255,.85); }
+.note-box { background: #fff; border: 1px solid #d6d3cd; border-radius: 10px; padding: 14px 18px; font-size: 14px; max-width: 1280px; margin-top: 14px; }
+.note-box b { font-weight: 600; }
+
+/* ============ Nextcloud 33 tokens (approximated) ============ */
+.nc {
+	--color-main-background: #ffffff;
+	--color-main-background-blur: rgba(255,255,255,.86);
+	--color-main-text: #222222;
+	--color-text-maxcontrast: #6b6b6b;
+	--color-border: #ededed;
+	--color-border-maxcontrast: #8f8f8f;
+	--color-background-hover: #f3f3f3;
+	--color-background-dark: #ededed;
+	--color-primary-element: #00679e;
+	--color-primary-element-text: #ffffff;
+	--color-primary-element-light: #e3eef5;
+	--color-primary-element-light-text: #00293f;
+	--color-success: #2d7b41;
+	--color-warning-text: #8a5300;
+	--color-warning-bg: #fdf1dc;
+	--color-error-text: #b0281c;
+	--nc-bg: #1d6aa0;
+	--border-radius-element: 8px;
+	--border-radius-container: 12px;
+	--border-radius-large: 16px;
+	--default-grid-baseline: 4px;
+	--default-clickable-area: 34px;
+	--band-1: color-mix(in srgb, var(--color-primary-element) 9%, var(--color-main-background));
+	--band-2: color-mix(in srgb, var(--color-primary-element) 4%, var(--color-main-background));
+	--shadow: 0 2px 10px rgba(0,0,0,.14), 0 12px 40px rgba(0,0,0,.14);
+	font: 15px/1.5 var(--sys);
+	color: var(--color-main-text);
+	background: var(--nc-bg);
+	height: 100%;
+	display: grid;
+	grid-template-rows: 50px minmax(0, 1fr);
+}
+.nc.dark {
+	--color-main-background: #171717;
+	--color-main-background-blur: rgba(26,26,26,.9);
+	--color-main-text: #ebebeb;
+	--color-text-maxcontrast: #9a9a9a;
+	--color-border: #2e2e2e;
+	--color-border-maxcontrast: #7a7a7a;
+	--color-background-hover: #262626;
+	--color-background-dark: #2a2a2a;
+	--color-primary-element: #1a7cc0;
+	--color-primary-element-text: #ffffff;
+	--color-primary-element-light: #18303f;
+	--color-primary-element-light-text: #d5e9f7;
+	--color-success: #5cbf75;
+	--color-warning-text: #f0bf6e;
+	--color-warning-bg: #3a2c12;
+	--nc-bg: #0d2a40;
+	--band-1: color-mix(in srgb, #4ea3e0 13%, var(--color-main-background));
+	--band-2: color-mix(in srgb, #4ea3e0 6%, var(--color-main-background));
+	--shadow: 0 2px 10px rgba(0,0,0,.5), 0 12px 40px rgba(0,0,0,.5);
+}
+
+/* icons */
+svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; display: block; }
+svg.i.sm { width: 16px; height: 16px; }
+svg.i.xs { width: 14px; height: 14px; }
+svg.i.lg { width: 64px; height: 64px; stroke-width: 1.2; }
+
+/* NC header */
+.nc-head { display: flex; align-items: center; gap: 4px; padding: 0 10px 0 14px; color: #fff; }
+.nc-logo { display: flex; gap: 2px; align-items: center; margin-right: 14px; }
+.nc-logo i { width: 11px; height: 11px; border-radius: 50%; border: 2.5px solid #fff; display: block; }
+.nc-logo i:nth-child(2) { width: 15px; height: 15px; }
+.nc-app { width: 44px; height: 50px; display: grid; place-items: center; opacity: .72; position: relative; }
+.nc-app.on { opacity: 1; }
+.nc-app.on::after { content: ""; position: absolute; bottom: 5px; width: 4px; height: 4px; border-radius: 50%; background: #fff; }
+.nc-sp { flex: 1; }
+.nc-avatar { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.25); display: grid; place-items: center; font-size: 12px; font-weight: 600; margin-left: 6px; }
+
+/* NC body: nav + content */
+.nc-body { margin: 0 8px 8px; border-radius: var(--border-radius-container); overflow: hidden; display: flex; background: var(--color-main-background); position: relative; min-height: 0; }
+.nav { width: 300px; flex: none; background: var(--color-main-background-blur); border-right: 1px solid var(--color-border); display: flex; flex-direction: column; padding: 8px; gap: 2px; min-height: 0; }
+.app { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; background: var(--color-main-background); }
+.side { width: 400px; flex: none; border-left: 1px solid var(--color-border); background: var(--color-main-background); display: flex; flex-direction: column; min-height: 0; }
+
+/* buttons */
+.btn { height: var(--default-clickable-area); padding: 0 14px; border-radius: var(--border-radius-element); border: 0; font: 600 14px/1 var(--sys); display: inline-flex; align-items: center; gap: 8px; background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); white-space: nowrap; }
+.btn.primary { background: var(--color-primary-element); color: var(--color-primary-element-text); }
+.btn.tertiary { background: transparent; color: var(--color-main-text); padding: 0 10px; }
+.btn.tertiary:hover, .btn.tertiary.hover { background: var(--color-background-hover); }
+.btn.wide { width: 100%; justify-content: center; }
+.ib { width: var(--default-clickable-area); height: var(--default-clickable-area); border-radius: var(--border-radius-element); display: grid; place-items: center; color: var(--color-main-text); background: transparent; border: 0; flex: none; }
+.ib.hover { background: var(--color-background-hover); }
+.ib.on { background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); }
+.ib.xs { width: 26px; height: 26px; color: var(--color-text-maxcontrast); }
+
+/* nav items */
+.nav-new { padding: 2px 2px 8px; }
+.ni { display: flex; flex-direction: column; padding: 7px 12px; border-radius: var(--border-radius-element); gap: 1px; position: relative; }
+.ni .nm { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ni .dt { font-size: 12.5px; color: var(--color-text-maxcontrast); }
+.ni.on { background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); }
+.ni.on .nm { font-weight: 600; }
+.ni.on .dt { color: inherit; opacity: .8; }
+.ni.hover { background: var(--color-background-hover); }
+.nav-cap { font-size: 12px; font-weight: 600; color: var(--color-text-maxcontrast); padding: 10px 12px 4px; }
+.nav-foot { margin-top: auto; border-top: 1px solid var(--color-border); padding-top: 6px; }
+.nav-foot .ni { flex-direction: row; align-items: center; gap: 10px; }
+
+/* outline top bar */
+.tb { height: 52px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 10px 0 8px; border-bottom: 1px solid transparent; }
+.tb .title { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding: 0 6px; }
+.tb .title.placeholder { color: var(--color-text-maxcontrast); font-weight: 500; }
+.tb .sp { flex: 1; }
+.tb .warn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 999px; background: var(--color-warning-bg); color: var(--color-warning-text); font-size: 13px; font-weight: 600; margin-right: 6px; }
+
+/* document column + rows */
+.doc { flex: 1; min-height: 0; overflow: hidden; padding: 6px 0 28px; }
+.col { max-width: 820px; margin: 0 auto; padding: 0 44px; }
+.r { --d: 0; --lh: 24px; display: flex; align-items: flex-start; gap: 2px; padding: 3px 10px 3px calc(8px + var(--d) * 24px); position: relative; border-radius: var(--border-radius-element); font-size: 15px; }
+.r .g { width: 24px; height: var(--lh); flex: none; display: grid; place-items: center; color: var(--color-text-maxcontrast); }
+.r .t { flex: 1; min-width: 0; line-height: var(--lh); text-wrap: pretty; }
+.r .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; display: block; }
+.r .tri { width: 11px; height: 11px; fill: currentColor; stroke: none; transition: transform .15s; }
+.r .tri.open { transform: rotate(90deg); }
+.r.l1 { --lh: 30px; font-size: 19px; font-weight: 650; letter-spacing: -0.005em; background: var(--band-1); margin-top: 18px; padding-top: 5px; padding-bottom: 5px; }
+.r.l1:first-child { margin-top: 4px; }
+.r.l2 { --lh: 26px; font-size: 16px; font-weight: 600; background: var(--band-2); margin-top: 8px; padding-top: 4px; padding-bottom: 4px; }
+.r .more { font-size: 12.5px; font-weight: 500; color: var(--color-text-maxcontrast); margin-left: 8px; letter-spacing: 0; }
+.r .h { position: absolute; left: calc(var(--d) * 24px - 12px); top: 50%; transform: translateY(-50%); color: var(--color-text-maxcontrast); display: none; }
+.r .acts { display: none; align-self: center; margin-left: 8px; }
+.r.hover { background-color: var(--color-background-hover); }
+.r.l1.hover { background-color: color-mix(in srgb, var(--band-1) 70%, var(--color-background-dark)); }
+.r.hover .h, .r.hover .acts { display: flex; }
+.r .notemark { align-self: center; color: var(--color-text-maxcontrast); margin-left: 8px; display: flex; }
+.r.focus { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-primary-element) 55%, transparent); }
+.caret { display: inline-block; width: 1.5px; height: 1.1em; background: var(--color-main-text); vertical-align: -0.15em; margin-left: 1px; }
+.r .ph { color: var(--color-text-maxcontrast); font-weight: 400; }
+.n { --d: 0; padding: 0 12px 6px calc(8px + var(--d) * 24px + 26px); font-size: 13.5px; line-height: 1.5; color: var(--color-text-maxcontrast); text-wrap: pretty; }
+.r.l1 + .n, .r.l2 + .n { background: inherit; }
+
+/* status line */
+.sl { height: 30px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-top: 1px solid var(--color-border); font-size: 12.5px; color: var(--color-text-maxcontrast); white-space: nowrap; overflow: hidden; }
+.sl .ok { display: inline-flex; align-items: center; gap: 5px; }
+.sl .sp { flex: 1; }
+.sl a { color: var(--color-text-maxcontrast); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; }
+.sl a b { color: var(--color-primary-element); font-weight: 600; }
+.nc.dark .sl a b { color: #6fb6ea; }
+.sl.warn { color: var(--color-warning-text); background: var(--color-warning-bg); }
+.sl.busy .spin { animation: none; }
+
+/* menus, dialogs, toasts */
+.menu { position: absolute; z-index: 20; width: 248px; background: var(--color-main-background); border-radius: var(--border-radius-container); box-shadow: var(--shadow); padding: 4px; }
+.mi { display: flex; align-items: center; gap: 12px; height: 38px; padding: 0 10px; border-radius: var(--border-radius-element); font-size: 14.5px; }
+.mi.hover { background: var(--color-background-hover); }
+.mi .kbd { margin-left: auto; font-size: 12px; color: var(--color-text-maxcontrast); }
+.msep { height: 1px; background: var(--color-border); margin: 4px 6px; }
+.scrim { position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,.45); display: grid; place-items: center; }
+.dialog { background: var(--color-main-background); color: var(--color-main-text); border-radius: var(--border-radius-large); box-shadow: var(--shadow); display: flex; flex-direction: column; overflow: hidden; }
+.dialog .dh { display: flex; align-items: center; gap: 8px; padding: 14px 10px 6px 20px; }
+.dialog .dh h3 { margin: 0; font-size: 18px; font-weight: 650; flex: 1; min-width: 0; }
+.dialog .db { padding: 8px 20px 4px; }
+.dialog .df { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 16px 16px; }
+.toast { position: absolute; z-index: 25; top: 62px; right: 16px; width: 380px; background: var(--color-main-background); color: var(--color-main-text); border-radius: var(--border-radius-container); box-shadow: var(--shadow); padding: 12px 12px 12px 14px; display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.toast .ok { color: var(--color-success); margin-top: 1px; }
+.toast a { color: var(--color-primary-element); font-weight: 600; text-decoration: none; display: inline-flex; gap: 4px; align-items: center; }
+
+/* fields */
+.field { height: 36px; border: 1.5px solid var(--color-border-maxcontrast); border-radius: var(--border-radius-element); display: flex; align-items: center; padding: 0 10px; gap: 8px; font-size: 14.5px; background: var(--color-main-background); }
+.field.focus { border-color: var(--color-primary-element); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary-element) 25%, transparent); }
+.field .fl { color: var(--color-text-maxcontrast); }
+.radio { display: flex; align-items: center; gap: 10px; height: 36px; font-size: 14.5px; }
+.radio i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--color-border-maxcontrast); display: block; flex: none; }
+.radio.on i { border: 5.5px solid var(--color-primary-element); }
+.seg { display: inline-flex; border-radius: var(--border-radius-element); background: var(--color-background-hover); padding: 3px; gap: 2px; }
+.seg span { padding: 6px 14px; border-radius: 6px; font-size: 14px; font-weight: 600; color: var(--color-text-maxcontrast); }
+.seg span.on { background: var(--color-main-background); color: var(--color-main-text); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.muted { color: var(--color-text-maxcontrast); }
+.small { font-size: 13px; }
+
+/* empty content */
+.empty { flex: 1; display: grid; place-items: center; text-align: center; padding: 40px; }
+.empty .ico { color: var(--color-text-maxcontrast); opacity: .55; display: grid; place-items: center; margin-bottom: 14px; }
+.empty h2 { font-size: 20px; margin: 0 0 6px; font-weight: 650; }
+.empty p { margin: 0 auto 18px; max-width: 42ch; color: var(--color-text-maxcontrast); text-wrap: pretty; }
+.empty .acts { display: flex; gap: 8px; justify-content: center; }
+
+/* hint card (first run) */
+.hints { margin: 22px 8px 0 34px; padding: 14px 16px; border-radius: var(--border-radius-container); background: var(--color-background-hover); color: var(--color-text-maxcontrast); font-size: 13.5px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 18px; }
+.hints .hd { grid-column: 1 / -1; display: flex; justify-content: space-between; color: var(--color-main-text); font-weight: 600; font-size: 13.5px; }
+.hints .hd span:last-child { color: var(--color-text-maxcontrast); font-weight: 500; }
+kbd { font: 600 11.5px/1 var(--sys); padding: 3px 6px; border-radius: 5px; background: var(--color-main-background); border: 1px solid var(--color-border-maxcontrast); color: var(--color-main-text); margin-right: 3px; }
+
+/* picker */
+.picker { width: 820px; height: 560px; }
+.picker .pb { flex: 1; display: flex; min-height: 0; border-top: 1px solid var(--color-border); margin-top: 8px; }
+.picker .pnav { width: 190px; padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--color-border); }
+.picker .pnav .ni { flex-direction: row; align-items: center; gap: 10px; padding: 8px 10px; }
+.picker .pmain { flex: 1; min-width: 0; padding: 10px 16px; display: flex; flex-direction: column; gap: 10px; }
+.crumbs { display: flex; align-items: center; gap: 4px; font-size: 14.5px; }
+.crumbs span { padding: 4px 6px; border-radius: 6px; }
+.crumbs .last { font-weight: 600; }
+.ft { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.ft th { text-align: left; font-weight: 500; color: var(--color-text-maxcontrast); font-size: 13px; padding: 6px 8px; border-bottom: 1px solid var(--color-border); }
+.ft td { padding: 9px 8px; border-bottom: 1px solid var(--color-border); }
+.ft td.nm { display: flex; align-items: center; gap: 10px; }
+.ft td .fold { color: var(--color-primary-element); }
+.nc.dark .ft td .fold { color: #6fb6ea; }
+.ft tr.sel td { background: var(--color-primary-element-light); }
+.ft td.mt { color: var(--color-text-maxcontrast); width: 150px; }
+
+/* versions sidebar */
+.side .sh { padding: 14px 10px 10px 20px; display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--color-border); }
+.side .sh h3 { margin: 0; font-size: 18px; font-weight: 650; }
+.side .sh .sub { font-size: 13px; color: var(--color-text-maxcontrast); }
+.side .sbody { flex: 1; overflow: hidden; padding: 8px 8px; }
+.vg { font-size: 12px; font-weight: 600; color: var(--color-text-maxcontrast); padding: 12px 12px 4px; }
+.v { display: flex; align-items: center; gap: 10px; padding: 8px 6px 8px 12px; border-radius: var(--border-radius-element); }
+.v .vm { flex: 1; min-width: 0; }
+.v .vt { font-size: 14.5px; }
+.v .vs { font-size: 12.5px; color: var(--color-text-maxcontrast); display: flex; align-items: center; gap: 5px; }
+.v .badge { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--color-background-hover); color: var(--color-text-maxcontrast); }
+.v.on { background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); }
+.v.on .vs { color: inherit; opacity: .85; }
+.v.hover { background: var(--color-background-hover); }
+.v .vlabel { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; font-size: 13px; color: var(--color-main-text); }
+.v.on .vlabel { color: inherit; }
+.v.bad .vt { color: var(--color-text-maxcontrast); }
+.vrename { padding: 4px 6px 10px 12px; display: flex; gap: 6px; align-items: center; }
+.vrename .field { flex: 1; }
+.banner { margin: 14px 44px 4px; padding: 12px 12px 12px 16px; border-radius: var(--border-radius-container); background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); display: flex; align-items: center; gap: 12px; font-size: 14px; flex-wrap: wrap; }
+.banner .bt { flex: 1; min-width: 200px; }
+.banner .bt b { display: block; font-size: 14.5px; }
+.banner.ok { background: color-mix(in srgb, var(--color-success) 12%, var(--color-main-background)); color: var(--color-main-text); }
+.readonly .r { opacity: .92; }
+
+/* ===== CURRENT (today) styles, reproduced from main ===== */
+.cur .nav { gap: 10px; padding: 12px; }
+.cur .curbtn { height: 34px; padding: 0 14px; border-radius: 8px; border: 0; background: var(--color-primary-element-light); color: var(--color-primary-element-light-text); font: 600 14px/1 var(--sys); display: inline-flex; align-items: center; width: max-content; }
+.cur .themerow { display: flex; justify-content: space-between; align-items: center; font-size: 15px; }
+.cur .sel { border: 1px solid var(--color-border-maxcontrast); border-radius: 8px; padding: 4px 26px 4px 8px; font-size: 14px; position: relative; }
+.cur .sel::after { content: "▾"; position: absolute; right: 8px; color: var(--color-text-maxcontrast); }
+.cur .hdr { display: flex; align-items: center; gap: 12px; padding: 0; }
+.cur .hdr h2 { font-size: 20px; margin: 14px 0; font-weight: 700; }
+.cur .hdr p { margin: 0; }
+.cur .sortbar { display: flex; align-items: center; gap: 8px; padding: 8px; font-size: 15px; }
+.cur .nb { height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--color-border-maxcontrast); background: var(--color-main-background); font: 14px/1 var(--sys); display: inline-flex; align-items: center; }
+.cur .crow { --d: 0; padding-left: calc(var(--d) * 24px); }
+.cur .cl { display: flex; align-items: center; min-height: 32px; gap: 4px; }
+.cur .cl .hd { width: 16px; text-align: center; color: var(--color-text-maxcontrast); opacity: .6; }
+.cur .cl .tg { width: 24px; text-align: center; }
+.cur .cl .in { flex: 1; padding: 4px 8px; border: 1px solid transparent; border-radius: 8px; line-height: 1.5; }
+.cur .cl .in.f { border-color: var(--color-primary-element); }
+.cur .cn { padding-left: 28px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.cur .cn .nt { font-size: 12.75px; color: var(--color-text-maxcontrast); padding: 2px 4px; }
+.cur .cn .ta { width: 100%; border: 1px solid var(--color-border); border-radius: 8px; padding: 6px 8px; line-height: 1.5; min-height: 54px; }
+.cur .cdoc { padding: 0 0 0 0; }
+</style>
+</head>
+<body>
+
+<!-- Icon sprite (simple stroke icons in the spirit of Material Design Icons, which Nextcloud uses) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+	<defs>
+		<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></symbol>
+		<symbol id="i-navopen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M9 4v16"></path></symbol>
+		<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></symbol>
+		<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"></path><path d="M10 20.5a2 2 0 0 0 4 0"></path></symbol>
+		<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none"></circle><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"></circle><circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none"></circle></symbol>
+		<symbol id="i-history" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"></path><path d="M3.5 4.5v4h4"></path><path d="M12 7.5V12l3 2"></path></symbol>
+		<symbol id="i-publish" viewBox="0 0 24 24"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"></path><path d="M14 3v5h5"></path><path d="M9 14.5l3-3 3 3"></path><path d="M12 11.5V17.5"></path></symbol>
+		<symbol id="i-tri" viewBox="0 0 12 12"><path d="M3.5 1.8l5.6 4.2-5.6 4.2z" fill="currentColor" stroke="none"></path></symbol>
+		<symbol id="i-drag" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><circle cx="9" cy="6" r="1.5"></circle><circle cx="15" cy="6" r="1.5"></circle><circle cx="9" cy="12" r="1.5"></circle><circle cx="15" cy="12" r="1.5"></circle><circle cx="9" cy="18" r="1.5"></circle><circle cx="15" cy="18" r="1.5"></circle></g></symbol>
+		<symbol id="i-note" viewBox="0 0 24 24"><path d="M5 4.5h14v11l-4.5 4.5H5z"></path><path d="M14.5 20v-4.5H19"></path><path d="M8.5 9h7M8.5 12.5h4"></path></symbol>
+		<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></symbol>
+		<symbol id="i-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"></path><circle cx="12" cy="12" r="6.6"></circle></symbol>
+		<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.8l2 2.2h8.2A1.5 1.5 0 0 1 21 9.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z" fill="currentColor" stroke="none"></path></symbol>
+		<symbol id="i-folder-o" viewBox="0 0 24 24"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.8l2 2.2h8.2A1.5 1.5 0 0 1 21 9.7v8.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"></path></symbol>
+		<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"></path></symbol>
+		<symbol id="i-check-c" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor" stroke="none"></circle><path d="M7.8 12.3l2.8 2.8 5.6-5.8" stroke="#fff" stroke-width="2.2"></path></symbol>
+		<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3.5l9.5 16.5h-19z"></path><path d="M12 10v4.5M12 17.2v.1"></path></symbol>
+		<symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6"></path><path d="M20 4l-8.5 8.5"></path><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></symbol>
+		<symbol id="i-sort" viewBox="0 0 24 24"><path d="M7 4v16M4 17l3 3 3-3"></path><path d="M13 6h8M13 11h6M13 16h4"></path></symbol>
+		<symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"></path></symbol>
+		<symbol id="i-outline" viewBox="0 0 24 24"><path d="M4 6h.01M8 6h12M8 11.5h.01M12 11.5h8M8 17h.01M12 17h8"></path></symbol>
+		<symbol id="i-import" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"></path><path d="M4 15.5v3A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-3"></path></symbol>
+		<symbol id="i-tag" viewBox="0 0 24 24"><path d="M3.5 12V4.5a1 1 0 0 1 1-1H12l8.5 8.5-8 8z"></path><circle cx="8" cy="8" r="1.3" fill="currentColor" stroke="none"></circle></symbol>
+		<symbol id="i-home" viewBox="0 0 24 24"><path d="M3.5 11L12 4l8.5 7"></path><path d="M6 9.5V20h12V9.5"></path></symbol>
+		<symbol id="i-bug" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="13" rx="5"></rect><path d="M12 11v9M4 13h3M17 13h3M5 8l2.5 2M19 8l-2.5 2M5 19l2.5-2M19 19l-2.5-2M9.5 5.5L10 7M14.5 5.5L14 7"></path></symbol>
+		<symbol id="i-cal" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="2"></rect><path d="M3.5 10h17M8 3v4M16 3v4"></path></symbol>
+		<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
+		<symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></symbol>
+		<symbol id="i-spin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" stroke-dasharray="34 50" stroke-width="2.4"></circle></symbol>
+		<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6.5A1.5 1.5 0 0 0 5 4.5v15A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V8z"></path><path d="M14 3v5h5"></path></symbol>
+		<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4 5.7-.8z"></path></symbol>
+		<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></symbol>
+	</defs>
+</svg>
+
+<div class="page">
+	<header>
+		<h1>Outliner: design pass for review</h1>
+		<p>Static mockups for issue #174. Nothing in the app has changed yet. Each section shows one screen; the outline view is shown as it is today and as proposed, so you can compare them. The numbered orange dots match the notes under each picture.</p>
+		<ul class="toc">
+			<li><a href="#a">A · Outline view: current vs proposed</a></li>
+			<li><a href="#b">B · Dark mode</a></li>
+			<li><a href="#c">C · Outline list and empty state</a></li>
+			<li><a href="#d">D · New, empty outline</a></li>
+			<li><a href="#e">E · Publish to Doc</a></li>
+			<li><a href="#f">F · Versions</a></li>
+			<li><a href="#g">G · Narrow window and phone</a></li>
+			<li><a href="#h">H · Where sort lives</a></li>
+		</ul>
+	</header>
+
+	<!-- ===================================================== A ===================================================== -->
+	<section class="s" id="a" data-screen-label="A Outline view">
+		<h2><span class="k">A</span> Outline view</h2>
+		<p class="cap">The same outline twice at 1280 px wide. Today every row carries its own controls; the proposal lets the text carry the structure and keeps controls out of sight until you point at a row.</p>
+
+		<div class="label"><span class="tag cur">Current</span> What main shows today <span class="dim">· reproduced from OutlineView, OutlineEditor and OutlineRow</span></div>
+		<div class="scroller">
+			<div class="frame w1280">
+				<div class="nc cur">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-cal"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-bell"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body">
+						<div class="nav">
+							<span class="curbtn">My outlines</span>
+							<div class="themerow"><span>Theme</span><span class="sel">Auto</span></div>
+						</div>
+						<div class="app">
+							<div class="ib" style="position:absolute;left:6px;top:8px;z-index:3;background:var(--color-main-background)"><svg class="i"><use href="#i-navopen"></use></svg></div>
+							<div class="hdr"><h2>Community garden plan</h2><p>Saved</p><span class="curbtn">Publish to Doc</span><span class="curbtn">Versions</span></div>
+							<div class="sortbar">Sort rows by <span class="sel">Topic</span><span class="nb">Ascending</span><span class="nb">Sort rows</span></div>
+							<div class="cdoc">
+								<div class="crow"><div class="cl"><span class="hd">⠿</span><span class="tg">▾</span><span class="in">Site and layout</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+								<div class="crow" style="--d:1"><div class="cl"><span class="hd">⠿</span><span class="tg">▾</span><span class="in">Beds</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+								<div class="crow" style="--d:2"><div class="cl"><span class="hd">⠿</span><span class="tg">•</span><span class="in">Six raised beds along the south fence</span></div><div class="cn"><span class="nt">Hide note</span><span class="ta">Check the fence line with the neighbours before anyone digs.</span></div></div>
+								<div class="crow" style="--d:2"><div class="cl"><span class="hd">⠿</span><span class="tg">•</span><span class="in">Paths between beds wide enough for a wheelbarrow</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+								<div class="crow" style="--d:2"><div class="cl"><span class="hd">⠿</span><span class="tg">•</span><span class="in">Two low beds by the gate for wheelchair users</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+								<div class="crow" style="--d:1"><div class="cl"><span class="hd">⠿</span><span class="tg">▸</span><span class="in">Water</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+								<div class="crow" style="--d:1"><div class="cl"><span class="hd">⠿</span><span class="tg">•</span><span class="in">Compost bays behind the shed</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+								<div class="crow"><div class="cl"><span class="hd">⠿</span><span class="tg">▾</span><span class="in f">Planting calendar</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+								<div class="crow" style="--d:1"><div class="cl"><span class="hd">⠿</span><span class="tg">▾</span><span class="in">Spring</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+								<div class="crow" style="--d:2"><div class="cl"><span class="hd">⠿</span><span class="tg">•</span><span class="in">Peas and broad beans in March</span></div><div class="cn"><span class="nt">Add note</span></div></div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<span class="pin" style="left:330px;top:66px">1</span>
+				<span class="pin" style="left:820px;top:66px">2</span>
+				<span class="pin" style="left:615px;top:122px">3</span>
+				<span class="pin" style="left:760px;top:230px">4</span>
+				<span class="pin" style="left:1000px;top:360px">5</span>
+			</div>
+		</div>
+		<ul class="legend">
+			<li><b class="num">1</b><span>The app's own content starts at the very top-left, where Nextcloud puts the navigation toggle, so the title can sit under it (check in the live app). The navigation holds one button and a theme drop-down.</span></li>
+			<li><b class="num">2</b><span>Title, "Saved", "Publish to Doc" and "Versions" share one row, at equal weight. In a narrower pane they wrap or squeeze the title.</span></li>
+			<li><b class="num">3</b><span>The sort bar is always there, though sorting is a rare, whole-outline action.</span></li>
+			<li><b class="num">4</b><span>Every row shows a drag handle, a triangle or bullet, a text box and an "Add note" button: four controls per line, so the text loses.</span></li>
+			<li><b class="num">5</b><span>Every level looks the same. Headings and bullets only show up after Publish to Doc.</span></li>
+		</ul>
+
+		<div class="label"><span class="tag new">Proposed</span> Typography carries the structure; controls appear on hover <span class="dim">· the pointer is on "Paths between beds…"</span></div>
+		<div class="scroller">
+			<div class="frame w1280">
+				<div class="nc">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-cal"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-bell"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body">
+						<div class="nav">
+							<div class="nav-new"><span class="btn primary wide"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span></div>
+							<div class="ni on"><span class="nm">Community garden plan</span><span class="dt">Edited just now</span></div>
+							<div class="ni"><span class="nm">Reading list</span><span class="dt">Yesterday</span></div>
+							<div class="ni"><span class="nm">Kitchen renovation</span><span class="dt">12 Oct</span></div>
+							<div class="ni"><span class="nm">Book club notes</span><span class="dt">3 Oct</span></div>
+							<div class="nav-foot"><div class="ni"><svg class="i sm"><use href="#i-cog"></use></svg><span class="nm">Outliner settings</span></div></div>
+						</div>
+						<div class="app">
+							<div class="tb">
+								<span class="ib"><svg class="i"><use href="#i-navopen"></use></svg></span>
+								<span class="title">Community garden plan</span>
+								<span class="sp"></span>
+								<span class="btn tertiary"><svg class="i"><use href="#i-publish"></use></svg>Publish</span>
+								<span class="ib" title="Versions"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib" title="More"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="doc"><div class="col">
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Site and layout</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Beds</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Six raised beds along the south fence</span></div>
+								<div class="n" style="--d:2">Check the fence line with the neighbours before anyone digs.</div>
+								<div class="r hover" style="--d:2"><span class="h"><svg class="i sm"><use href="#i-drag"></use></svg></span><span class="g"><i class="dot"></i></span><span class="t">Paths between beds wide enough for a wheelbarrow</span><span class="acts"><span class="ib xs" title="Add note"><svg class="i sm"><use href="#i-note"></use></svg></span></span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Two low beds by the gate for wheelchair users</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri"><use href="#i-tri"></use></svg></span><span class="t">Water<span class="more">3 rows</span></span></div>
+								<div class="r" style="--d:1"><span class="g"><i class="dot"></i></span><span class="t">Compost bays behind the shed</span><span class="notemark" title="Has a hidden note"><svg class="i xs"><use href="#i-note"></use></svg></span></div>
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Planting calendar</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Spring</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Peas and broad beans in March</span></div>
+								<div class="r focus" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Lettuce every two weeks from April<span class="caret"></span></span></div>
+								<div class="n" style="--d:2">Stagger sowings so the harvest doesn't arrive all at once.</div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Summer</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Tomatoes and beans out after the last frost</span></div>
+								<div class="r l1"><span class="g"><svg class="i tri"><use href="#i-tri"></use></svg></span><span class="t">Volunteers<span class="more">6 rows</span></span></div>
+							</div></div>
+							<div class="sl"><span class="ok"><svg class="i xs"><use href="#i-check"></use></svg>Saved</span><span>·</span><span>21 rows · 164 words</span><span class="sp"></span><a href="#e">Published to Documents/Community garden plan.odt · <b>Open document</b><svg class="i xs"><use href="#i-ext"></use></svg></a></div>
+						</div>
+					</div>
+				</div>
+				<span class="pin" style="left:300px;top:110px">1</span>
+				<span class="pin" style="left:1040px;top:66px">2</span>
+				<span class="pin" style="left:636px;top:122px">3</span>
+				<span class="pin" style="left:850px;top:188px">4</span>
+				<span class="pin" style="left:430px;top:242px">5</span>
+				<span class="pin" style="left:680px;top:335px">6</span>
+				<span class="pin" style="left:520px;top:757px">7</span>
+			</div>
+		</div>
+		<ul class="legend">
+			<li><b class="num">1</b><span>The navigation lists your outlines, newest first, like the Notes app. "New outline" sits at the top and the theme moves into "Outliner settings" at the bottom.</span></li>
+			<li><b class="num">2</b><span>A slim bar: the title on the left, then Publish, Versions (clock icon) and a ⋯ menu for the rarer actions. Nothing else competes with the title.</span></li>
+			<li><b class="num">3</b><span>Levels look like the document they publish to: top-level rows are large and sit on a tinted band (Heading 1), second-level parents are smaller on a lighter band (Heading 2), and everything else is body text with a small bullet. This follows the heading rule in ADR 0003.</span></li>
+			<li><b class="num">4</b><span>Notes sit right under their row in smaller, muted text, with no box around them until you click into one.</span></li>
+			<li><b class="num">5</b><span>The row under the pointer shows its drag handle (left) and an "Add note" icon (right); other rows show no controls. The triangles in the left gutter fold a branch.</span></li>
+			<li><b class="num">6</b><span>A folded branch says how many rows it hides. A row with a hidden note shows a small note mark.</span></li>
+			<li><b class="num">7</b><span>A quiet status line replaces "Saved" in the header and carries the link to the last published document.</span></li>
+		</ul>
+
+		<div class="label">Status line states <span class="dim">· autosave (M13). Only "Can't save" asks for attention, so only that state gets colour.</span></div>
+		<div class="nc" style="display:block;height:auto;background:transparent;max-width:1280px">
+			<div style="display:grid;gap:10px;background:var(--color-main-background);border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.08)">
+				<div class="sl" style="border-top:0"><span class="ok"><svg class="i xs"><use href="#i-check"></use></svg>Saved</span><span>·</span><span>21 rows · 164 words</span></div>
+				<div class="sl"><span class="ok"><svg class="i xs"><use href="#i-spin"></use></svg>Saving…</span><span>·</span><span>21 rows · 164 words</span></div>
+				<div class="sl warn"><span class="ok"><svg class="i xs"><use href="#i-alert"></use></svg><b>Can't save. Retrying</b></span><span>·</span><span>Your changes are kept in this tab. Don't close it yet.</span></div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ===================================================== B ===================================================== -->
+	<section class="s" id="b" data-screen-label="B Dark mode">
+		<h2><span class="k">B</span> Dark mode</h2>
+		<p class="cap">The same screen with Nextcloud set to dark, or the Theme setting on Dark. Every colour comes from Nextcloud's own variables, so dark mode needs no separate design. The level bands are a tint of the accent colour mixed into the background, so they stay quiet on black too.</p>
+		<div class="scroller">
+			<div class="frame w1280">
+				<div class="nc dark">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-cal"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-bell"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body">
+						<div class="nav">
+							<div class="nav-new"><span class="btn primary wide"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span></div>
+							<div class="ni on"><span class="nm">Community garden plan</span><span class="dt">Edited just now</span></div>
+							<div class="ni"><span class="nm">Reading list</span><span class="dt">Yesterday</span></div>
+							<div class="ni"><span class="nm">Kitchen renovation</span><span class="dt">12 Oct</span></div>
+							<div class="ni"><span class="nm">Book club notes</span><span class="dt">3 Oct</span></div>
+							<div class="nav-foot"><div class="ni"><svg class="i sm"><use href="#i-cog"></use></svg><span class="nm">Outliner settings</span></div></div>
+						</div>
+						<div class="app">
+							<div class="tb">
+								<span class="ib"><svg class="i"><use href="#i-navopen"></use></svg></span>
+								<span class="title">Community garden plan</span>
+								<span class="sp"></span>
+								<span class="btn tertiary"><svg class="i"><use href="#i-publish"></use></svg>Publish</span>
+								<span class="ib"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="doc"><div class="col">
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Site and layout</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Beds</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Six raised beds along the south fence</span></div>
+								<div class="n" style="--d:2">Check the fence line with the neighbours before anyone digs.</div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Paths between beds wide enough for a wheelbarrow</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Two low beds by the gate for wheelchair users</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri"><use href="#i-tri"></use></svg></span><span class="t">Water<span class="more">3 rows</span></span></div>
+								<div class="r" style="--d:1"><span class="g"><i class="dot"></i></span><span class="t">Compost bays behind the shed</span><span class="notemark"><svg class="i xs"><use href="#i-note"></use></svg></span></div>
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Planting calendar</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Spring</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Peas and broad beans in March</span></div>
+								<div class="r focus" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Lettuce every two weeks from April<span class="caret"></span></span></div>
+								<div class="n" style="--d:2">Stagger sowings so the harvest doesn't arrive all at once.</div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Summer</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Tomatoes and beans out after the last frost</span></div>
+								<div class="r l1"><span class="g"><svg class="i tri"><use href="#i-tri"></use></svg></span><span class="t">Volunteers<span class="more">6 rows</span></span></div>
+							</div></div>
+							<div class="sl"><span class="ok"><svg class="i xs"><use href="#i-check"></use></svg>Saved</span><span>·</span><span>21 rows · 164 words</span><span class="sp"></span><a href="#e">Published to Documents/Community garden plan.odt · <b>Open document</b><svg class="i xs"><use href="#i-ext"></use></svg></a></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ===================================================== C ===================================================== -->
+	<section class="s" id="c" data-screen-label="C Outline list">
+		<h2><span class="k">C</span> Outline list ("My outlines") and the empty state</h2>
+		<p class="cap">The list moves into the left navigation, so you can switch outlines without leaving the one you're in. Opening the app goes straight to the outline you last had open. With no outlines yet, the content area shows Nextcloud's standard empty-state layout instead of a single line of text.</p>
+
+		<div class="label">First visit: no outlines yet</div>
+		<div class="scroller">
+			<div class="frame w1280">
+				<div class="nc">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-cal"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-bell"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body">
+						<div class="nav">
+							<div class="nav-new"><span class="btn primary wide"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span></div>
+							<div class="nav-foot"><div class="ni"><svg class="i sm"><use href="#i-cog"></use></svg><span class="nm">Outliner settings</span></div></div>
+						</div>
+						<div class="app">
+							<div class="empty"><div>
+								<div class="ico"><svg class="i lg"><use href="#i-outline"></use></svg></div>
+								<h2>No outlines yet</h2>
+								<p>Outlines are saved as .opml files in the Outlines folder of your Files, so they sync and keep versions like any other file.</p>
+								<div class="acts"><span class="btn primary"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span><span class="btn"><svg class="i sm"><use href="#i-import"></use></svg>Import OPML…</span></div>
+							</div></div>
+						</div>
+					</div>
+				</div>
+				<span class="pin" style="left:968px;top:492px">1</span>
+			</div>
+		</div>
+		<ul class="legend">
+			<li><b class="num">1</b><span>"Import OPML…" appears once import (M11, #27) is built. Until then the page shows only "New outline".</span></li>
+		</ul>
+
+		<div class="label">The navigation, close up <span class="dim">· a list with the pointer on one outline, and Outliner settings open</span></div>
+		<div class="row-of">
+			<div class="frame" style="width:316px;height:640px">
+				<div class="nc" style="grid-template-rows:0 1fr;background:#d9d6d0">
+					<div></div>
+					<div class="nc-body" style="margin:8px">
+						<div class="nav" style="width:100%">
+							<div class="nav-new"><span class="btn primary wide"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span></div>
+							<div class="ni on"><span class="nm">Community garden plan</span><span class="dt">Edited just now</span></div>
+							<div class="ni hover"><span class="nm">Reading list</span><span class="dt">Yesterday</span><span class="ib xs" style="position:absolute;right:6px;top:12px"><svg class="i sm"><use href="#i-dots"></use></svg></span></div>
+							<div class="ni"><span class="nm">Kitchen renovation</span><span class="dt">12 Oct</span></div>
+							<div class="ni"><span class="nm">Book club notes</span><span class="dt">3 Oct</span></div>
+							<div class="ni"><span class="nm">Trip ideas for next spring, with a long name that gets cut off</span><span class="dt">28 Sept</span></div>
+							<div class="nav-foot">
+								<div class="ni"><svg class="i sm"><use href="#i-cog"></use></svg><span class="nm">Outliner settings</span></div>
+								<div style="padding:6px 12px 8px">
+									<div class="small" style="font-weight:600;margin-bottom:2px">Theme</div>
+									<div class="radio on"><i></i>Follow Nextcloud</div>
+									<div class="radio"><i></i>Light</div>
+									<div class="radio"><i></i>Dark</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="note-box" style="max-width:520px;margin-top:0">
+				<p style="margin-top:0"><b>Why the list moves into the navigation.</b> Today the navigation holds one "My outlines" button and a theme drop-down, and the list is a separate page you go back to. The Notes and Deck apps put the list in the navigation instead, which is what people expect in Nextcloud.</p>
+				<p><b>Each entry</b> shows the outline's name and when it was last edited. The ⋯ on hover is there for later actions such as "Show in Files". It holds nothing new in this pass, so it can wait.</p>
+				<p style="margin-bottom:0"><b>Theme</b> becomes three plain choices under Outliner settings, Nextcloud's usual place for app settings. "Auto" is renamed "Follow Nextcloud" so it says what it does.</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- ===================================================== D ===================================================== -->
+	<section class="s" id="d" data-screen-label="D Empty outline">
+		<h2><span class="k">D</span> A new, empty outline</h2>
+		<p class="cap">"New outline" opens with the caret already in the first row, so you can just type. The "Add first row" button goes. A short keyboard card sits under the rows and goes away once the outline has a few rows, or when you hide it.</p>
+		<div class="scroller">
+			<div class="frame w1280">
+				<div class="nc">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-cal"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-bell"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body">
+						<div class="nav">
+							<div class="nav-new"><span class="btn primary wide"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span></div>
+							<div class="ni on"><span class="nm">Untitled</span><span class="dt">Just now</span></div>
+							<div class="ni"><span class="nm">Community garden plan</span><span class="dt">Today</span></div>
+							<div class="ni"><span class="nm">Reading list</span><span class="dt">Yesterday</span></div>
+							<div class="nav-foot"><div class="ni"><svg class="i sm"><use href="#i-cog"></use></svg><span class="nm">Outliner settings</span></div></div>
+						</div>
+						<div class="app">
+							<div class="tb">
+								<span class="ib"><svg class="i"><use href="#i-navopen"></use></svg></span>
+								<span class="title">Untitled</span>
+								<span class="sp"></span>
+								<span class="btn tertiary"><svg class="i"><use href="#i-publish"></use></svg>Publish</span>
+								<span class="ib"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="doc"><div class="col">
+								<div class="r l1 focus" style="margin-top:14px"><span class="g"><i class="dot"></i></span><span class="t"><span class="caret"></span><span class="ph">Type your first heading</span></span></div>
+								<div class="hints">
+									<div class="hd"><span>Keyboard</span><span>Hide</span></div>
+									<div><kbd>Enter</kbd> new row</div>
+									<div><kbd>Tab</kbd> indent</div>
+									<div><kbd>Shift</kbd><kbd>Tab</kbd> outdent</div>
+									<div><kbd>Alt</kbd><kbd>↑</kbd><kbd>↓</kbd> move row</div>
+									<div><kbd>←</kbd><kbd>→</kbd> fold or unfold</div>
+									<div><kbd>Ctrl</kbd><kbd>Z</kbd> undo</div>
+								</div>
+							</div></div>
+							<div class="sl"><span class="ok"><svg class="i xs"><use href="#i-check"></use></svg>Saved</span><span>·</span><span>Empty</span></div>
+						</div>
+					</div>
+				</div>
+				<span class="pin" style="left:720px;top:122px">1</span>
+				<span class="pin" style="left:440px;top:186px">2</span>
+			</div>
+		</div>
+		<ul class="legend">
+			<li><b class="num">1</b><span>The first row is a placeholder until you type, so an outline with no rows (a new one, or an empty imported file) never shows a bare button. Typing creates the row through History, as "Add first row" does today, so undo still works.</span></li>
+			<li><b class="num">2</b><span>The card lists the keys that exist today (M2 to M5, M8). On a Mac it shows ⌘ and ⌥. It hides itself after about five rows, and "Hide" keeps it hidden.</span></li>
+		</ul>
+	</section>
+
+	<!-- ===================================================== E ===================================================== -->
+	<section class="s" id="e" data-screen-label="E Publish">
+		<h2><span class="k">E</span> Publish to Doc</h2>
+		<p class="cap">Three steps. (1) Publish in the top bar opens Nextcloud's own folder picker, titled with the document's name so you know what will be written. (2) The picker covers the whole page, navigation included. (3) When it's done, a toast says where the document went and offers to open it, and the status line keeps that link afterwards.</p>
+
+		<div class="label">Step 1 to 2 · the folder picker <span class="dim">· first publish starts in the outline's folder; later ones start where you last published</span></div>
+		<div class="scroller">
+			<div class="frame w1280">
+				<div class="nc">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-cal"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-bell"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body">
+						<div class="nav">
+							<div class="nav-new"><span class="btn primary wide"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span></div>
+							<div class="ni on"><span class="nm">Community garden plan</span><span class="dt">Edited just now</span></div>
+							<div class="ni"><span class="nm">Reading list</span><span class="dt">Yesterday</span></div>
+						</div>
+						<div class="app">
+							<div class="tb">
+								<span class="ib"><svg class="i"><use href="#i-navopen"></use></svg></span>
+								<span class="title">Community garden plan</span>
+								<span class="sp"></span>
+								<span class="btn tertiary hover"><svg class="i"><use href="#i-publish"></use></svg>Publish</span>
+								<span class="ib"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="doc"><div class="col">
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Site and layout</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Beds</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Six raised beds along the south fence</span></div>
+							</div></div>
+						</div>
+					</div>
+					<div class="scrim">
+						<div class="dialog picker">
+							<div class="dh"><h3>Publish “Community garden plan.odt” to…</h3><span class="ib"><svg class="i"><use href="#i-close"></use></svg></span></div>
+							<div class="pb">
+								<div class="pnav">
+									<div class="ni on"><svg class="i sm"><use href="#i-folder-o"></use></svg><span class="nm">All files</span></div>
+									<div class="ni"><svg class="i sm"><use href="#i-clock"></use></svg><span class="nm">Recent</span></div>
+									<div class="ni"><svg class="i sm"><use href="#i-star"></use></svg><span class="nm">Favorites</span></div>
+								</div>
+								<div class="pmain">
+									<div class="crumbs"><svg class="i sm"><use href="#i-home"></use></svg><span>All files</span><span class="muted">›</span><span class="last">Outlines</span></div>
+									<div class="field"><svg class="i sm"><use href="#i-search"></use></svg><span class="fl">Filter file list</span></div>
+									<table class="ft">
+										<thead><tr><th>Name</th><th>Modified</th></tr></thead>
+										<tbody>
+											<tr><td class="nm"><svg class="i fold"><use href="#i-folder"></use></svg>Archive</td><td class="mt">2 weeks ago</td></tr>
+											<tr><td class="nm"><svg class="i fold"><use href="#i-folder"></use></svg>Garden group</td><td class="mt">3 days ago</td></tr>
+											<tr><td class="nm"><svg class="i fold"><use href="#i-folder"></use></svg>Shared with the committee</td><td class="mt">Yesterday</td></tr>
+										</tbody>
+									</table>
+									<p class="small muted" style="margin:auto 0 0">Publishing writes the document here. If a copy is already here, it is replaced, and Files keeps the old one as a version.</p>
+								</div>
+							</div>
+							<div class="df"><span class="btn primary">Publish here</span></div>
+						</div>
+					</div>
+				</div>
+				<span class="pin" style="left:150px;top:300px">1</span>
+				<span class="pin" style="left:560px;top:600px">2</span>
+			</div>
+		</div>
+		<ul class="legend">
+			<li><b class="num">1</b><span>The picker's backdrop covers the navigation too. Today's Versions dialog is mounted inside the content area (container set to null), which is the likely reason the navigation drew over it. Every dialog in this pass mounts at page level.</span></li>
+			<li><b class="num">2</b><span>The only text added to Nextcloud's picker is its title and one line explaining that a copy already there gets replaced. The button stays "Publish here".</span></li>
+		</ul>
+
+		<div class="label">Step 3 · published <span class="dim">· the toast fades after a few seconds; the status-line link stays</span></div>
+		<div class="scroller">
+			<div class="frame" style="width:1280px;height:300px">
+				<div class="nc" style="height:300px">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body" style="margin-left:0;border-top-left-radius:0;border-bottom-left-radius:0">
+						<div class="app">
+							<div class="tb">
+								<span class="sp"></span>
+								<span class="btn tertiary"><svg class="i"><use href="#i-publish"></use></svg>Publish</span>
+								<span class="ib"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="doc"><div class="col" style="margin:0 0 0 120px">
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Site and layout</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Beds</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Six raised beds along the south fence</span></div>
+							</div></div>
+							<div class="sl"><span class="ok"><svg class="i xs"><use href="#i-check"></use></svg>Saved</span><span>·</span><span>21 rows · 164 words</span><span class="sp"></span><a href="#e">Published to Outlines/Garden group/Community garden plan.odt · <b>Open document</b><svg class="i xs"><use href="#i-ext"></use></svg></a></div>
+						</div>
+					</div>
+				</div>
+				<div class="toast" style="top:112px"><svg class="i ok"><use href="#i-check-c"></use></svg><div style="flex:1"><div style="font-weight:600">Published</div><div class="muted small">Outlines/Garden group/Community garden plan.odt</div><div style="margin-top:6px"><a href="#e">Open document <svg class="i xs"><use href="#i-ext"></use></svg></a></div></div><span class="ib xs"><svg class="i sm"><use href="#i-close"></use></svg></span></div>
+			</div>
+		</div>
+		<div class="label">Publish button states</div>
+		<div class="nc" style="display:flex;height:auto;background:transparent;gap:16px;flex-wrap:wrap">
+			<div style="background:var(--color-main-background);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:4px"><span class="btn tertiary"><svg class="i"><use href="#i-publish"></use></svg>Publish</span><span class="muted small" style="margin-left:6px">Ready</span></div>
+			<div style="background:var(--color-main-background);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:4px"><span class="btn tertiary" style="opacity:.6"><svg class="i"><use href="#i-spin"></use></svg>Publishing…</span><span class="muted small" style="margin-left:6px">Saves first, then writes; disabled meanwhile</span></div>
+			<div style="background:var(--color-main-background);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:4px"><span class="btn tertiary"><svg class="i" style="color:var(--color-success)"><use href="#i-check"></use></svg>Published</span><span class="muted small" style="margin-left:6px">For 3 seconds, then back to Publish</span></div>
+		</div>
+	</section>
+
+	<!-- ===================================================== F ===================================================== -->
+	<section class="s" id="f" data-screen-label="F Versions">
+		<h2><span class="k">F</span> Versions</h2>
+		<p class="cap">Versions open in Nextcloud's right-hand sidebar, the same place Files shows versions, so they never sit under the left navigation. Picking a version shows it in the main area, drawn as an outline in the same style, never as raw OPML. A banner says it's read-only and offers Restore.</p>
+
+		<div class="label">Previewing an older version <span class="dim">· the navigation is open as well, to show the two panels don't overlap; at this width Publish drops its label</span></div>
+		<div class="scroller">
+			<div class="frame w1280">
+				<div class="nc">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-cal"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-app"><svg class="i"><use href="#i-bell"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body">
+						<div class="nav">
+							<div class="nav-new"><span class="btn primary wide"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span></div>
+							<div class="ni on"><span class="nm">Community garden plan</span><span class="dt">Edited just now</span></div>
+							<div class="ni"><span class="nm">Reading list</span><span class="dt">Yesterday</span></div>
+							<div class="ni"><span class="nm">Kitchen renovation</span><span class="dt">12 Oct</span></div>
+							<div class="nav-foot"><div class="ni"><svg class="i sm"><use href="#i-cog"></use></svg><span class="nm">Outliner settings</span></div></div>
+						</div>
+						<div class="app">
+							<div class="tb">
+								<span class="ib"><svg class="i"><use href="#i-navopen"></use></svg></span>
+								<span class="title">Community garden plan</span>
+								<span class="sp"></span>
+								<span class="ib"><svg class="i"><use href="#i-publish"></use></svg></span>
+								<span class="ib on"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="banner" style="margin:6px 20px 4px">
+								<svg class="i"><use href="#i-eye"></use></svg>
+								<div class="bt"><b>Version from today, 09:15</b>Read-only. Your current outline is unchanged.</div>
+								<span style="display:flex;gap:6px"><span class="btn primary">Restore this version</span><span class="btn tertiary">Back to current</span></span>
+							</div>
+							<div class="doc readonly"><div class="col" style="padding:0 20px">
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Site and layout</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Beds</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Four raised beds along the south fence</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Paths between beds</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Water</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Ask about a standpipe</span></div>
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Planting calendar</span></div>
+								<div class="r" style="--d:1"><span class="g"><i class="dot"></i></span><span class="t">Spring: peas, beans, lettuce</span></div>
+							</div></div>
+							<div class="sl"><span class="ok"><svg class="i xs"><use href="#i-check"></use></svg>Saved</span><span>·</span><span>Viewing an older version</span></div>
+						</div>
+						<div class="side" style="width:380px">
+							<div class="sh"><div style="flex:1"><h3>Versions</h3><div class="sub">Community garden plan</div></div><span class="ib"><svg class="i"><use href="#i-close"></use></svg></span></div>
+							<div class="sbody">
+								<div class="v"><div class="vm"><div class="vt">Current version</div><div class="vs">Saved just now</div></div><span class="badge">Current</span></div>
+								<div class="vg">Today</div>
+								<div class="v"><div class="vm"><div class="vt">14:02</div><div class="vs">Before restore 14:02 · named</div></div></div>
+								<div class="v on"><div class="vm"><div class="vt">09:15</div><div class="vs">Showing</div></div><span class="ib xs"><svg class="i sm"><use href="#i-dots"></use></svg></span></div>
+								<div class="vg">Yesterday</div>
+								<div class="v hover"><div class="vm"><div class="vt">17:40</div><div class="vs"><span class="vlabel"><svg class="i xs"><use href="#i-tag"></use></svg>Before restructure</span></div></div><span class="ib xs"><svg class="i sm"><use href="#i-dots"></use></svg></span></div>
+								<div class="vrename"><div class="field focus"><span>Before restructure</span><span class="caret"></span></div><span class="ib on"><svg class="i"><use href="#i-check"></use></svg></span></div>
+								<div class="v"><div class="vm"><div class="vt">11:05</div><div class="vs"> </div></div></div>
+								<div class="vg">Earlier</div>
+								<div class="v bad"><div class="vm"><div class="vt">21 Oct, 16:30</div><div class="vs"><svg class="i xs"><use href="#i-alert"></use></svg>This version can't be opened</div></div></div>
+								<div class="v"><div class="vm"><div class="vt">20 Oct, 10:12</div><div class="vs"><span class="vlabel"><svg class="i xs"><use href="#i-tag"></use></svg>First draft</span></div></div></div>
+							</div>
+						</div>
+					</div>
+					<div class="menu" style="right:30px;top:268px;width:220px">
+						<div class="mi hover"><svg class="i sm"><use href="#i-history"></use></svg>Restore</div>
+						<div class="mi"><svg class="i sm"><use href="#i-tag"></use></svg>Name this version</div>
+					</div>
+				</div>
+				<span class="pin" style="left:328px;top:244px">1</span>
+				<span class="pin" style="left:880px;top:66px">2</span>
+				<span class="pin" style="left:1200px;top:252px">3</span>
+				<span class="pin" style="left:902px;top:432px">4</span>
+			</div>
+		</div>
+		<ul class="legend">
+			<li><b class="num">1</b><span>The preview uses the same row style as the editor, read-only, so a version looks like the outline it was. This replaces the raw-XML preview.</span></li>
+			<li><b class="num">2</b><span>The clock button is highlighted while the sidebar is open. Nextcloud's sidebar is its own column, so it never collides with the left navigation, and on a phone it covers the screen (see G).</span></li>
+			<li><b class="num">3</b><span>Each version keeps three actions, now in a ⋯ menu: click the row to preview, then Restore or "Name this version". Named versions show their name with a tag icon, because naming is what keeps a version from being cleaned up.</span></li>
+			<li><b class="num">4</b><span>Naming happens in place, in a field under the row. A version that can't be read says so in the row and has no Restore.</span></li>
+		</ul>
+
+		<div class="label">After a restore <span class="dim">· the offer to name the state from before the restore moves from a form into a banner</span></div>
+		<div style="max-width:1280px;border-radius:10px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.08)">
+			<div class="nc" style="display:block;height:auto;background:var(--color-main-background);padding:1px 0">
+				<div class="banner ok" style="margin:16px 20px">
+					<svg class="i" style="color:var(--color-success)"><use href="#i-check"></use></svg>
+					<div class="bt"><b>Restored the version from today, 09:15</b>What you had before was kept as a version. Name it so it's never cleaned up:</div>
+					<div class="field" style="width:260px"><span>Before restore 14:02</span></div>
+					<span class="btn primary">Save name</span>
+					<span class="btn tertiary">Not now</span>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- ===================================================== G ===================================================== -->
+	<section class="s" id="g" data-screen-label="G Narrow and phone">
+		<h2><span class="k">G</span> Narrow window and phone</h2>
+		<p class="cap">The spec rules out a phone layout for 1.0, but "narrow screens must not break". Three rules give that for free. The page column shrinks with its padding instead of overflowing. Publish drops its label below about 760 px of content width. Indents shrink from 24 px to 16 px per level below 600 px. Nextcloud already turns the navigation into a drawer and the sidebar into a full-screen panel on small screens.</p>
+
+		<div class="label">A 1024 px window with the navigation open <span class="dim">· about 700 px for the outline, the case the owner saw</span></div>
+		<div class="scroller">
+			<div class="frame w1024">
+				<div class="nc">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app"><svg class="i"><use href="#i-folder-o"></use></svg></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body">
+						<div class="nav">
+							<div class="nav-new"><span class="btn primary wide"><svg class="i sm"><use href="#i-plus"></use></svg>New outline</span></div>
+							<div class="ni on"><span class="nm">Community garden plan</span><span class="dt">Edited just now</span></div>
+							<div class="ni"><span class="nm">Reading list</span><span class="dt">Yesterday</span></div>
+							<div class="nav-foot"><div class="ni"><svg class="i sm"><use href="#i-cog"></use></svg><span class="nm">Outliner settings</span></div></div>
+						</div>
+						<div class="app">
+							<div class="tb">
+								<span class="ib"><svg class="i"><use href="#i-navopen"></use></svg></span>
+								<span class="title">Community garden plan</span>
+								<span class="sp"></span>
+								<span class="ib" title="Publish to Doc"><svg class="i"><use href="#i-publish"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="doc"><div class="col" style="padding:0 24px">
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Site and layout</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Beds</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Six raised beds along the south fence</span></div>
+								<div class="n" style="--d:2">Check the fence line with the neighbours before anyone digs.</div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Paths between beds wide enough for a wheelbarrow</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Two low beds by the gate for wheelchair users, with a ramp and a hard surface all the way from the gate</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri"><use href="#i-tri"></use></svg></span><span class="t">Water<span class="more">3 rows</span></span></div>
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Planting calendar</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Spring</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Peas and broad beans in March</span></div>
+								<div class="r focus" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Lettuce every two weeks from April<span class="caret"></span></span></div>
+							</div></div>
+							<div class="sl"><span class="ok"><svg class="i xs"><use href="#i-check"></use></svg>Saved</span><span>·</span><span>21 rows</span><span class="sp"></span><a href="#e"><b>Open document</b><svg class="i xs"><use href="#i-ext"></use></svg></a></div>
+						</div>
+					</div>
+				</div>
+				<span class="pin" style="left:880px;top:66px">1</span>
+				<span class="pin" style="left:316px;top:292px">2</span>
+			</div>
+		</div>
+		<ul class="legend">
+			<li><b class="num">1</b><span>Publish shows as an icon with a tooltip. The title takes whatever room is left and is cut off with "…", never wrapped.</span></li>
+			<li><b class="num">2</b><span>Long rows wrap onto the next line and stay aligned with their own text, not with the bullet.</span></li>
+		</ul>
+
+		<div class="label">Phone, 390 px <span class="dim">· the outline, and Versions as a full-screen panel</span></div>
+		<div class="row-of">
+			<div class="frame phone">
+				<div class="nc" style="grid-template-rows:50px minmax(0,1fr)">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-app"><svg class="i"><use href="#i-search"></use></svg></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body" style="margin:0;border-radius:14px 14px 0 0">
+						<div class="app">
+							<div class="tb" style="padding:0 4px">
+								<span class="ib"><svg class="i"><use href="#i-menu"></use></svg></span>
+								<span class="title" style="font-size:15px">Community garden plan</span>
+								<span class="sp"></span>
+								<span class="ib"><svg class="i"><use href="#i-publish"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="doc"><div class="col" style="padding:0 8px">
+								<div class="r l1" style="font-size:18px;padding-left:4px"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Site and layout</span></div>
+								<div class="r l2" style="padding-left:20px"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Beds</span></div>
+								<div class="r" style="padding-left:36px"><span class="g"><i class="dot"></i></span><span class="t">Six raised beds along the south fence</span></div>
+								<div class="n" style="padding-left:62px">Check the fence line with the neighbours before anyone digs.</div>
+								<div class="r" style="padding-left:36px"><span class="g"><i class="dot"></i></span><span class="t">Paths between beds wide enough for a wheelbarrow</span></div>
+								<div class="r" style="padding-left:36px"><span class="g"><i class="dot"></i></span><span class="t">Two low beds by the gate for wheelchair users</span></div>
+								<div class="r l2" style="padding-left:20px"><span class="g"><svg class="i tri"><use href="#i-tri"></use></svg></span><span class="t">Water<span class="more">3 rows</span></span></div>
+								<div class="r" style="padding-left:20px"><span class="g"><i class="dot"></i></span><span class="t">Compost bays behind the shed</span></div>
+								<div class="r l1" style="font-size:18px;padding-left:4px"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Planting calendar</span></div>
+								<div class="r l2" style="padding-left:20px"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Spring</span></div>
+								<div class="r" style="padding-left:36px"><span class="g"><i class="dot"></i></span><span class="t">Peas and broad beans in March</span></div>
+								<div class="r focus" style="padding-left:36px"><span class="g"><i class="dot"></i></span><span class="t">Lettuce every two weeks from April<span class="caret"></span></span></div>
+								<div class="n" style="padding-left:62px">Stagger sowings so the harvest doesn't arrive all at once.</div>
+								<div class="r l1" style="font-size:18px;padding-left:4px"><span class="g"><svg class="i tri"><use href="#i-tri"></use></svg></span><span class="t">Volunteers<span class="more">6 rows</span></span></div>
+							</div></div>
+							<div class="sl"><span class="ok"><svg class="i xs"><use href="#i-check"></use></svg>Saved</span><span>·</span><span>21 rows</span></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="frame phone">
+				<div class="nc" style="grid-template-rows:50px minmax(0,1fr)">
+					<div class="nc-head">
+						<div class="nc-logo"><i></i><i></i><i></i></div>
+						<div class="nc-app on"><svg class="i"><use href="#i-outline"></use></svg></div>
+						<div class="nc-sp"></div>
+						<div class="nc-avatar">U</div>
+					</div>
+					<div class="nc-body" style="margin:0;border-radius:14px 14px 0 0">
+						<div class="side" style="width:100%;border:0">
+							<div class="sh"><div style="flex:1"><h3>Versions</h3><div class="sub">Community garden plan</div></div><span class="ib"><svg class="i"><use href="#i-close"></use></svg></span></div>
+							<div class="sbody">
+								<div class="v"><div class="vm"><div class="vt">Current version</div><div class="vs">Saved just now</div></div><span class="badge">Current</span></div>
+								<div class="vg">Today</div>
+								<div class="v"><div class="vm"><div class="vt">14:02</div><div class="vs">Before restore 14:02 · named</div></div><span class="ib xs"><svg class="i sm"><use href="#i-dots"></use></svg></span></div>
+								<div class="v"><div class="vm"><div class="vt">09:15</div><div class="vs"> </div></div><span class="ib xs"><svg class="i sm"><use href="#i-dots"></use></svg></span></div>
+								<div class="vg">Yesterday</div>
+								<div class="v"><div class="vm"><div class="vt">17:40</div><div class="vs"><span class="vlabel"><svg class="i xs"><use href="#i-tag"></use></svg>Before restructure</span></div></div><span class="ib xs"><svg class="i sm"><use href="#i-dots"></use></svg></span></div>
+								<div class="v"><div class="vm"><div class="vt">11:05</div><div class="vs"> </div></div><span class="ib xs"><svg class="i sm"><use href="#i-dots"></use></svg></span></div>
+								<div class="vg">Earlier</div>
+								<div class="v"><div class="vm"><div class="vt">20 Oct, 10:12</div><div class="vs"><span class="vlabel"><svg class="i xs"><use href="#i-tag"></use></svg>First draft</span></div></div><span class="ib xs"><svg class="i sm"><use href="#i-dots"></use></svg></span></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="note-box" style="max-width:420px;margin-top:0">
+				<p style="margin-top:0"><b>What's not designed for phones.</b> Drag-and-drop (M9) stays a desktop pointer action, so the handle doesn't appear on touch. Moving rows still works from the keyboard with Alt+↑/↓.</p>
+				<p style="margin-bottom:0"><b>On a phone,</b> picking a version closes the panel and shows the preview with the same banner as on desktop. "Back to current" brings the list back.</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- ===================================================== H ===================================================== -->
+	<section class="s" id="h" data-screen-label="H Sort">
+		<h2><span class="k">H</span> Where sort lives</h2>
+		<p class="cap">Sort rearranges the whole outline for good, so it shouldn't sit one click away all the time. It moves into the ⋯ menu as "Sort rows…" and opens a small dialog that says what it will do. Undo (Ctrl+Z) reverses it, as it does today.</p>
+		<div class="row-of">
+			<div class="frame" style="width:620px;height:420px">
+				<div class="nc" style="grid-template-rows:0 1fr;background:#d9d6d0">
+					<div></div>
+					<div class="nc-body" style="margin:0;border-radius:0">
+						<div class="app">
+							<div class="tb">
+								<span class="title">Community garden plan</span>
+								<span class="sp"></span>
+								<span class="btn tertiary"><svg class="i"><use href="#i-publish"></use></svg>Publish</span>
+								<span class="ib"><svg class="i"><use href="#i-history"></use></svg></span>
+								<span class="ib on"><svg class="i"><use href="#i-dots"></use></svg></span>
+							</div>
+							<div class="doc"><div class="col" style="padding:0 24px">
+								<div class="r l1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Site and layout</span></div>
+								<div class="r l2" style="--d:1"><span class="g"><svg class="i tri open"><use href="#i-tri"></use></svg></span><span class="t">Beds</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Six raised beds along the south fence</span></div>
+								<div class="r" style="--d:2"><span class="g"><i class="dot"></i></span><span class="t">Paths between beds</span></div>
+							</div></div>
+						</div>
+					</div>
+					<div class="menu" style="right:10px;top:48px">
+						<div class="mi hover"><svg class="i sm"><use href="#i-sort"></use></svg>Sort rows…</div>
+						<div class="mi"><svg class="i sm"><use href="#i-history"></use></svg>Versions</div>
+						<div class="msep"></div>
+						<div class="mi"><svg class="i sm"><use href="#i-bug"></use></svg>Report a bug</div>
+					</div>
+				</div>
+			</div>
+			<div class="frame" style="width:620px;height:420px">
+				<div class="nc" style="grid-template-rows:0 1fr;background:rgba(0,0,0,.45)">
+					<div></div>
+					<div style="display:grid;place-items:center">
+						<div class="dialog" style="width:440px">
+							<div class="dh"><h3>Sort rows</h3><span class="ib"><svg class="i"><use href="#i-close"></use></svg></span></div>
+							<div class="db">
+								<div class="small" style="font-weight:600;margin-bottom:2px">Sort by</div>
+								<div class="radio on"><i></i>Row text</div>
+								<div class="radio"><i></i>Note</div>
+								<div class="radio"><i></i>Checkbox (from imported files)</div>
+								<div style="display:flex;align-items:center;gap:12px;margin:10px 0 12px"><span class="small" style="font-weight:600">Order</span><span class="seg"><span class="on">A → Z</span><span>Z → A</span></span></div>
+								<p class="small muted" style="margin:0">Sorts the rows under every heading, at every level. Undo with Ctrl+Z.</p>
+							</div>
+							<div class="df"><span class="btn tertiary">Cancel</span><span class="btn primary">Sort</span></div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="note-box">
+			<b>The ⋯ menu</b> holds the actions you use less often: Sort rows…, Versions (also on the clock button, but kept here for narrow widths), and Report a bug once M14 lands. The current sort options were "Topic / Status / Note" with an Ascending button and a separate "Sort rows" button. They become plain choices, with "Topic" renamed "Row text" and "Status" renamed "Checkbox (from imported files)", because 1.0 doesn't show checkboxes. Sorting only the selected rows (#31) can join the dialog when row selection exists.
+		</div>
+	</section>
+</div>
+</body>
+</html>

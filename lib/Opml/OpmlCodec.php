@@ -24,7 +24,9 @@ final class OpmlCodec {
 
 		try {
 			$document = new \DOMDocument();
-			if (!$document->loadXML($xml, LIBXML_NONET)) {
+			// Outlines saved before #225 can hold characters XML does not allow: drop them and try once more.
+			if (!$document->loadXML($xml, LIBXML_NONET)
+				&& !$document->loadXML(self::withoutIllegalReferences(self::withoutIllegalCharacters($xml)), LIBXML_NONET)) {
 				throw new OpmlParseException('Invalid OPML XML');
 			}
 		} finally {
@@ -41,6 +43,16 @@ final class OpmlCodec {
 
 		$title = $head === null ? '' : ($this->childElement($head, 'title')?->textContent ?? '');
 		$publishPath = $head === null ? null : $this->namespacedChildText($head, 'publishPath');
+		$headExtra = [];
+		if ($head !== null) {
+			foreach ($head->childNodes as $child) {
+				if ($child instanceof \DOMElement && !(($child->namespaceURI === null && $child->localName === 'title') || ($child->namespaceURI === self::NS && $child->localName === 'publishPath'))) {
+					$copy = new \DOMDocument();
+					$copy->appendChild($copy->importNode($child, true));
+					$headExtra[] = (string)$copy->saveXML($copy->documentElement);
+				}
+			}
+		}
 		$rows = [];
 		foreach ($body->childNodes as $child) {
 			if ($child instanceof \DOMElement && $child->localName === 'outline') {
@@ -48,7 +60,7 @@ final class OpmlCodec {
 			}
 		}
 
-		return new Outline($title, $rows, $publishPath);
+		return new Outline($title, $rows, $publishPath, $headExtra);
 	}
 
 	private function childElement(\DOMElement $parent, string $name): ?\DOMElement {
@@ -82,6 +94,17 @@ final class OpmlCodec {
 		$id = $element->hasAttributeNS(self::NS, 'id')
 			? $element->getAttributeNS(self::NS, 'id')
 			: bin2hex(random_bytes(8));
+		$extra = [];
+		foreach ($element->attributes as $attribute) {
+			$uri = $attribute->namespaceURI;
+			if (($uri === null && in_array($attribute->nodeName, ['text', '_note'], true)) || ($uri === self::NS && in_array($attribute->localName, ['id', 'collapsed', 'noteHidden'], true)) || str_starts_with($attribute->nodeName, 'xmlns')) {
+				continue;
+			}
+			if ($uri !== null && $attribute->prefix !== 'xml') {
+				$extra['xmlns:' . $attribute->prefix] = $uri;
+			}
+			$extra[$attribute->nodeName] = $attribute->value;
+		}
 
 		return new Row(
 			$id,
@@ -89,6 +112,8 @@ final class OpmlCodec {
 			$element->getAttribute('_note'),
 			$element->getAttributeNS(self::NS, 'collapsed') === 'true',
 			$children,
+			$extra,
+			$element->getAttributeNS(self::NS, 'noteHidden') === 'true',
 		);
 	}
 
@@ -111,20 +136,55 @@ final class OpmlCodec {
 			$publishPath->textContent =$outline->publishPath;
 			$head->appendChild($publishPath);
 		}
+		foreach ($outline->headExtra as $xml) {
+			$extraDocument = new \DOMDocument();
+			$previous = libxml_use_internal_errors(true);
+			try {
+				$loaded = $extraDocument->loadXML($xml, LIBXML_NONET);
+			} finally {
+				libxml_clear_errors();
+				libxml_use_internal_errors($previous);
+			}
+			$element = $extraDocument->documentElement;
+			if (!$loaded || $extraDocument->doctype !== null || $element === null || ($element->namespaceURI === null && $element->localName === 'title') || ($element->namespaceURI === self::NS && $element->localName === 'publishPath')) {
+				continue;
+			}
+			$head->appendChild($document->importNode($element, true));
+		}
 		
 		$opml->appendChild($head);
 		
 		$body = $document->createElement('body');
+		$opml->appendChild($body);
 		foreach ($outline->rows as $row) {
 			$this->writeRow($document, $body, $row);
 		}
-		$opml->appendChild($body);
 		
-		return $document->saveXML();
+		// A paste can carry control characters (#225). XML does not allow them and a file holding them
+		// cannot be opened again, so they never reach the file.
+		return self::withoutIllegalCharacters((string)$document->saveXML());
+	}
+
+	/** Drop the characters XML 1.0 does not allow (most C0 controls, U+FFFE, U+FFFF). */
+	private static function withoutIllegalCharacters(string $text): string {
+		return preg_replace('/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u', '', $text) ?? $text;
+	}
+
+	/** Drop character references (&#1; &#x8;) to characters XML 1.0 does not allow. */
+	private static function withoutIllegalReferences(string $xml): string {
+		return preg_replace_callback('/&#(x[0-9a-fA-F]+|[0-9]+);/', static function (array $match): string {
+			$code = $match[1][0] === 'x' ? (int)hexdec(substr($match[1], 1)) : (int)$match[1];
+			$allowed = in_array($code, [0x9, 0xA, 0xD], true)
+				|| ($code >= 0x20 && $code <= 0xD7FF)
+				|| ($code >= 0xE000 && $code <= 0xFFFD)
+				|| ($code >= 0x10000 && $code <= 0x10FFFF);
+			return $allowed ? $match[0] : '';
+		}, $xml) ?? $xml;
 	}
 
 	private function writeRow(\DOMDocument $document, \DOMElement $parent, Row $row): void {
 		$outline = $document->createElement('outline');
+		$parent->appendChild($outline);
 		// Let DOM handle escaping properly
 		$outline->setAttribute('text', $row->text);
 		if ($row->note !== '') {
@@ -134,11 +194,37 @@ final class OpmlCodec {
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
 		}
+		if ($row->noteHidden) {
+			$outline->setAttributeNS(self::NS, 'nco:noteHidden', 'true');
+		}
+		// Namespace declarations belong to each row: siblings can bind the same
+		// prefix to different URIs without changing the imported attribute names.
+		foreach ($row->extra as $name => $value) {
+			if (str_starts_with($name, 'xmlns:') && !in_array(substr($name, 6), ['nco', 'xml'], true)) {
+				$outline->setAttributeNS('http://www.w3.org/2000/xmlns/', $name, $value);
+			}
+		}
+		foreach ($row->extra as $name => $value) {
+			if (str_starts_with($name, 'xmlns')) {
+				continue;
+			}
+			if (str_contains($name, ':')) {
+				[$prefix, $localName] = explode(':', $name, 2);
+				$uri = $prefix === 'xml' ? 'http://www.w3.org/XML/1998/namespace' : ($prefix === 'nco' ? self::NS : ($row->extra['xmlns:' . $prefix] ?? null));
+				if ($uri === self::NS && in_array($localName, ['id', 'collapsed', 'noteHidden'], true)) {
+					continue;
+				}
+				if ($uri !== null) {
+					$outline->setAttributeNS($uri, $name, $value);
+				}
+			} elseif (!in_array($name, ['text', '_note'], true)) {
+				$outline->setAttribute($name, $value);
+			}
+		}
 		
 		foreach ($row->children as $child) {
 			$this->writeRow($document, $outline, $child);
 		}
 		
-		$parent->appendChild($outline);
 	}
 }
