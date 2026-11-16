@@ -5,7 +5,7 @@
  *
  * @typedef {import('../model/outline.js').Tree} Tree
  * @typedef {{fileId: number, name: string, mtime: number}} OutlineEntry
- * @typedef {{title: string, rows: Tree, publishPath: string|null, headExtra?: Record<string, unknown>}} OutlineDoc
+ * @typedef {{title: string, rows: Tree, publishPath: string|null, headExtra?: string[]}} OutlineDoc
  */
 
 import axios from '@nextcloud/axios'

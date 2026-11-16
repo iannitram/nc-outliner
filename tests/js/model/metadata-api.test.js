@@ -12,7 +12,7 @@ it('carries opaque read metadata through an edit, undo, redo and the actual save
 	const outline = {
 		title: 'Imported',
 		publishPath: null,
-		headExtra: { dateCreated: '2026-10-01', ownerName: 'Source author' },
+		headExtra: ['<dateCreated>2026-10-01</dateCreated>', '<ownerName>Source author</ownerName>'],
 		rows: [{ id: 'row', text: 'Original', note: '', collapsed: false, extra: { _status: 'checked', type: 'checkbox' }, children: [] }],
 	}
 	get.mockResolvedValue({ data: { fileId: 7, name: 'Imported.opml', etag: 'before', outline } })
