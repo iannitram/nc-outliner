@@ -128,19 +128,20 @@ final class OpmlCodec {
 		
 		$head = $document->createElement('head');
 		$title = $document->createElement('title');
-		$title->textContent = $outline->title;
+		// Clean before DOM sees the text: newer libxml2 replaces illegal characters with U+FFFD.
+		$title->textContent = self::withoutIllegalCharacters($outline->title);
 		$head->appendChild($title);
 		
 		if ($outline->publishPath !== null) {
 			$publishPath = $document->createElement('nco:publishPath');
-			$publishPath->textContent =$outline->publishPath;
+			$publishPath->textContent = self::withoutIllegalCharacters($outline->publishPath);
 			$head->appendChild($publishPath);
 		}
 		foreach ($outline->headExtra as $xml) {
 			$extraDocument = new \DOMDocument();
 			$previous = libxml_use_internal_errors(true);
 			try {
-				$loaded = $extraDocument->loadXML($xml, LIBXML_NONET);
+				$loaded = $extraDocument->loadXML(self::withoutIllegalCharacters($xml), LIBXML_NONET);
 			} finally {
 				libxml_clear_errors();
 				libxml_use_internal_errors($previous);
@@ -161,7 +162,7 @@ final class OpmlCodec {
 		}
 		
 		// A paste can carry control characters (#225). XML does not allow them and a file holding them
-		// cannot be opened again, so they never reach the file.
+		// cannot be opened again. Keep this output guard as well as cleaning the DOM inputs.
 		return self::withoutIllegalCharacters((string)$document->saveXML());
 	}
 
@@ -186,11 +187,11 @@ final class OpmlCodec {
 		$outline = $document->createElement('outline');
 		$parent->appendChild($outline);
 		// Let DOM handle escaping properly
-		$outline->setAttribute('text', $row->text);
+		$outline->setAttribute('text', self::withoutIllegalCharacters($row->text));
 		if ($row->note !== '') {
-			$outline->setAttribute('_note', $row->note);
+			$outline->setAttribute('_note', self::withoutIllegalCharacters($row->note));
 		}
-		$outline->setAttributeNS(self::NS, 'nco:id', $row->id);
+		$outline->setAttributeNS(self::NS, 'nco:id', self::withoutIllegalCharacters($row->id));
 		if ($row->collapsed) {
 			$outline->setAttributeNS(self::NS, 'nco:collapsed', 'true');
 		}
@@ -201,7 +202,7 @@ final class OpmlCodec {
 		// prefix to different URIs without changing the imported attribute names.
 		foreach ($row->extra as $name => $value) {
 			if (str_starts_with($name, 'xmlns:') && !in_array(substr($name, 6), ['nco', 'xml'], true)) {
-				$outline->setAttributeNS('http://www.w3.org/2000/xmlns/', $name, $value);
+				$outline->setAttributeNS('http://www.w3.org/2000/xmlns/', $name, self::withoutIllegalCharacters($value));
 			}
 		}
 		foreach ($row->extra as $name => $value) {
@@ -211,14 +212,15 @@ final class OpmlCodec {
 			if (str_contains($name, ':')) {
 				[$prefix, $localName] = explode(':', $name, 2);
 				$uri = $prefix === 'xml' ? 'http://www.w3.org/XML/1998/namespace' : ($prefix === 'nco' ? self::NS : ($row->extra['xmlns:' . $prefix] ?? null));
-				if ($uri === self::NS && in_array($localName, ['id', 'collapsed', 'noteHidden'], true)) {
-					continue;
-				}
 				if ($uri !== null) {
-					$outline->setAttributeNS($uri, $name, $value);
+					$uri = self::withoutIllegalCharacters($uri);
+					if ($uri === self::NS && in_array($localName, ['id', 'collapsed', 'noteHidden'], true)) {
+						continue;
+					}
+					$outline->setAttributeNS($uri, $name, self::withoutIllegalCharacters($value));
 				}
 			} elseif (!in_array($name, ['text', '_note'], true)) {
-				$outline->setAttribute($name, $value);
+				$outline->setAttribute($name, self::withoutIllegalCharacters($value));
 			}
 		}
 		
