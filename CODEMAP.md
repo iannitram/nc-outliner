@@ -146,7 +146,7 @@ final class OpmlCodec {
 }
 ```
 
-Parse with `DOMDocument::loadXML($xml, LIBXML_NONET)` and never `LIBXML_NOENT`: imported files are untrusted, so no external entities and no network. Invalid XML or no `<body>` throws `OpmlParseException`, never a partial tree. Characters XML 1.0 does not allow (most control characters) are dropped on write; a file that fails to parse is tried once more with them (and references to them) removed, so outlines saved with them before #225 open again.
+Parse with `DOMDocument::loadXML($xml, LIBXML_NONET)` and never `LIBXML_NOENT`: imported files are untrusted, so no external entities and no network. Invalid XML or no `<body>` throws `OpmlParseException`, never a partial tree. Characters XML 1.0 does not allow (most control characters) are dropped before write passes text and attribute values to the DOM, with another strip on the serialized output, so newer libxml2 cannot replace them with U+FFFD (#231). A file that fails to parse is tried once more with them (and references to them) removed, so outlines saved with them before #225 open again.
 
 ### ODT writer
 
