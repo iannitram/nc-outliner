@@ -115,8 +115,19 @@ export function installCrashLog(config = {}) {
 	}
 	const listeners = [
 		['error', (event) => {
-			const value = event.error !== undefined ? event.error : event.message
-			capture('error', 'error', () => describe(value))
+			const error = event.error
+			if (typeof event.message === 'string' && event.message.startsWith('ResizeObserver loop')) {
+				return
+			}
+			if (error !== null && typeof error === 'object') {
+				capture('error', 'error', () => describe(error))
+				return
+			}
+			if (typeof event.message === 'string' && event.message !== '') {
+				capture('error', 'error', () => ({ message: sanitizeText(event.message), stack: '' }))
+				return
+			}
+			capture('error', 'error', () => describe(error))
 		}],
 		['unhandledrejection', (event) => {
 			capture('error', 'rejection', () => describe(event.reason))

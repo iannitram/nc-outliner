@@ -315,6 +315,48 @@ describe('what is kept from the page and the error', () => {
 	})
 })
 
+describe('null error events', () => {
+	it('logs the message of an error event whose error is null', () => {
+		installCrashLog(ON)
+
+		window.dispatchEvent(new ErrorEvent('error', { message: 'Script error.', error: null }))
+		vi.advanceTimersByTime(2000)
+
+		expect(sentEvents()).toHaveLength(1)
+		expect(sentEvents()[0]).toMatchObject({ level: 'error', kind: 'error', message: 'Script error.' })
+	})
+
+	it('logs the sanitized message when error is a primitive', () => {
+		installCrashLog(ON)
+
+		window.dispatchEvent(new ErrorEvent('error', { message: 'failed at https://example.test/file.js', error: 'thrown' }))
+		vi.advanceTimersByTime(2000)
+
+		expect(sentEvents()).toHaveLength(1)
+		expect(sentEvents()[0].message).toBe('failed at <url>')
+	})
+
+	it('drops the ResizeObserver loop notice', () => {
+		installCrashLog(ON)
+
+		window.dispatchEvent(new ErrorEvent('error', { message: 'ResizeObserver loop completed with undelivered notifications.', error: new Error('ignored') }))
+		vi.advanceTimersByTime(2000)
+
+		expect(sentEvents()).toHaveLength(0)
+		expect(axios.post).not.toHaveBeenCalled()
+	})
+
+	it('still logs a real Error', () => {
+		installCrashLog(ON)
+
+		window.dispatchEvent(new ErrorEvent('error', { message: 'x', error: new TypeError('boom') }))
+		vi.advanceTimersByTime(2000)
+
+		expect(sentEvents()).toHaveLength(1)
+		expect(sentEvents()[0]).toMatchObject({ message: 'TypeError: boom' })
+	})
+})
+
 describe('sanitizers', () => {
 	it('replaces every quoted substring and cuts at an unpaired quote', () => {
 		expect(sanitizeText('a \'b\' "c" `d` e')).toBe(`a ${ELLIPSIS} ${ELLIPSIS} ${ELLIPSIS} e`)
