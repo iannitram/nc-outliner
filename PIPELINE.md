@@ -3,7 +3,7 @@ Since: 2026-10-26
 Kind: own
 Spec: SPEC.md   Roadmap: ROADMAP.md (all features) and docs/plan/1.0-work.md (1.0 tickets)   Code map: CODEMAP.md
 Platforms: mac, windows, linux (desktop browsers; the server side is any Nextcloud 33 host)
-Notes: Code map covers every 1.0 module; CI green on Mac, PC and Linux. 11 tickets merged by 2026-10-26 (#85-#89, #101, #103-#106, #112). 24 open 1.0 issues in the standard issue format (6 Easy with briefs and locked tests, 17 Medium, 1 Hard); unblocked now: #108 (API routes), #91 (row editor), #120 (check the .odt). #124 and #125 wait on a private shared module; #128-#130 wait on the private app-store feed. #27 needs a real OmniOutliner export; #9 needs the owner's approval of a sample doc.
+Notes: Code map covers every 1.0 module; CI green on Linux and Windows (no macOS runner yet). Version 0.1.2 is out. Open 1.0 work: #27 (OPML import, needs a real OmniOutliner export), #9 (publish to Doc in the browser, needs the owner's approval of a sample doc), #129 and #130 (release workflow and first signed release through craft-nc-appstore), #174 (design pass). The F74-F77 automation issues (#213-#216) and the F-numbered `after-1.0` issues are After 1.0. Reuse: bug-report relay and crashLog.js copies move to craft-bugreport-web (#233, craft-bugreport-web#57).
 
 Stages: Proposal -> Spec -> Roadmap -> Dev Loop -> Prototype / Beta.
 What each stage means and who moves a project: the pipeline repo (private).
