@@ -35,7 +35,7 @@ Merged in #84.
 | `js/`, `css/` | Build output of `npm run build` (generated, not edited) |
 | `img/app.svg` | App icon |
 | `vite.config.mjs` | `@nextcloud/vite-config`; entry `src/main.js`, output `js/`; styles inlined into the script (`inlineCSS`) so script and styles always come from one build |
-| `tools/package.mjs`, `tools/install-docker.mjs` | `npm run package` builds `build/nc_outliner-<version>.tar.gz`; `npm run install:docker` installs it into a Docker Nextcloud and checks it. See `INSTALL.md` |
+| `tools/package.mjs`, `tools/install-docker.mjs`, `tools/install-args.mjs` | `npm run package` builds `build/nc_outliner-<version>.tar.gz`; `npm run install:docker` installs it into a Docker Nextcloud and checks it; `install-args.mjs` holds the argument rules of `install-docker.mjs` so they are tested without Docker (`tests/js/release/install-args.test.js`). `package.mjs` is the model for nc-projects `tools/package.mjs` and craft-nc-appstore's build workflow (nc-projects#196, craft-nc-appstore#23). See `INSTALL.md` |
 | `vitest.config.mjs` | jsdom environment for the JavaScript tests; `maxWorkers: 2` when `CI` is set, to bound worker startup on the shared runners |
 | `eslint.config.mjs` | `@nextcloud/eslint-config` (recommended) |
 | `composer.json` | PHP autoload (`OCA\NcOutliner\` to `lib/`), phpunit and `nextcloud/ocp` for tests |
