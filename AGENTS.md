@@ -15,3 +15,5 @@ Everything you need to work here is in this repo. The full pipeline and rules li
 
 - **Deploying into a live Nextcloud needs the maintainer's approval every time.** That covers copying the app into `custom_apps/` and `occ app:enable`. Develop in a throwaway container.
 - **The publisher only writes inside the user's own Files,** through Nextcloud's file API, never by direct filesystem writes into the data directory.
+
+**Upstream and peers:** see `PEERS.md` at the repo root. When I say "upstream", I mean the repo in its Upstream section; reuse a peer's code only as that file allows.
